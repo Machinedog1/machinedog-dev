@@ -6,15 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectStatus } from "./projectStatus";
+import type { ProjectViewerRole } from "./projectViewerRole";
 
 export interface Project {
   id: number;
   clientId: number;
   title: string;
   description: string;
+  summary: string;
+  /** @nullable */
+  liveUrl?: string | null;
+  /** @nullable */
+  coverImageUrl?: string | null;
   status: ProjectStatus;
   /** @nullable */
   consultingBookingId?: number | null;
+  viewerRole: ProjectViewerRole;
   createdAt: Date;
   updatedAt: Date;
 }

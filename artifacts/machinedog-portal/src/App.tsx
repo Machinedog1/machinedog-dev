@@ -17,6 +17,7 @@ import { getGetMeQueryKey } from "@workspace/api-client-react";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
 import ProjectsPage from "@/pages/projects";
+import ProjectDetailPage from "@/pages/project-detail";
 import WorkPage from "@/pages/work";
 import ConsultingPage from "@/pages/consulting";
 import AdminDashboard from "@/pages/admin/index";
@@ -103,6 +104,9 @@ function Router() {
       </Route>
       <Route path="/projects">
         <AuthGuard><ProjectsPage /></AuthGuard>
+      </Route>
+      <Route path="/projects/:id">
+        <AuthGuard><ProjectDetailPage /></AuthGuard>
       </Route>
       <Route path="/consulting">
         <AuthGuard><ConsultingPage /></AuthGuard>

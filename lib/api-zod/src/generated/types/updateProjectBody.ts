@@ -10,5 +10,10 @@ import type { UpdateProjectBodyStatus } from "./updateProjectBodyStatus";
 export interface UpdateProjectBody {
   title?: string;
   description?: string;
+  summary?: string;
+  /** @nullable */
+  liveUrl?: string | null;
+  /** @nullable */
+  coverImageUrl?: string | null;
   status?: UpdateProjectBodyStatus;
 }

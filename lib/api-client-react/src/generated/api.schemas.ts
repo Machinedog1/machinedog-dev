@@ -111,14 +111,28 @@ export const ProjectStatus = {
   archived: "archived",
 } as const;
 
+export type ProjectViewerRole =
+  (typeof ProjectViewerRole)[keyof typeof ProjectViewerRole];
+
+export const ProjectViewerRole = {
+  owner: "owner",
+  collaborator: "collaborator",
+} as const;
+
 export interface Project {
   id: number;
   clientId: number;
   title: string;
   description: string;
+  summary: string;
+  /** @nullable */
+  liveUrl?: string | null;
+  /** @nullable */
+  coverImageUrl?: string | null;
   status: ProjectStatus;
   /** @nullable */
   consultingBookingId?: number | null;
+  viewerRole: ProjectViewerRole;
   createdAt: string;
   updatedAt: string;
 }
@@ -131,6 +145,9 @@ export interface CreateProjectBody {
   /** @minLength 1 */
   title: string;
   description: string;
+  summary?: string;
+  liveUrl?: string;
+  coverImageUrl?: string;
 }
 
 export type UpdateProjectBodyStatus =
@@ -146,7 +163,50 @@ export const UpdateProjectBodyStatus = {
 export interface UpdateProjectBody {
   title?: string;
   description?: string;
+  summary?: string;
+  /** @nullable */
+  liveUrl?: string | null;
+  /** @nullable */
+  coverImageUrl?: string | null;
   status?: UpdateProjectBodyStatus;
+}
+
+export type ProjectMemberRole =
+  (typeof ProjectMemberRole)[keyof typeof ProjectMemberRole];
+
+export const ProjectMemberRole = {
+  owner: "owner",
+  collaborator: "collaborator",
+} as const;
+
+export type ProjectMemberStatus =
+  (typeof ProjectMemberStatus)[keyof typeof ProjectMemberStatus];
+
+export const ProjectMemberStatus = {
+  pending: "pending",
+  active: "active",
+  removed: "removed",
+} as const;
+
+export interface ProjectMember {
+  id: number;
+  projectId: number;
+  email: string;
+  /** @nullable */
+  clientId?: number | null;
+  role: ProjectMemberRole;
+  status: ProjectMemberStatus;
+  invitedAt: string;
+  /** @nullable */
+  acceptedAt?: string | null;
+}
+
+export interface ProjectMemberList {
+  data: ProjectMember[];
+}
+
+export interface InviteProjectMemberBody {
+  email: string;
 }
 
 export interface ConsultingPackage {

@@ -82,12 +82,12 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         <div className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-8">
           {me && (
-            <div className="px-2">
-              <div className="text-xs font-mono text-muted-foreground mb-2 uppercase tracking-wider">Fuel</div>
+            <div className="px-2 flex flex-col gap-2">
+              <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Fuel</div>
               <Link href="/tokens">
                 <div className="glass-subtle rounded-full px-3 py-2 flex items-center gap-3 border border-border/20 cursor-pointer hover:bg-muted/10 transition-colors relative overflow-hidden group">
-                  <div 
-                    className="absolute inset-0 bg-primary/10 transition-all duration-500 ease-out" 
+                  <div
+                    className="absolute inset-0 bg-primary/10 transition-all duration-500 ease-out"
                     style={{ width: `${Math.min(100, (me.tokenBalance / 50000) * 100)}%` }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
@@ -99,6 +99,18 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <span className="text-[10px] font-mono text-muted-foreground leading-none">TKNS</span>
                   </div>
                 </div>
+              </Link>
+              <Link href="/tokens">
+                <button
+                  type="button"
+                  className="w-full rounded-full px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-lg shadow-primary/30 hover:opacity-95 transition-opacity"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                  }}
+                >
+                  Buy tokens
+                </button>
               </Link>
             </div>
           )}

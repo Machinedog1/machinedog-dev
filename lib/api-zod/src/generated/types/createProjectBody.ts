@@ -10,4 +10,7 @@ export interface CreateProjectBody {
   /** @minLength 1 */
   title: string;
   description: string;
+  summary?: string;
+  liveUrl?: string;
+  coverImageUrl?: string;
 }

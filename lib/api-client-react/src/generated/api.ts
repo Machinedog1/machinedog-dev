@@ -31,12 +31,15 @@ import type {
   ErrorResponse,
   HealthStatus,
   InviteClientBody,
+  InviteProjectMemberBody,
   InviteResponse,
   ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
   Project,
   ProjectList,
+  ProjectMember,
+  ProjectMemberList,
   PromptSession,
   PromptSessionList,
   PublicCheckoutBody,
@@ -1117,6 +1120,265 @@ export const useUpdateProject = <
   TContext
 > => {
   return useMutation(getUpdateProjectMutationOptions(options));
+};
+
+/**
+ * @summary List members on a project
+ */
+export const getListProjectMembersUrl = (id: number) => {
+  return `/api/projects/${id}/members`;
+};
+
+export const listProjectMembers = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ProjectMemberList> => {
+  return customFetch<ProjectMemberList>(getListProjectMembersUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectMembersQueryKey = (id: number) => {
+  return [`/api/projects/${id}/members`] as const;
+};
+
+export const getListProjectMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectMembers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectMembersQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectMembers>>
+  > = ({ signal }) => listProjectMembers(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectMembers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectMembers>>
+>;
+export type ListProjectMembersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List members on a project
+ */
+
+export function useListProjectMembers<
+  TData = Awaited<ReturnType<typeof listProjectMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectMembers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectMembersQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Invite a client to a project by email
+ */
+export const getInviteProjectMemberUrl = (id: number) => {
+  return `/api/projects/${id}/members`;
+};
+
+export const inviteProjectMember = async (
+  id: number,
+  inviteProjectMemberBody: InviteProjectMemberBody,
+  options?: RequestInit,
+): Promise<ProjectMember> => {
+  return customFetch<ProjectMember>(getInviteProjectMemberUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(inviteProjectMemberBody),
+  });
+};
+
+export const getInviteProjectMemberMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteProjectMember>>,
+    TError,
+    { id: number; data: BodyType<InviteProjectMemberBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof inviteProjectMember>>,
+  TError,
+  { id: number; data: BodyType<InviteProjectMemberBody> },
+  TContext
+> => {
+  const mutationKey = ["inviteProjectMember"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof inviteProjectMember>>,
+    { id: number; data: BodyType<InviteProjectMemberBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return inviteProjectMember(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type InviteProjectMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof inviteProjectMember>>
+>;
+export type InviteProjectMemberMutationBody = BodyType<InviteProjectMemberBody>;
+export type InviteProjectMemberMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Invite a client to a project by email
+ */
+export const useInviteProjectMember = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteProjectMember>>,
+    TError,
+    { id: number; data: BodyType<InviteProjectMemberBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof inviteProjectMember>>,
+  TError,
+  { id: number; data: BodyType<InviteProjectMemberBody> },
+  TContext
+> => {
+  return useMutation(getInviteProjectMemberMutationOptions(options));
+};
+
+/**
+ * @summary Remove a member from a project
+ */
+export const getRemoveProjectMemberUrl = (id: number, memberId: number) => {
+  return `/api/projects/${id}/members/${memberId}`;
+};
+
+export const removeProjectMember = async (
+  id: number,
+  memberId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getRemoveProjectMemberUrl(id, memberId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemoveProjectMemberMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeProjectMember>>,
+    TError,
+    { id: number; memberId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeProjectMember>>,
+  TError,
+  { id: number; memberId: number },
+  TContext
+> => {
+  const mutationKey = ["removeProjectMember"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeProjectMember>>,
+    { id: number; memberId: number }
+  > = (props) => {
+    const { id, memberId } = props ?? {};
+
+    return removeProjectMember(id, memberId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveProjectMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeProjectMember>>
+>;
+
+export type RemoveProjectMemberMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove a member from a project
+ */
+export const useRemoveProjectMember = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeProjectMember>>,
+    TError,
+    { id: number; memberId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeProjectMember>>,
+  TError,
+  { id: number; memberId: number },
+  TContext
+> => {
+  return useMutation(getRemoveProjectMemberMutationOptions(options));
 };
 
 /**

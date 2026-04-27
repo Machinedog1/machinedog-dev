@@ -278,6 +278,68 @@ paths:
               schema:
                 $ref: "#/components/schemas/Project"
 
+  /projects/{id}/members:
+    get:
+      operationId: listProjectMembers
+      tags: [projects]
+      summary: List members on a project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMemberList"
+    post:
+      operationId: inviteProjectMember
+      tags: [projects]
+      summary: Invite a client to a project by email
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteProjectMemberBody"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMember"
+
+  /projects/{id}/members/{memberId}:
+    delete:
+      operationId: removeProjectMember
+      tags: [projects]
+      summary: Remove a member from a project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Member removed
+
   # ─── Consulting packages ───────────────────────────────────────────────────
 
   /consulting/packages:
@@ -719,18 +781,27 @@ components:
           type: string
         description:
           type: string
+        summary:
+          type: string
+        liveUrl:
+          type: ["string", "null"]
+        coverImageUrl:
+          type: ["string", "null"]
         status:
           type: string
           enum: [draft, active, completed, archived]
         consultingBookingId:
           type: ["integer", "null"]
+        viewerRole:
+          type: string
+          enum: [owner, collaborator]
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required: [id, clientId, title, description, status, createdAt, updatedAt]
+      required: [id, clientId, title, description, summary, status, viewerRole, createdAt, updatedAt]
 
     ProjectList:
       type: object
@@ -749,6 +820,12 @@ components:
           minLength: 1
         description:
           type: string
+        summary:
+          type: string
+        liveUrl:
+          type: string
+        coverImageUrl:
+          type: string
       required: [title, description]
 
     UpdateProjectBody:
@@ -758,9 +835,57 @@ components:
           type: string
         description:
           type: string
+        summary:
+          type: string
+        liveUrl:
+          type: ["string", "null"]
+        coverImageUrl:
+          type: ["string", "null"]
         status:
           type: string
           enum: [draft, active, completed, archived]
+
+    ProjectMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        email:
+          type: string
+        clientId:
+          type: ["integer", "null"]
+        role:
+          type: string
+          enum: [owner, collaborator]
+        status:
+          type: string
+          enum: [pending, active, removed]
+        invitedAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, projectId, email, role, status, invitedAt]
+
+    ProjectMemberList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectMember"
+      required: [data]
+
+    InviteProjectMemberBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required: [email]
 
     ConsultingPackage:
       type: object

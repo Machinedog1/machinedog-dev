@@ -24,6 +24,17 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
+## Per-project client invites
+
+- Schema: `projects` carries `summary`, `liveUrl`, `coverImageUrl` plus the existing fields. Membership lives in `project_members` (`projectId`, `email`, `clientId?`, `role`, `status: pending|active|removed`, `invitedByClientId`, `invitedAt`, `acceptedAt`).
+- API: `GET /api/projects` returns owned + shared projects with a synthesized `viewerRole` (`"owner"` or `"collaborator"`). `GET /api/projects/:id` allows owner or any active member. `PATCH /api/projects/:id` is owner-only.
+- Members API (owner-only): `GET /api/projects/:id/members`, `POST /api/projects/:id/members` (body `{ email }`), `DELETE /api/projects/:id/members/:memberId` (soft-removes by setting status to `removed`).
+- Invite flow: `POST .../members` lowercases email, upserts a `project_members` row, sends an invite email via `lib/project-invites.ts` (uses the shared SMTP mailer + `PUBLIC_APP_URL` / `REPLIT_DEV_DOMAIN`), and stubs an `invited` client placeholder if no account exists yet.
+- Activation rule: a membership is only auto-marked `active` if a matching client row already has `status === "active"`. Anything else (no client, `invited` placeholder, `suspended`) stays `pending` until that user actually signs in.
+- `loadOrCreateClient` in `api-server/src/lib/auth.ts` calls `attachPendingProjectMemberships(clientId, email)` whenever an active client is loaded or freshly created — this promotes any pending memberships matching the user's email to `active` and stamps `acceptedAt`. First-time signers with no admin-side client invite but a pending project membership are auto-activated as a regular `active` client (zero token balance).
+- Frontend: `/projects` lists owned + shared with a "Shared with me" badge; cards link to `/projects/:id` (registered in `App.tsx`). `/projects/:id` shows cover image / summary / live URL, an owner-only edit form (title, summary, liveUrl, coverImageUrl, description, status), and an owner-only collaborators panel for invite + remove. Sidebar (`AppLayout.tsx`) now has a prominent "Buy tokens" CTA next to the token bar.
+- Pricing page has a "Portal Access — $500/mo" copy section above the retainer block (no Stripe enforcement yet).
+
 ## Public Stripe Checkout (pricing page)
 
 - `START YOUR BUILD` and `INCLUDE RETAINER` on `/pricing` create public Stripe Checkout sessions via `POST /api/checkout/build` and `POST /api/checkout/retainer`. No auth required — anonymous visitors can pay.

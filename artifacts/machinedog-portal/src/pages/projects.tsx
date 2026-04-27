@@ -1,9 +1,19 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useListMyProjects, useCreateProject } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { FolderGit2, Plus, Calendar, Activity, Archive, CheckCircle2 } from "lucide-react";
+import {
+  FolderGit2,
+  Plus,
+  Calendar,
+  Activity,
+  Archive,
+  CheckCircle2,
+  ExternalLink,
+  Users,
+} from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListMyProjectsQueryKey } from "@workspace/api-client-react";
@@ -32,6 +42,8 @@ export default function ProjectsPage() {
   const [open, setOpen] = useState(false);
 
   const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
   const [description, setDescription] = useState("");
 
   const handleCreate = (e: React.FormEvent) => {
@@ -39,15 +51,24 @@ export default function ProjectsPage() {
     if (!title.trim()) return;
 
     createProject.mutate(
-      { data: { title, description } },
+      {
+        data: {
+          title,
+          description,
+          summary,
+          liveUrl: liveUrl.trim() || undefined,
+        },
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListMyProjectsQueryKey() });
           setOpen(false);
           setTitle("");
+          setSummary("");
+          setLiveUrl("");
           setDescription("");
-        }
-      }
+        },
+      },
     );
   };
 
@@ -79,18 +100,38 @@ export default function ProjectsPage() {
             <form onSubmit={handleCreate} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <label className="text-xs font-mono font-bold text-muted-foreground">TITLE</label>
-                <Input 
-                  value={title} 
-                  onChange={(e) => setTitle(e.target.value)} 
-                  placeholder="e.g. Core API Migration"
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. BeeSuite.farm"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold text-muted-foreground">ONE-LINE SUMMARY</label>
+                <Input
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="Beekeeping operations platform"
+                  maxLength={160}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold text-muted-foreground">LIVE URL</label>
+                <Input
+                  value={liveUrl}
+                  onChange={(e) => setLiveUrl(e.target.value)}
+                  placeholder="https://beesuite.farm"
+                  type="url"
                   className="font-mono"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-mono font-bold text-muted-foreground">DESCRIPTION</label>
-                <Textarea 
-                  value={description} 
-                  onChange={(e) => setDescription(e.target.value)} 
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   placeholder="Context and goals..."
                   className="font-mono min-h-[100px] resize-y"
                 />
@@ -120,29 +161,47 @@ export default function ProjectsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               key={project.id}
-              className="glass-interactive p-5 rounded-xl flex flex-col gap-4"
             >
-              <div className="flex justify-between items-start relative z-10">
-                <h3 className="font-bold text-lg font-mono line-clamp-1 text-foreground">{project.title}</h3>
-                <span className={`text-[10px] font-mono px-2 py-1 rounded flex items-center gap-1 uppercase tracking-wider ${statusColors[project.status]}`}>
-                  {statusIcons[project.status]}
-                  {project.status}
-                </span>
-              </div>
-              
-              <p className="text-sm text-muted-foreground flex-1 line-clamp-3 relative z-10">
-                {project.description || "No description provided."}
-              </p>
-              
-              <div className="text-xs font-mono text-muted-foreground flex items-center justify-between pt-4 border-t border-border/20 relative z-10">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {format(new Date(project.updatedAt), "MMM d, yyyy")}
-                </span>
-                <span className="font-mono text-primary cursor-pointer hover:underline">
-                  VIEW_DETAILS &rarr;
-                </span>
-              </div>
+              <Link href={`/projects/${project.id}`}>
+                <div className="glass-interactive p-5 rounded-xl flex flex-col gap-4 cursor-pointer h-full">
+                  <div className="flex justify-between items-start relative z-10 gap-2">
+                    <h3 className="font-bold text-lg font-mono line-clamp-1 text-foreground flex-1 min-w-0">
+                      {project.title}
+                    </h3>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-1 rounded flex items-center gap-1 uppercase tracking-wider ${statusColors[project.status]}`}
+                    >
+                      {statusIcons[project.status]}
+                      {project.status}
+                    </span>
+                  </div>
+
+                  {project.viewerRole === "collaborator" && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-primary self-start px-2 py-0.5 rounded bg-primary/10 ring-1 ring-primary/20">
+                      <Users className="h-3 w-3" /> Shared with me
+                    </span>
+                  )}
+
+                  <p className="text-sm text-muted-foreground flex-1 line-clamp-3 relative z-10">
+                    {project.summary || project.description || "No description provided."}
+                  </p>
+
+                  {project.liveUrl && (
+                    <span className="inline-flex items-center gap-1 text-xs text-primary hover:underline truncate">
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                      {project.liveUrl.replace(/^https?:\/\//, "")}
+                    </span>
+                  )}
+
+                  <div className="text-xs font-mono text-muted-foreground flex items-center justify-between pt-4 border-t border-border/20 relative z-10">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {format(new Date(project.updatedAt), "MMM d, yyyy")}
+                    </span>
+                    <span className="font-mono text-primary">VIEW &rarr;</span>
+                  </div>
+                </div>
+              </Link>
             </motion.div>
           ))
         )}

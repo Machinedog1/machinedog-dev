@@ -574,6 +574,63 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* PORTAL ACCESS */}
+      <section id="portal-access" className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-12">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass-strong rounded-2xl p-8 sm:p-10 flex flex-col lg:flex-row gap-8 lg:items-center lg:justify-between">
+            <div className="flex-1">
+              <div className="text-eyebrow text-primary mb-2">PORTAL ACCESS</div>
+              <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
+                Machinedog.Dev Portal Membership
+              </h3>
+              <p className="text-muted-foreground max-w-xl mb-4">
+                Your private workspace to run Claude prompts, attach the projects we build for
+                you (e.g. BeeSuite.farm), and invite your own clients to collaborate.
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                  <span>Unlimited project workspaces with per-project client invites</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                  <span>Tokens billed separately as bundles (use what you need)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                  <span>Optional consulting hours (purchase any package, anytime)</span>
+                </li>
+              </ul>
+            </div>
+            <div className="lg:w-72 lg:shrink-0">
+              <div className="rounded-2xl glass p-6 text-center">
+                <div className="text-eyebrow text-muted-foreground mb-3">MEMBERSHIP</div>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-extrabold tracking-tight text-gradient-cyber">
+                    $500
+                  </span>
+                  <span className="text-base text-muted-foreground">/mo</span>
+                </div>
+                <div className="text-xs font-mono tracking-widest text-muted-foreground mt-2">
+                  TOKENS &amp; CONSULTING SOLD SEPARATELY
+                </div>
+                <Link href="/intake">
+                  <Button
+                    className="w-full mt-6 h-11 text-sm tracking-wider font-bold"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                    }}
+                  >
+                    REQUEST ACCESS
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* RETAINER */}
       <section id="retainer" className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-20 lg:pb-28">
         <div className="max-w-4xl mx-auto">

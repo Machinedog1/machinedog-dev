@@ -174,8 +174,12 @@ export const ListMyProjectsResponse = zod.object({
       clientId: zod.number(),
       title: zod.string(),
       description: zod.string(),
+      summary: zod.string(),
+      liveUrl: zod.string().nullish(),
+      coverImageUrl: zod.string().nullish(),
       status: zod.enum(["draft", "active", "completed", "archived"]),
       consultingBookingId: zod.number().nullish(),
+      viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
     }),
@@ -189,6 +193,9 @@ export const ListMyProjectsResponse = zod.object({
 export const CreateProjectBody = zod.object({
   title: zod.string().min(1),
   description: zod.string(),
+  summary: zod.string().optional(),
+  liveUrl: zod.string().optional(),
+  coverImageUrl: zod.string().optional(),
 });
 
 /**
@@ -203,8 +210,12 @@ export const GetProjectResponse = zod.object({
   clientId: zod.number(),
   title: zod.string(),
   description: zod.string(),
+  summary: zod.string(),
+  liveUrl: zod.string().nullish(),
+  coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
   consultingBookingId: zod.number().nullish(),
+  viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -219,6 +230,9 @@ export const UpdateProjectParams = zod.object({
 export const UpdateProjectBody = zod.object({
   title: zod.string().optional(),
   description: zod.string().optional(),
+  summary: zod.string().optional(),
+  liveUrl: zod.string().nullish(),
+  coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]).optional(),
 });
 
@@ -227,10 +241,55 @@ export const UpdateProjectResponse = zod.object({
   clientId: zod.number(),
   title: zod.string(),
   description: zod.string(),
+  summary: zod.string(),
+  liveUrl: zod.string().nullish(),
+  coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
   consultingBookingId: zod.number().nullish(),
+  viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List members on a project
+ */
+export const ListProjectMembersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectMembersResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      projectId: zod.number(),
+      email: zod.string(),
+      clientId: zod.number().nullish(),
+      role: zod.enum(["owner", "collaborator"]),
+      status: zod.enum(["pending", "active", "removed"]),
+      invitedAt: zod.coerce.date(),
+      acceptedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary Invite a client to a project by email
+ */
+export const InviteProjectMemberParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const InviteProjectMemberBody = zod.object({
+  email: zod.string().email(),
+});
+
+/**
+ * @summary Remove a member from a project
+ */
+export const RemoveProjectMemberParams = zod.object({
+  id: zod.coerce.number(),
+  memberId: zod.coerce.number(),
 });
 
 /**
@@ -471,8 +530,12 @@ export const ListAllProjectsResponse = zod.object({
       clientId: zod.number(),
       title: zod.string(),
       description: zod.string(),
+      summary: zod.string(),
+      liveUrl: zod.string().nullish(),
+      coverImageUrl: zod.string().nullish(),
       status: zod.enum(["draft", "active", "completed", "archived"]),
       consultingBookingId: zod.number().nullish(),
+      viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
     }),

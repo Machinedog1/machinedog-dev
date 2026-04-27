@@ -1,7 +1,7 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
-import { eq } from "drizzle-orm";
-import { db, clientsTable, type Client } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { db, clientsTable, projectMembersTable, type Client } from "@workspace/db";
 
 declare module "express-serve-static-core" {
   // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -45,6 +45,9 @@ export async function loadOrCreateClient(req: Request, res: Response, next: Next
   const existing = await db.select().from(clientsTable).where(eq(clientsTable.userId, req.userId));
   if (existing[0]) {
     req.client = existing[0];
+    if (existing[0].status === "active") {
+      await attachPendingProjectMemberships(existing[0].id, existing[0].email);
+    }
     next();
     return;
   }
@@ -68,6 +71,36 @@ export async function loadOrCreateClient(req: Request, res: Response, next: Next
       .where(eq(clientsTable.id, invited[0].id))
       .returning();
     req.client = updated;
+    await attachPendingProjectMemberships(updated.id, lowered);
+    next();
+    return;
+  }
+
+  // Activate via pending project invite even without an admin "client invite" row.
+  const pendingMember = await db
+    .select()
+    .from(projectMembersTable)
+    .where(
+      and(
+        eq(projectMembersTable.email, lowered),
+        eq(projectMembersTable.status, "pending"),
+      ),
+    )
+    .limit(1);
+
+  if (pendingMember.length > 0) {
+    const [created] = await db
+      .insert(clientsTable)
+      .values({
+        userId: req.userId,
+        email: lowered,
+        isAdmin: ADMIN_EMAILS.includes(lowered),
+        status: "active",
+        tokenBalance: 0,
+      })
+      .returning();
+    req.client = created;
+    await attachPendingProjectMemberships(created.id, lowered);
     next();
     return;
   }
@@ -86,7 +119,22 @@ export async function loadOrCreateClient(req: Request, res: Response, next: Next
     })
     .returning();
   req.client = created;
+  if (isAdmin) {
+    await attachPendingProjectMemberships(created.id, lowered);
+  }
   next();
+}
+
+async function attachPendingProjectMemberships(clientId: number, lowered: string): Promise<void> {
+  await db
+    .update(projectMembersTable)
+    .set({ clientId, status: "active", acceptedAt: new Date() })
+    .where(
+      and(
+        eq(projectMembersTable.email, lowered),
+        eq(projectMembersTable.status, "pending"),
+      ),
+    );
 }
 
 export function requireActiveClient(req: Request, res: Response, next: NextFunction): void {
