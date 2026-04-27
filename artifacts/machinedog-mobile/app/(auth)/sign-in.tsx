@@ -31,7 +31,10 @@ export default function SignInScreen() {
     r.isTablet ? 620 : 500,
   );
   const sidePad = r.isTablet ? 32 : r.isCompact ? 18 : 22;
-  const headlineFont = r.font(26, 32, 56);
+  // Match the website's clamp(1.5rem, 7vw, 4.5rem) — at 393px that's ~27px.
+  const headlineFont = r.isTablet
+    ? Math.min(Math.max(Math.round(r.width * 0.07), 40), 64)
+    : Math.min(Math.max(Math.round(r.width * 0.07), 22), 30);
   const headlineLine = Math.round(headlineFont * 0.95);
 
   const [emailAddress, setEmailAddress] = React.useState("");
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
   headline: {
     fontFamily: "Inter_700Bold",
     fontWeight: "900",
-    letterSpacing: -1.2,
+    letterSpacing: -0.6,
     color: "#FFFFFF",
     textTransform: "uppercase",
   },
