@@ -1,5 +1,4 @@
 import { useSignIn } from "@clerk/expo";
-import { LinearGradient } from "expo-linear-gradient";
 import { type Href, Link, useRouter } from "expo-router";
 import React from "react";
 import {
@@ -19,7 +18,7 @@ import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
 
 const huskyImg = require("@/assets/images/husky-mark.png");
-const huskyPortrait = require("@/assets/images/husky-portrait.png");
+const huskyPortrait = require("@/assets/images/husky-portrait-frontal.png");
 
 export default function SignInScreen() {
   const colors = useColors();
@@ -31,9 +30,9 @@ export default function SignInScreen() {
     Math.max(Math.round(r.height * (r.isTablet ? 0.5 : 0.58)), 340),
     r.isTablet ? 620 : 500,
   );
-  const heroPaddingX = r.isTablet ? 32 : r.isCompact ? 14 : 18;
-  const headlineFont = r.isTablet ? 56 : r.isCompact ? 28 : 38;
-  const headlineLine = r.isTablet ? 58 : r.isCompact ? 30 : 40;
+  const sidePad = r.isTablet ? 32 : r.isCompact ? 18 : 22;
+  const headlineFont = r.font(26, 32, 56);
+  const headlineLine = Math.round(headlineFont * 0.95);
 
   const [emailAddress, setEmailAddress] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -63,14 +62,36 @@ export default function SignInScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScreenShell contentStyle={{ paddingHorizontal: 0, gap: 0 }}>
-        {/* Hero header — dramatic husky portrait backdrop */}
+        {/* Top brand row — sits above the hero, mirroring the website header */}
+        <View style={[styles.topBar, { paddingHorizontal: sidePad }]}>
+          <View
+            style={[
+              styles.brandRing,
+              {
+                borderColor: colors.primary,
+                shadowColor: colors.primary,
+              },
+            ]}
+          >
+            <Image
+              source={huskyImg}
+              style={styles.brandAvatar}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={styles.brandWord}>
+            MACHINEDOG<Text style={{ color: colors.primary }}>.DEV</Text>
+          </Text>
+        </View>
+
+        {/* Hero — husky portrait with eyes visible, no overlay copy.
+            Mirrors portal sign-in mobile hero exactly via web-only CSS props. */}
         <View
           style={[
             styles.hero,
             {
               height: heroHeight,
-              paddingHorizontal: heroPaddingX,
-              paddingBottom: r.isTablet ? 36 : 28,
+              marginTop: 12,
             },
           ]}
         >
@@ -78,55 +99,61 @@ export default function SignInScreen() {
             source={huskyPortrait}
             resizeMode="cover"
             style={[
+              {
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "50% 30%",
+                filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+              } as object,
+            ]}
+          />
+          {/* Cyan halo radial over the eyes (mix-blend-screen mirrors portal) */}
+          <View
+            pointerEvents="none"
+            style={[
               StyleSheet.absoluteFill,
-              // objectPosition is honored by react-native-web only;
-              // shifts focal point lower so the cyan eye + collar are visible.
-              { objectPosition: "50% 65%" } as object,
+              {
+                backgroundImage:
+                  "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
+                mixBlendMode: "screen",
+              } as object,
             ]}
           />
-          {/* Cyber blue radial tint */}
-          <LinearGradient
-            colors={[
-              "rgba(63,184,240,0.28)",
-              "transparent",
-              "rgba(168,140,255,0.18)",
+          {/* Bottom fade only over lower 2/3 so the husky face stays clear */}
+          <View
+            pointerEvents="none"
+            style={[
+              {
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: Math.round(heroHeight * 0.66),
+                backgroundImage:
+                  "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 55%, hsla(220,45%,3%,1) 100%)",
+              } as object,
             ]}
-            start={{ x: 0.5, y: 0.15 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
           />
-          {/* Bottom fade for headline legibility */}
-          <LinearGradient
-            colors={[
-              "transparent",
-              "rgba(4,7,17,0.55)",
-              "rgba(4,7,17,0.95)",
-              colors.background,
-            ]}
-            locations={[0, 0.55, 0.85, 1]}
-            style={StyleSheet.absoluteFill}
-          />
+        </View>
 
-          <View style={styles.heroBrandRow}>
-            <View
-              style={[
-                styles.brandRing,
-                {
-                  borderColor: colors.primary,
-                  shadowColor: colors.primary,
-                },
-              ]}
-            >
-              <Image
-                source={huskyImg}
-                style={styles.brandAvatar}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.brandWord}>MACHINEDOG.DEV</Text>
-          </View>
-
-          <View style={styles.heroCopy}>
+        {/* Headline glass card — sits BELOW the hero, like the website */}
+        <View
+          style={[
+            styles.section,
+            {
+              paddingHorizontal: sidePad,
+              maxWidth: r.containerMaxWidth,
+              alignSelf: "center",
+              width: "100%",
+              marginTop: r.isTablet ? 8 : -16,
+            },
+          ]}
+        >
+          <GlassCard padding={r.isTablet ? 28 : 22}>
             <Text
               style={[
                 styles.eyebrow,
@@ -144,33 +171,53 @@ export default function SignInScreen() {
                 },
               ]}
             >
-              WE FORGE{"\n"}
+              We forge{"\n"}
               <Text style={{ color: colors.primaryBright ?? colors.primary }}>
-                DIGITAL
+                digital
               </Text>
-              {"\n"}INTELLIGENCE
+              {"\n"}intelligence
             </Text>
-          </View>
+            <Text
+              style={[
+                styles.heroBody,
+                {
+                  color: colors.mutedForeground,
+                  fontSize: r.font(15, 16, 18),
+                  lineHeight: r.font(22, 24, 26),
+                },
+              ]}
+            >
+              Machinedog.Dev is a private engineering atelier. Sign in with
+              your invited account to access prompts, projects, and consulting
+              hours.
+            </Text>
+          </GlassCard>
         </View>
 
-        {/* Form */}
+        {/* Form glass card */}
         <View
           style={[
-            styles.formWrap,
+            styles.section,
             {
-              paddingHorizontal: heroPaddingX,
+              paddingHorizontal: sidePad,
               maxWidth: r.containerMaxWidth,
               alignSelf: "center",
               width: "100%",
+              marginTop: r.isTablet ? 22 : 16,
             },
           ]}
         >
-          <GlassCard padding={22} style={styles.card}>
-            <Text style={[styles.title, { color: colors.foreground }]}>
-              Welcome back
+          <GlassCard padding={r.isTablet ? 28 : 22}>
+            <Text
+              style={[
+                styles.welcomeEyebrow,
+                { color: colors.mutedForeground },
+              ]}
+            >
+              WELCOME BACK
             </Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              Sign in to your invite-only Machinedog.Dev workspace.
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              Sign in to continue
             </Text>
 
             <View style={{ gap: 14, marginTop: 18 }}>
@@ -260,8 +307,7 @@ export default function SignInScreen() {
           </GlassCard>
 
           <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-            Machinedog.Dev is invite-only. Reach out to your account team for an
-            invitation.
+            ENCRYPTED · INVITE-ONLY · NO SPAM
           </Text>
         </View>
       </ScreenShell>
@@ -270,16 +316,12 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    width: "100%",
-    overflow: "hidden",
-    justifyContent: "space-between",
-    paddingTop: 12,
-  },
-  heroBrandRow: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   brandRing: {
     width: 44,
@@ -305,43 +347,43 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     color: "#FFFFFF",
   },
-  heroCopy: {
-    paddingBottom: 8,
+  hero: {
+    width: "100%",
+    overflow: "hidden",
+  },
+  section: {
+    paddingTop: 0,
   },
   eyebrow: {
     fontFamily: "Inter_700Bold",
     fontWeight: "700",
     fontSize: 11,
-    letterSpacing: 2.2,
-    marginBottom: 8,
+    letterSpacing: 2.6,
+    marginBottom: 12,
   },
   headline: {
     fontFamily: "Inter_700Bold",
     fontWeight: "900",
-    fontSize: 38,
-    lineHeight: 40,
     letterSpacing: -1.2,
     color: "#FFFFFF",
+    textTransform: "uppercase",
   },
-  formWrap: {
-    paddingHorizontal: 18,
-    paddingTop: 4,
-    gap: 12,
+  heroBody: {
+    fontFamily: "Inter_400Regular",
+    marginTop: 16,
   },
-  card: {
-    marginTop: 4,
+  welcomeEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
+    fontSize: 11,
+    letterSpacing: 2.6,
+    marginBottom: 6,
   },
   title: {
     fontFamily: "Inter_700Bold",
-    fontWeight: "700",
-    fontSize: 24,
+    fontWeight: "800",
+    fontSize: 26,
     letterSpacing: -0.6,
-  },
-  subtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    marginTop: 6,
-    lineHeight: 20,
   },
   label: {
     fontSize: 11,
@@ -370,8 +412,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     textAlign: "center",
-    fontSize: 12,
+    fontSize: 10,
+    letterSpacing: 2.4,
     paddingHorizontal: 12,
-    marginTop: 4,
+    marginTop: 16,
+    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
   },
 });
