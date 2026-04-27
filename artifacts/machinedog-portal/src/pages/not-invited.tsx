@@ -7,7 +7,7 @@ export default function NotInvitedPage() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center">
       <div className="mb-8 flex items-center justify-center gap-3 font-mono font-bold tracking-tight text-2xl opacity-50">
         <Terminal className="h-8 w-8 text-primary" />
-        <span>MACHINEDOG</span>
+        <span>MACHINEDOG.DEV</span>
       </div>
       
       <div className="max-w-md w-full bg-card border border-border p-8 rounded-lg shadow-xl flex flex-col items-center">
@@ -18,7 +18,7 @@ export default function NotInvitedPage() {
         <h1 className="text-2xl font-bold mb-4 font-mono">ACCESS_DENIED</h1>
         
         <p className="text-muted-foreground mb-8">
-          The email address associated with this account has not been approved for access. Machinedog operates on a strictly invite-only basis.
+          The email address associated with this account has not been approved for access. Machinedog.Dev operates on a strictly invite-only basis.
         </p>
         
         <div className="w-full space-y-4">

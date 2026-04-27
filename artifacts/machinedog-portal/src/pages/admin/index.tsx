@@ -14,7 +14,7 @@ export default function AdminDashboard() {
           SYSTEM_OVERVIEW
         </h1>
         <p className="text-muted-foreground text-sm font-mono">
-          Machinedog operations and platform metrics.
+          Machinedog.Dev operations and platform metrics.
         </p>
       </div>
 

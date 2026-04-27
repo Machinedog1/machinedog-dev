@@ -60,7 +60,7 @@ export function Logo({ size = "md", showWordmark = true }: LogoProps) {
             },
           ]}
         >
-          MACHINEDOG
+          MACHINEDOG.DEV
         </Text>
       )}
     </View>

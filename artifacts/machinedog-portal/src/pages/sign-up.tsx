@@ -12,7 +12,7 @@ export default function SignUpPage() {
       <div className="bg-grid" />
       <div className="mb-8 flex items-center gap-3 font-mono font-bold tracking-tight text-2xl z-10 text-foreground">
         <Terminal className="h-8 w-8 text-primary" />
-        <span>MACHINEDOG</span>
+        <span>MACHINEDOG.DEV</span>
       </div>
       <div className="w-full max-w-md z-10">
         <SignUp 

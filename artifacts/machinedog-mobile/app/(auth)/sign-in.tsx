@@ -99,7 +99,7 @@ export default function SignInScreen() {
                 resizeMode="cover"
               />
             </View>
-            <Text style={styles.brandWord}>MACHINEDOG</Text>
+            <Text style={styles.brandWord}>MACHINEDOG.DEV</Text>
           </View>
 
           <View style={styles.heroCopy}>
@@ -128,7 +128,7 @@ export default function SignInScreen() {
               Welcome back
             </Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              Sign in to your invite-only Machinedog workspace.
+              Sign in to your invite-only Machinedog.Dev workspace.
             </Text>
 
             <View style={{ gap: 14, marginTop: 18 }}>
@@ -218,7 +218,7 @@ export default function SignInScreen() {
           </GlassCard>
 
           <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-            Machinedog is invite-only. Reach out to your account team for an
+            Machinedog.Dev is invite-only. Reach out to your account team for an
             invitation.
           </Text>
         </View>

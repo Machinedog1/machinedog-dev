@@ -79,7 +79,7 @@ export default function ConsultingScreen() {
           Book a strategist
         </Text>
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-          Pair your prompts with hands-on strategy from the Machinedog team.
+          Pair your prompts with hands-on strategy from the Machinedog.Dev team.
           Hours never expire.
         </Text>
       </GlassCard>

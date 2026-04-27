@@ -109,7 +109,7 @@ export default function PricingPage() {
             />
           </div>
           <span className="font-extrabold tracking-[0.2em] text-sm sm:text-base">
-            MACHINEDOG
+            MACHINEDOG<span className="text-primary">.DEV</span>
           </span>
         </Link>
 
@@ -639,11 +639,11 @@ export default function PricingPage() {
               />
             </div>
             <span className="font-mono tracking-widest text-xs">
-              MACHINEDOG · CUSTOM AI SYSTEMS
+              MACHINEDOG.DEV · CUSTOM AI SYSTEMS
             </span>
           </div>
           <div className="text-xs">
-            © {new Date().getFullYear()} Machinedog. All rights reserved.
+            © {new Date().getFullYear()} Machinedog.Dev. All rights reserved.
           </div>
         </div>
       </footer>

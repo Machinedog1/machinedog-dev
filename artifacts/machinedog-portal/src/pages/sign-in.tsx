@@ -74,7 +74,7 @@ export default function SignInPage() {
             className="text-headline text-white text-xl"
             style={{ letterSpacing: "0.16em", fontWeight: 800 }}
           >
-            MACHINEDOG
+            MACHINEDOG.DEV
           </span>
         </div>
 
@@ -90,7 +90,7 @@ export default function SignInPage() {
             intelligence
           </h1>
           <p className="mt-6 text-base text-white/70 max-w-sm leading-relaxed">
-            Machinedog is a private engineering atelier. Sign in with your
+            Machinedog.Dev is a private engineering atelier. Sign in with your
             invited account to access prompts, projects, and consulting hours.
           </p>
         </div>

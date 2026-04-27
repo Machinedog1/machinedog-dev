@@ -57,7 +57,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 border-b border-border/20 glass z-50 flex items-center justify-between px-4">
         <div className="flex items-center gap-2 font-mono font-bold tracking-tight">
           <Terminal className="h-5 w-5 text-primary" />
-          <span>MACHINEDOG</span>
+          <span>MACHINEDOG.DEV</span>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={toggleTheme} className="p-2 text-muted-foreground hover:text-foreground">
@@ -77,7 +77,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="h-14 flex items-center justify-between px-6 border-b border-border/20 hidden md:flex">
           <div className="flex items-center gap-2 font-mono font-bold tracking-tight">
             <Terminal className="h-5 w-5 text-primary" />
-            <span>MACHINEDOG</span>
+            <span>MACHINEDOG.DEV</span>
           </div>
           <button onClick={toggleTheme} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors">
             {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}

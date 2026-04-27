@@ -18,7 +18,7 @@ export default function SettingsPage() {
           SETTINGS
         </h1>
         <p className="text-muted-foreground text-sm font-mono">
-          Manage your Machinedog identity and security.
+          Manage your Machinedog.Dev identity and security.
         </p>
       </div>
 
@@ -28,7 +28,7 @@ export default function SettingsPage() {
             <ShieldAlert className="h-5 w-5 text-primary" />
             <div>
               <div className="font-mono font-bold text-primary text-sm">ADMIN_PRIVILEGES_ACTIVE</div>
-              <div className="text-xs text-muted-foreground font-mono">You have access to the Machinedog management console.</div>
+              <div className="text-xs text-muted-foreground font-mono">You have access to the Machinedog.Dev management console.</div>
             </div>
           </div>
           <Link href="/admin">
