@@ -44,12 +44,37 @@ export default function SignInPage() {
       className="dark relative min-h-screen w-full overflow-hidden text-white"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* Subtle desktop ambient glow (no full-bleed husky anymore — husky lives in the right column at half-size) */}
+      {/* DESKTOP full-bleed husky portrait — eye-focused crop, hidden on mobile */}
+      <div
+        className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
+        style={{
+          backgroundImage: `url(${huskyPortrait})`,
+          filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+        }}
+      />
+
+      {/* Desktop cyan halo behind the eyes */}
+      <div
+        className="hidden lg:block absolute inset-0 pointer-events-none mix-blend-screen"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 35% at 52% 38%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
+        }}
+      />
+
+      {/* Desktop vignette / bottom fade for legibility */}
       <div
         className="hidden lg:block absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 60% 50% at 75% 45%, hsla(200,95%,55%,0.18) 0%, transparent 70%)",
+            "radial-gradient(ellipse at 50% 35%, transparent 0%, hsla(220,45%,3%,0.35) 60%, hsla(220,45%,3%,0.85) 100%)",
+        }}
+      />
+      <div
+        className="hidden lg:block absolute inset-x-0 bottom-0 h-1/2 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 55%, hsla(220,45%,3%,0.95) 100%)",
         }}
       />
 
@@ -119,12 +144,10 @@ export default function SignInPage() {
           />
         </div>
 
-        {/* Main grid: both cards stacked on the left, husky portrait on the right (50% smaller). */}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(420px,1fr)_minmax(0,520px)] items-start lg:items-center gap-6 lg:gap-12 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
-          {/* LEFT COLUMN — both glass cards stacked */}
-          <div className="order-1 flex flex-col gap-5 lg:gap-6 w-full max-w-xl">
-          {/* Headline — wrapped in an Apple-style glass card */}
-          <div className="w-full">
+        {/* Main grid: glass card left, headline right on desktop (stacks on mobile, headline first). */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(420px,0.95fr)_1.05fr] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
+          {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
+          <div className="order-1 lg:order-2 w-full max-w-xl lg:ml-auto">
             <div
               className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
               style={{
@@ -197,7 +220,7 @@ export default function SignInPage() {
           </div>
 
           {/* Apple-style glass sign-in card */}
-          <div className="w-full max-w-md mx-auto lg:mx-0 min-w-0">
+          <div className="order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0 lg:mr-auto min-w-0">
             <div
               className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
               style={{
@@ -363,46 +386,6 @@ export default function SignInPage() {
             <p className="mt-4 text-center text-[10px] tracking-[0.2em] uppercase font-mono text-white/35">
               Encrypted · Invite-only · No spam
             </p>
-          </div>
-          </div>
-
-          {/* RIGHT COLUMN — husky portrait at ~50% size, desktop only */}
-          <div className="hidden lg:flex order-2 w-full items-center justify-center">
-            <div
-              className="relative w-full max-w-[460px] aspect-[4/5] rounded-[28px] overflow-hidden"
-              style={{
-                border: "1px solid rgba(255,255,255,0.12)",
-                boxShadow:
-                  "0 30px 80px -20px rgba(0,0,0,0.6), 0 1px 0 0 rgba(255,255,255,0.18) inset",
-              }}
-            >
-              <img
-                src={huskyPortrait}
-                alt=""
-                aria-hidden="true"
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{
-                  objectPosition: "50% 32%",
-                  filter: "saturate(1.18) contrast(1.06) brightness(0.85)",
-                }}
-              />
-              <div
-                aria-hidden
-                className="absolute inset-0 pointer-events-none mix-blend-screen"
-                style={{
-                  background:
-                    "radial-gradient(ellipse 70% 35% at 50% 40%, hsla(200,95%,55%,0.32) 0%, transparent 60%)",
-                }}
-              />
-              <div
-                aria-hidden
-                className="absolute inset-x-0 bottom-0 h-1/2 pointer-events-none"
-                style={{
-                  background:
-                    "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 60%, hsla(220,45%,3%,0.92) 100%)",
-                }}
-              />
-            </div>
           </div>
         </main>
       </div>
