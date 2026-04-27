@@ -223,6 +223,15 @@ export interface AdjustBalanceBody {
   reason?: string;
 }
 
+export interface PublicCheckoutBody {
+  /**
+   * Where the visitor came from (e.g. "pricing-page")
+   * @maxLength 100
+   * @nullable
+   */
+  source?: string | null;
+}
+
 export interface SubmitLeadBody {
   /**
    * @minLength 1

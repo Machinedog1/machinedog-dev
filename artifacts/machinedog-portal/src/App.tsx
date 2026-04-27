@@ -10,6 +10,7 @@ import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import NotInvitedPage from "@/pages/not-invited";
 import PricingPage from "@/pages/pricing";
+import ThankYouPage from "@/pages/thank-you";
 import IntakePage from "@/pages/intake";
 import PromptConsole from "@/pages/index";
 import HistoryPage from "@/pages/history";
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/intake" component={IntakePage} />
       <Route path="/work" component={WorkPage} />
 
@@ -171,6 +173,7 @@ function App() {
                 <Switch>
                   <Route path="/sign-up" component={SignUpPage} />
                   <Route path="/pricing" component={PricingPage} />
+                  <Route path="/thank-you" component={ThankYouPage} />
                   <Route path="/intake" component={IntakePage} />
                   <Route path="/work" component={WorkPage} />
                   <Route path="*" component={SignInPage} />

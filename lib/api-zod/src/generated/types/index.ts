@@ -32,6 +32,7 @@ export * from "./projectList";
 export * from "./projectStatus";
 export * from "./promptSession";
 export * from "./promptSessionList";
+export * from "./publicCheckoutBody";
 export * from "./submitLeadBody";
 export * from "./submitLeadResponse";
 export * from "./submitPromptBody";

@@ -24,6 +24,8 @@ tags:
     description: Admin operations
   - name: leads
     description: Public lead capture (e.g. pricing-page contact form)
+  - name: checkout
+    description: Public Stripe Checkout entry points (no auth)
 
 paths:
   /healthz:
@@ -295,6 +297,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CheckoutResponse"
+
+  # ─── Public checkout (no auth) ─────────────────────────────────────────────
+
+  /checkout/build:
+    post:
+      operationId: createBuildCheckout
+      tags: [checkout]
+      summary: Start a public Stripe Checkout for the Premium Build deposit (no auth)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicCheckoutBody"
+      responses:
+        "200":
+          description: Stripe checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "503":
+          description: Stripe is not configured
+
+  /checkout/retainer:
+    post:
+      operationId: createRetainerCheckout
+      tags: [checkout]
+      summary: Start a public Stripe Checkout for the monthly retainer subscription (no auth)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicCheckoutBody"
+      responses:
+        "200":
+          description: Stripe checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "503":
+          description: Stripe is not configured
 
   # ─── Public lead capture ───────────────────────────────────────────────────
 
@@ -795,6 +841,14 @@ components:
         reason:
           type: string
       required: [delta]
+
+    PublicCheckoutBody:
+      type: object
+      properties:
+        source:
+          type: ["string", "null"]
+          maxLength: 100
+          description: Where the visitor came from (e.g. "pricing-page")
 
     SubmitLeadBody:
       type: object

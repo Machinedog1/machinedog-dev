@@ -37,6 +37,7 @@ import type {
   ProjectList,
   PromptSession,
   PromptSessionList,
+  PublicCheckoutBody,
   SubmitLeadBody,
   SubmitLeadResponse,
   SubmitPromptBody,
@@ -1265,6 +1266,178 @@ export const useCreateConsultingCheckout = <
   TContext
 > => {
   return useMutation(getCreateConsultingCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary Start a public Stripe Checkout for the Premium Build deposit (no auth)
+ */
+export const getCreateBuildCheckoutUrl = () => {
+  return `/api/checkout/build`;
+};
+
+export const createBuildCheckout = async (
+  publicCheckoutBody?: PublicCheckoutBody,
+  options?: RequestInit,
+): Promise<CheckoutResponse> => {
+  return customFetch<CheckoutResponse>(getCreateBuildCheckoutUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(publicCheckoutBody),
+  });
+};
+
+export const getCreateBuildCheckoutMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBuildCheckout>>,
+    TError,
+    { data: BodyType<PublicCheckoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBuildCheckout>>,
+  TError,
+  { data: BodyType<PublicCheckoutBody> },
+  TContext
+> => {
+  const mutationKey = ["createBuildCheckout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBuildCheckout>>,
+    { data: BodyType<PublicCheckoutBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBuildCheckout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBuildCheckoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBuildCheckout>>
+>;
+export type CreateBuildCheckoutMutationBody = BodyType<PublicCheckoutBody>;
+export type CreateBuildCheckoutMutationError = ErrorType<void>;
+
+/**
+ * @summary Start a public Stripe Checkout for the Premium Build deposit (no auth)
+ */
+export const useCreateBuildCheckout = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBuildCheckout>>,
+    TError,
+    { data: BodyType<PublicCheckoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBuildCheckout>>,
+  TError,
+  { data: BodyType<PublicCheckoutBody> },
+  TContext
+> => {
+  return useMutation(getCreateBuildCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary Start a public Stripe Checkout for the monthly retainer subscription (no auth)
+ */
+export const getCreateRetainerCheckoutUrl = () => {
+  return `/api/checkout/retainer`;
+};
+
+export const createRetainerCheckout = async (
+  publicCheckoutBody?: PublicCheckoutBody,
+  options?: RequestInit,
+): Promise<CheckoutResponse> => {
+  return customFetch<CheckoutResponse>(getCreateRetainerCheckoutUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(publicCheckoutBody),
+  });
+};
+
+export const getCreateRetainerCheckoutMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRetainerCheckout>>,
+    TError,
+    { data: BodyType<PublicCheckoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createRetainerCheckout>>,
+  TError,
+  { data: BodyType<PublicCheckoutBody> },
+  TContext
+> => {
+  const mutationKey = ["createRetainerCheckout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createRetainerCheckout>>,
+    { data: BodyType<PublicCheckoutBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createRetainerCheckout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateRetainerCheckoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createRetainerCheckout>>
+>;
+export type CreateRetainerCheckoutMutationBody = BodyType<PublicCheckoutBody>;
+export type CreateRetainerCheckoutMutationError = ErrorType<void>;
+
+/**
+ * @summary Start a public Stripe Checkout for the monthly retainer subscription (no auth)
+ */
+export const useCreateRetainerCheckout = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRetainerCheckout>>,
+    TError,
+    { data: BodyType<PublicCheckoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createRetainerCheckout>>,
+  TError,
+  { data: BodyType<PublicCheckoutBody> },
+  TContext
+> => {
+  return useMutation(getCreateRetainerCheckoutMutationOptions(options));
 };
 
 /**

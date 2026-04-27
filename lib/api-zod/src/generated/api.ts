@@ -250,6 +250,40 @@ export const CreateConsultingCheckoutResponse = zod.object({
 });
 
 /**
+ * @summary Start a public Stripe Checkout for the Premium Build deposit (no auth)
+ */
+export const createBuildCheckoutBodySourceMax = 100;
+
+export const CreateBuildCheckoutBody = zod.object({
+  source: zod
+    .string()
+    .max(createBuildCheckoutBodySourceMax)
+    .nullish()
+    .describe('Where the visitor came from (e.g. \"pricing-page\")'),
+});
+
+export const CreateBuildCheckoutResponse = zod.object({
+  url: zod.string(),
+});
+
+/**
+ * @summary Start a public Stripe Checkout for the monthly retainer subscription (no auth)
+ */
+export const createRetainerCheckoutBodySourceMax = 100;
+
+export const CreateRetainerCheckoutBody = zod.object({
+  source: zod
+    .string()
+    .max(createRetainerCheckoutBodySourceMax)
+    .nullish()
+    .describe('Where the visitor came from (e.g. \"pricing-page\")'),
+});
+
+export const CreateRetainerCheckoutResponse = zod.object({
+  url: zod.string(),
+});
+
+/**
  * @summary Submit a lead from a public contact form (no auth)
  */
 export const submitLeadBodyNameMax = 200;

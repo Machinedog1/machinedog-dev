@@ -8,6 +8,7 @@ import consultingRouter from "./consulting";
 import adminRouter from "./admin";
 import intakeRouter from "./intake";
 import leadsRouter from "./leads";
+import checkoutRouter from "./checkout";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(projectsRouter);
 router.use(consultingRouter);
 router.use(adminRouter);
 router.use(leadsRouter);
+router.use(checkoutRouter);
 
 export default router;

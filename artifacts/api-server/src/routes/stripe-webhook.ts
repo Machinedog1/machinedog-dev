@@ -5,6 +5,7 @@ import {
   clientsTable,
   tokenPurchasesTable,
   consultingBookingsTable,
+  buildOrdersTable,
 } from "@workspace/db";
 import { getStripe } from "../lib/stripe";
 
@@ -38,6 +39,42 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const kind = session.metadata?.kind;
+
+    // Public checkouts (no clientId) — Premium Build deposit and monthly retainer.
+    if (kind === "build" || kind === "retainer") {
+      const customerEmail =
+        session.customer_details?.email ?? session.customer_email ?? null;
+      const customerName = session.customer_details?.name ?? null;
+      const customerId =
+        typeof session.customer === "string" ? session.customer : null;
+      const subscriptionId =
+        typeof session.subscription === "string" ? session.subscription : null;
+      const paymentIntentId =
+        typeof session.payment_intent === "string" ? session.payment_intent : null;
+
+      const status = kind === "retainer" ? "active" : "completed";
+
+      await db
+        .update(buildOrdersTable)
+        .set({
+          status,
+          email: customerEmail,
+          name: customerName,
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: subscriptionId,
+          stripePaymentIntentId: paymentIntentId,
+          completedAt: new Date(),
+        })
+        .where(eq(buildOrdersTable.stripeSessionId, session.id));
+
+      req.log.info(
+        { kind, sessionId: session.id, email: customerEmail },
+        "Public checkout completed",
+      );
+      res.json({ received: true });
+      return;
+    }
+
     const clientId = Number(session.metadata?.clientId);
     if (!clientId || Number.isNaN(clientId)) {
       req.log.warn({ sessionId: session.id }, "Missing clientId in metadata");

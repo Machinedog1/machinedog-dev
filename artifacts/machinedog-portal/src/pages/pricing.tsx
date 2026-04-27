@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useSubmitLead } from "@workspace/api-client-react";
+import {
+  useSubmitLead,
+  useCreateBuildCheckout,
+  useCreateRetainerCheckout,
+} from "@workspace/api-client-react";
+import { Loader2 } from "lucide-react";
 import {
   ArrowRight,
   Check,
@@ -66,7 +71,71 @@ export default function PricingPage() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const submitLead = useSubmitLead();
+  const buildCheckout = useCreateBuildCheckout();
+  const retainerCheckout = useCreateRetainerCheckout();
+
+  function describeCheckoutError(err: unknown): string {
+    const status =
+      typeof err === "object" && err !== null && "status" in err
+        ? (err as { status?: number }).status
+        : undefined;
+    const data =
+      typeof err === "object" && err !== null && "data" in err
+        ? (err as { data?: { error?: string } }).data
+        : undefined;
+    if (status === 503) {
+      return (
+        data?.error ??
+        "Payments aren't connected yet. Reach out and we'll set you up directly."
+      );
+    }
+    if (status === 429) {
+      return "Too many checkout attempts. Please try again in a moment.";
+    }
+    return (
+      data?.error ??
+      "We couldn't start checkout. Please try again or email hello@machinedog.dev."
+    );
+  }
+
+  function startBuildCheckout() {
+    setCheckoutError(null);
+    buildCheckout.mutate(
+      { data: { source: "pricing-page" } },
+      {
+        onSuccess: (res) => {
+          if (res?.url) {
+            window.location.href = res.url;
+          } else {
+            setCheckoutError("Checkout could not be opened. Please try again.");
+          }
+        },
+        onError: (err: unknown) => setCheckoutError(describeCheckoutError(err)),
+      },
+    );
+  }
+
+  function startRetainerCheckout() {
+    setCheckoutError(null);
+    retainerCheckout.mutate(
+      { data: { source: "pricing-page" } },
+      {
+        onSuccess: (res) => {
+          if (res?.url) {
+            window.location.href = res.url;
+          } else {
+            setCheckoutError("Checkout could not be opened. Please try again.");
+          }
+        },
+        onError: (err: unknown) => setCheckoutError(describeCheckoutError(err)),
+      },
+    );
+  }
+
+  const buildPending = buildCheckout.isPending;
+  const retainerPending = retainerCheckout.isPending;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -463,7 +532,8 @@ export default function PricingPage() {
               </div>
               <Button
                 size="lg"
-                onClick={() => scrollToId("contact")}
+                onClick={startBuildCheckout}
+                disabled={buildPending}
                 className="h-12 px-8 text-sm tracking-wider font-bold"
                 style={{
                   background:
@@ -471,10 +541,35 @@ export default function PricingPage() {
                   boxShadow: "0 10px 30px -10px hsla(200,90%,60%,0.55)",
                 }}
               >
-                START YOUR BUILD
-                <ArrowRight className="ml-2 h-4 w-4" />
+                {buildPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    OPENING CHECKOUT…
+                  </>
+                ) : (
+                  <>
+                    START YOUR BUILD
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
               </Button>
             </div>
+
+            {checkoutError && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <span>{checkoutError}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCheckoutError(null);
+                    scrollToId("contact");
+                  }}
+                  className="font-mono text-xs tracking-widest text-red-100 hover:text-white underline underline-offset-4"
+                >
+                  CONTACT US INSTEAD →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -537,14 +632,22 @@ export default function PricingPage() {
                       BILLED MONTHLY
                     </div>
                     <Button
-                      onClick={() => scrollToId("contact")}
+                      onClick={startRetainerCheckout}
+                      disabled={retainerPending}
                       className="w-full mt-6 h-11 text-sm tracking-wider font-bold"
                       style={{
                         background:
                           "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
                       }}
                     >
-                      INCLUDE RETAINER
+                      {retainerPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          OPENING CHECKOUT…
+                        </>
+                      ) : (
+                        "INCLUDE RETAINER"
+                      )}
                     </Button>
                   </div>
                 </div>

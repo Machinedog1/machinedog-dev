@@ -24,6 +24,14 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
+## Public Stripe Checkout (pricing page)
+
+- `START YOUR BUILD` and `INCLUDE RETAINER` on `/pricing` create public Stripe Checkout sessions via `POST /api/checkout/build` and `POST /api/checkout/retainer`. No auth required — anonymous visitors can pay.
+- Build is a one-time payment (defaults to **$25,000**, override with `STRIPE_BUILD_DEPOSIT_USD`). Retainer is a monthly subscription (defaults to **$1,200/mo**, override with `STRIPE_RETAINER_USD`).
+- Optionally pass an existing Stripe Price ID via `STRIPE_PRICE_BUILD` / `STRIPE_PRICE_RETAINER` instead of inline `price_data`.
+- Successful checkout redirects to `/thank-you?kind=build|retainer&session_id=...`. The `checkout.session.completed` webhook records the order in the `build_orders` table (kind, email, name, Stripe IDs, status).
+- If `STRIPE_SECRET_KEY` is not set, both endpoints return HTTP 503 and the UI shows a friendly fallback to the contact form.
+
 ## Operator notifications (pricing-page leads)
 
 - `LEADS_NOTIFY_EMAIL` — operator inbox that receives new pricing-page leads. If unset, falls back to `SMTP_FROM_EMAIL` / `SMTP_FROM` / `SMTP_USER`.
