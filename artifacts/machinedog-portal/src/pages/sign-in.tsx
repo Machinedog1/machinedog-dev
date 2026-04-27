@@ -1,7 +1,7 @@
 import { SignIn } from "@clerk/react";
 import { useTheme } from "@/hooks/use-theme";
 import { dark } from "@clerk/themes";
-import huskyImg from "@assets/IMG_8700_1777249578831.png";
+import huskyImg from "@assets/generated_images/husky_cyber_portrait.png";
 
 export default function SignInPage() {
   const { theme } = useTheme();
@@ -10,16 +10,15 @@ export default function SignInPage() {
     <div className="min-h-screen bg-background flex flex-col lg:flex-row text-foreground relative overflow-hidden">
       {/* Hero side */}
       <div className="relative flex flex-col justify-between p-8 lg:p-12 lg:w-1/2 min-h-[520px] lg:min-h-screen overflow-hidden bg-[hsl(220,40%,4%)]">
-        {/* Zoomed husky portrait — crops out source text */}
+        {/* Husky portrait backdrop */}
         <div
           className="absolute inset-0"
           style={{
             backgroundImage: `url(${huskyImg})`,
-            backgroundSize: "320%",
-            backgroundPosition: "52% 62%",
+            backgroundSize: "cover",
+            backgroundPosition: "50% 30%",
             backgroundRepeat: "no-repeat",
-            filter: "blur(14px) saturate(1.25) contrast(1.05) brightness(0.7)",
-            transform: "scale(1.08)",
+            filter: "saturate(1.15) contrast(1.05) brightness(0.85)",
           }}
         />
         {/* Cyber blue tint */}
@@ -67,7 +66,7 @@ export default function SignInPage() {
               src={huskyImg}
               alt=""
               className="h-full w-full object-cover"
-              style={{ objectPosition: "50% 70%", transform: "scale(1.6)" }}
+              style={{ objectPosition: "50% 30%" }}
             />
           </div>
           <span

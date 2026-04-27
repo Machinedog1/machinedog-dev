@@ -20,7 +20,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 
-import huskyImg from "@assets/IMG_8700_1777249578831.png";
+import huskyImg from "@assets/generated_images/husky_cyber_portrait.png";
 
 function scrollToId(id: string) {
   const el = document.getElementById(id);
@@ -69,14 +69,17 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden">
+    <div
+      className="dark min-h-screen text-white relative overflow-x-hidden"
+      style={{ background: "hsl(220 40% 3%)" }}
+    >
       {/* Ambient brand backdrop */}
       <div className="fixed inset-0 pointer-events-none -z-10">
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(1200px 800px at 80% -10%, hsla(254,95%,75%,0.18), transparent 60%), radial-gradient(900px 700px at -10% 30%, hsla(200,90%,60%,0.18), transparent 55%), radial-gradient(700px 500px at 50% 110%, hsla(200,90%,60%,0.10), transparent 60%)",
+              "radial-gradient(1200px 800px at 80% -10%, hsla(254,95%,75%,0.22), transparent 60%), radial-gradient(900px 700px at -10% 30%, hsla(200,90%,60%,0.22), transparent 55%), radial-gradient(700px 500px at 50% 110%, hsla(200,90%,60%,0.12), transparent 60%)",
           }}
         />
         <div
@@ -100,12 +103,7 @@ export default function PricingPage() {
               src={huskyImg}
               alt=""
               className="w-full h-full object-cover"
-              style={{
-                objectPosition: "50% 58%",
-                transform: "scale(2.4)",
-                transformOrigin: "50% 58%",
-                filter: "saturate(1.2) brightness(0.95)",
-              }}
+              style={{ objectPosition: "50% 30%" }}
             />
           </div>
           <span className="font-extrabold tracking-[0.2em] text-sm sm:text-base">
@@ -165,63 +163,173 @@ export default function PricingPage() {
       </nav>
 
       {/* HERO */}
-      <header className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pt-12 pb-24 lg:pt-20 lg:pb-32">
-        <div className="max-w-4xl">
-          <div className="inline-flex items-center gap-2 glass-subtle rounded-full px-4 py-1.5 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-mono tracking-[0.18em] text-primary">
-              CUSTOM APP &amp; AI SYSTEM DEVELOPMENT
-            </span>
-          </div>
-          <h1 className="text-headline text-5xl sm:text-6xl lg:text-7xl leading-[0.95] tracking-tight mb-6">
-            We Build the System
-            <br />
-            <span className="text-gradient-cyber">Your Business Runs On.</span>
-          </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed">
-            Custom AI-powered apps and websites designed to replace manual work and
-            generate revenue from day one.
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
-            <Button
-              size="lg"
-              onClick={() => scrollToId("pricing")}
-              className="h-12 px-7 text-sm tracking-wider font-bold"
+      <header className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pt-8 pb-20 lg:pt-12 lg:pb-28">
+        {/* Mobile: husky as full-bleed backdrop. Desktop: husky on the right. */}
+        <div className="relative grid lg:grid-cols-12 gap-10 lg:gap-6 items-center">
+          {/* Husky portrait — mobile background */}
+          <div className="absolute inset-0 lg:hidden -z-0 pointer-events-none overflow-hidden rounded-3xl">
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url(${huskyImg})`,
+                backgroundSize: "cover",
+                backgroundPosition: "50% 35%",
+                opacity: 0.5,
+                filter: "saturate(1.15) contrast(1.05)",
+              }}
+            />
+            <div
+              className="absolute inset-0"
               style={{
                 background:
-                  "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
-                boxShadow: "0 10px 30px -10px hsla(200,90%,60%,0.55)",
+                  "radial-gradient(70% 60% at 50% 45%, transparent 0%, hsla(220,40%,3%,0.85) 80%), linear-gradient(180deg, hsla(220,40%,3%,0.4) 0%, hsla(220,40%,3%,0.95) 100%)",
               }}
-            >
-              START YOUR BUILD
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => scrollToId("contact")}
-              className="h-12 px-7 text-sm tracking-wider font-bold border-foreground/20 hover:border-foreground/40"
-            >
-              SCHEDULE A CALL
-            </Button>
+            />
           </div>
 
-          <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-3xl">
-            {[
-              { value: "4–8 wk", label: "Avg delivery" },
-              { value: "100%", label: "Owned by you" },
-              { value: "AI-native", label: "Built-in agents" },
-              { value: "24/7", label: "Production-grade" },
-            ].map((s) => (
-              <div key={s.label} className="glass rounded-xl px-4 py-3">
-                <div className="text-2xl font-extrabold text-gradient-cyber">
-                  {s.value}
+          {/* Text column */}
+          <div className="relative z-10 lg:col-span-7">
+            <div
+              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-7"
+              style={{
+                background: "hsla(200,90%,60%,0.08)",
+                border: "1px solid hsla(200,90%,60%,0.35)",
+              }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-[11px] font-mono tracking-[0.22em] text-primary">
+                WEB · APP · AI SYSTEM DEVELOPMENT
+              </span>
+            </div>
+
+            <h1
+              className="text-headline uppercase font-extrabold leading-[0.92] tracking-tight mb-7 text-white"
+              style={{
+                fontSize: "clamp(2.75rem, 7vw, 5.75rem)",
+                textShadow: "0 2px 30px hsla(220,40%,3%,0.6)",
+              }}
+            >
+              We Build
+              <br />
+              the{" "}
+              <span
+                className="text-gradient-cyber"
+                style={{
+                  WebkitTextFillColor: "transparent",
+                  WebkitBackgroundClip: "text",
+                  backgroundImage:
+                    "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                }}
+              >
+                System
+              </span>
+              <br />
+              Your Business
+              <br />
+              Runs On.
+            </h1>
+
+            <p className="text-base sm:text-lg text-white/70 max-w-xl mb-9 leading-relaxed">
+              Machinedog.Dev is a private engineering atelier building bold custom
+              AI-powered apps, websites, and automations for businesses ready to
+              replace manual work with revenue-generating systems.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <Button
+                size="lg"
+                onClick={() => scrollToId("pricing")}
+                className="h-14 px-8 text-sm tracking-wider font-bold text-white border-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                  boxShadow:
+                    "0 12px 40px -10px hsla(200,90%,60%,0.7), 0 0 0 1px hsla(200,90%,60%,0.4) inset",
+                }}
+              >
+                START YOUR PROJECT
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => scrollToId("pricing")}
+                className="h-14 px-8 text-sm tracking-wider font-bold bg-transparent text-white"
+                style={{
+                  border: "1px solid hsla(0,0%,100%,0.25)",
+                }}
+              >
+                VIEW OUR WORK
+              </Button>
+            </div>
+
+            <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-2xl">
+              {[
+                { value: "4–8 wk", label: "Avg delivery" },
+                { value: "100%", label: "Owned by you" },
+                { value: "AI-native", label: "Built-in agents" },
+                { value: "24/7", label: "Production-grade" },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="rounded-xl px-4 py-3"
+                  style={{
+                    background: "hsla(0,0%,100%,0.04)",
+                    border: "1px solid hsla(0,0%,100%,0.08)",
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  <div className="text-xl sm:text-2xl font-extrabold text-gradient-cyber">
+                    {s.value}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/55 mt-1">
+                    {s.label}
+                  </div>
                 </div>
-                <div className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
-                  {s.label}
-                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Husky portrait — desktop right column */}
+          <div className="relative z-10 hidden lg:block lg:col-span-5">
+            <div className="relative aspect-[4/5] w-full">
+              {/* Outer glow */}
+              <div
+                aria-hidden
+                className="absolute -inset-6 rounded-full blur-3xl opacity-70"
+                style={{
+                  background:
+                    "radial-gradient(circle at 50% 45%, hsla(200,90%,60%,0.55), hsla(254,95%,75%,0.35) 45%, transparent 70%)",
+                }}
+              />
+              {/* Cropped husky portrait */}
+              <div
+                className="relative w-full h-full overflow-hidden rounded-[28px]"
+                style={{
+                  border: "1px solid hsla(200,90%,60%,0.25)",
+                  boxShadow:
+                    "0 0 80px -20px hsla(200,90%,60%,0.55), inset 0 0 80px hsla(220,40%,3%,0.6)",
+                }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${huskyImg})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "50% 30%",
+                    filter: "saturate(1.15) contrast(1.05)",
+                  }}
+                />
+                {/* Subtle vignette to soften edges */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      "radial-gradient(75% 75% at 50% 45%, transparent 55%, hsla(220,40%,3%,0.7) 100%)",
+                  }}
+                />
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </header>
@@ -631,11 +739,7 @@ export default function PricingPage() {
                 src={huskyImg}
                 alt=""
                 className="w-full h-full object-cover"
-                style={{
-                  objectPosition: "50% 58%",
-                  transform: "scale(2.4)",
-                  transformOrigin: "50% 58%",
-                }}
+                style={{ objectPosition: "50% 30%" }}
               />
             </div>
             <span className="font-mono tracking-widest text-xs">
