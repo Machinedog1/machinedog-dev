@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import huskyMark from "@assets/generated_images/husky_mark.png";
+import huskyMark from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777254862515.png";
 
 type LogoSize = "sm" | "md" | "lg";
 
@@ -42,7 +42,8 @@ export function Logo({
         <img
           src={huskyMark}
           alt="Machinedog husky logo"
-          className="h-full w-full object-contain p-0.5"
+          className="h-full w-full object-cover"
+          style={{ objectPosition: "50% 22%" }}
         />
       </span>
       {showWordmark && (

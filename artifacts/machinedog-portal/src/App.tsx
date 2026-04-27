@@ -15,6 +15,7 @@ import PromptConsole from "@/pages/index";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
 import ProjectsPage from "@/pages/projects";
+import WorkPage from "@/pages/work";
 import ConsultingPage from "@/pages/consulting";
 import AdminDashboard from "@/pages/admin/index";
 import AdminClients from "@/pages/admin/clients";
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/intake" component={IntakePage} />
+      <Route path="/work" component={WorkPage} />
 
       <Route path="/">
         <AuthGuard><PromptConsole /></AuthGuard>
@@ -170,6 +172,7 @@ function App() {
                   <Route path="/sign-up" component={SignUpPage} />
                   <Route path="/pricing" component={PricingPage} />
                   <Route path="/intake" component={IntakePage} />
+                  <Route path="/work" component={WorkPage} />
                   <Route path="*" component={SignInPage} />
                 </Switch>
               </SignedOut>
