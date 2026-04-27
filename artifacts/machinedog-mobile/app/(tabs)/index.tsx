@@ -153,16 +153,27 @@ export default function ConsoleScreen() {
           />
 
           <View style={styles.actionRow}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-              Powered by Claude Sonnet 4.5
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.mutedForeground,
+                fontSize: 12,
+                flexShrink: 1,
+                flexBasis: "auto",
+                minWidth: 0,
+              }}
+            >
+              Powered by Machinedog.ai
             </Text>
-            <PrimaryButton
-              title={submit.isPending ? "Thinking…" : "Send prompt"}
-              size="md"
-              loading={submit.isPending}
-              disabled={!prompt.trim() || balance <= 0}
-              onPress={handleSubmit}
-            />
+            <View style={{ flexShrink: 0 }}>
+              <PrimaryButton
+                title={submit.isPending ? "Thinking…" : "Send"}
+                size="md"
+                loading={submit.isPending}
+                disabled={!prompt.trim() || balance <= 0}
+                onPress={handleSubmit}
+              />
+            </View>
           </View>
 
           {balance <= 0 && (
