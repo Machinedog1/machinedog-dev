@@ -4,7 +4,12 @@ import {
   useSubmitLead,
   useCreateBuildCheckout,
   useCreateRetainerCheckout,
+  useCreatePortalCheckout,
+  useGetMe,
+  getGetMeQueryKey,
 } from "@workspace/api-client-react";
+import { useUser } from "@clerk/react";
+import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import {
   ArrowRight,
@@ -614,15 +619,13 @@ export default function PricingPage() {
                 <div className="text-xs font-mono tracking-widest text-muted-foreground mt-2">
                   TOKENS &amp; CONSULTING SOLD SEPARATELY
                 </div>
+                <PortalCheckoutButton />
                 <Link href="/intake">
                   <Button
-                    className="w-full mt-6 h-11 text-sm tracking-wider font-bold"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
-                    }}
+                    variant="ghost"
+                    className="w-full mt-2 h-9 text-xs tracking-wider font-mono text-muted-foreground"
                   >
-                    REQUEST ACCESS
+                    OR REQUEST INVITE
                   </Button>
                 </Link>
               </div>
@@ -980,5 +983,75 @@ export default function PricingPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function PortalCheckoutButton() {
+  const { isSignedIn, isLoaded } = useUser();
+  const { data: me } = useGetMe({
+    query: { queryKey: getGetMeQueryKey(), enabled: !!isSignedIn, retry: false },
+  });
+  const checkout = useCreatePortalCheckout();
+  const { toast } = useToast();
+
+  const isActive =
+    me?.portalSubscriptionStatus === "active" || me?.portalSubscriptionStatus === "trialing";
+
+  const handleClick = () => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      window.location.href = "/sign-in?redirect_url=/pricing#portal-access";
+      return;
+    }
+    checkout.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data?.url) {
+          window.location.href = data.url;
+        }
+      },
+      onError: (err: unknown) => {
+        const msg =
+          err && typeof err === "object" && "data" in err
+            ? ((err as { data?: { error?: string } }).data?.error ?? "Could not start checkout")
+            : "Could not start checkout";
+        toast({ variant: "destructive", title: "Checkout failed", description: msg });
+      },
+    });
+  };
+
+  if (isActive) {
+    return (
+      <Link href="/projects">
+        <Button
+          className="w-full mt-6 h-11 text-sm tracking-wider font-bold"
+          style={{
+            background:
+              "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+          }}
+        >
+          OPEN YOUR PORTAL
+        </Button>
+      </Link>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      onClick={handleClick}
+      disabled={checkout.isPending || !isLoaded}
+      className="w-full mt-6 h-11 text-sm tracking-wider font-bold"
+      style={{
+        background: "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+      }}
+    >
+      {checkout.isPending ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin mr-2" /> REDIRECTING…
+        </>
+      ) : (
+        <>START PORTAL ACCESS</>
+      )}
+    </Button>
   );
 }

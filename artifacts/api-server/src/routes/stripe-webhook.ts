@@ -261,6 +261,70 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
         .set({ status: "active" })
         .where(eq(consultingBookingsTable.stripeSessionId, session.id));
       req.log.info({ clientId, sessionId: session.id }, "Consulting booking activated");
+    } else if (kind === "portal") {
+      const customerId =
+        typeof session.customer === "string" ? session.customer : null;
+      const subscriptionId =
+        typeof session.subscription === "string" ? session.subscription : null;
+      await db
+        .update(clientsTable)
+        .set({
+          stripeCustomerId: customerId ?? undefined,
+          portalSubscriptionId: subscriptionId ?? undefined,
+          portalSubscriptionStatus: "active",
+        })
+        .where(eq(clientsTable.id, clientId));
+      req.log.info({ clientId, subscriptionId }, "Portal Access subscription activated");
+    }
+  }
+
+  if (
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.deleted"
+  ) {
+    const sub = event.data.object;
+    const kind = sub.metadata?.kind;
+    if (kind === "portal") {
+      const clientId = Number(sub.metadata?.clientId);
+      const customerId = typeof sub.customer === "string" ? sub.customer : null;
+      const status = sub.status;
+      const allowedStatuses = [
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+      ] as const;
+      const portalStatus = allowedStatuses.includes(status as (typeof allowedStatuses)[number])
+        ? (status as (typeof allowedStatuses)[number])
+        : "incomplete";
+      const periodEndUnix =
+        typeof (sub as { current_period_end?: number }).current_period_end === "number"
+          ? (sub as { current_period_end: number }).current_period_end
+          : null;
+      const periodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
+
+      const updateValues = {
+        portalSubscriptionId: sub.id,
+        portalSubscriptionStatus:
+          event.type === "customer.subscription.deleted" ? ("canceled" as const) : portalStatus,
+        portalCurrentPeriodEnd: periodEnd,
+        ...(customerId ? { stripeCustomerId: customerId } : {}),
+      };
+
+      if (clientId && !Number.isNaN(clientId)) {
+        await db.update(clientsTable).set(updateValues).where(eq(clientsTable.id, clientId));
+      } else if (customerId) {
+        await db
+          .update(clientsTable)
+          .set(updateValues)
+          .where(eq(clientsTable.stripeCustomerId, customerId));
+      }
+      req.log.info(
+        { clientId, subscriptionId: sub.id, status: updateValues.portalSubscriptionStatus },
+        "Portal subscription state synced",
+      );
     }
   }
 

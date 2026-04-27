@@ -26,6 +26,15 @@ export const GetMeResponse = zod.object({
   isAdmin: zod.boolean(),
   stripeCustomerId: zod.string().nullish(),
   status: zod.enum(["active", "suspended", "invited"]),
+  portalSubscriptionStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  portalCurrentPeriodEnd: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 
@@ -45,6 +54,7 @@ export const ListMyPromptsResponse = zod.object({
     zod.object({
       id: zod.number(),
       clientId: zod.number(),
+      projectId: zod.number().nullish(),
       prompt: zod.string(),
       output: zod.string(),
       tokensUsed: zod.number(),
@@ -68,6 +78,7 @@ export const SubmitPromptBody = zod.object({
 export const SubmitPromptResponse = zod.object({
   id: zod.number(),
   clientId: zod.number(),
+  projectId: zod.number().nullish(),
   prompt: zod.string(),
   output: zod.string(),
   tokensUsed: zod.number(),
@@ -87,6 +98,7 @@ export const GetPromptParams = zod.object({
 export const GetPromptResponse = zod.object({
   id: zod.number(),
   clientId: zod.number(),
+  projectId: zod.number().nullish(),
   prompt: zod.string(),
   output: zod.string(),
   tokensUsed: zod.number(),
@@ -112,6 +124,7 @@ export const PublishPromptBody = zod.object({
 export const PublishPromptResponse = zod.object({
   id: zod.number(),
   clientId: zod.number(),
+  projectId: zod.number().nullish(),
   prompt: zod.string(),
   output: zod.string(),
   tokensUsed: zod.number(),
@@ -293,6 +306,155 @@ export const RemoveProjectMemberParams = zod.object({
 });
 
 /**
+ * @summary List comments on a project (owner or member)
+ */
+export const ListProjectCommentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectCommentsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      projectId: zod.number(),
+      clientId: zod.number(),
+      clientEmail: zod.string(),
+      body: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Post a comment on a project
+ */
+export const AddProjectCommentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const addProjectCommentBodyBodyMax = 5000;
+
+export const AddProjectCommentBody = zod.object({
+  body: zod.string().min(1).max(addProjectCommentBodyBodyMax),
+});
+
+/**
+ * @summary Delete a comment (author or project owner only)
+ */
+export const DeleteProjectCommentParams = zod.object({
+  id: zod.coerce.number(),
+  commentId: zod.coerce.number(),
+});
+
+/**
+ * @summary List prompt sessions scoped to this project (shared across members)
+ */
+export const ListProjectPromptsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectPromptsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      clientId: zod.number(),
+      projectId: zod.number().nullish(),
+      prompt: zod.string(),
+      output: zod.string(),
+      tokensUsed: zod.number(),
+      model: zod.string(),
+      isPublished: zod.boolean(),
+      publishedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Submit a prompt scoped to this project (charges submitter tokens)
+ */
+export const SubmitProjectPromptParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SubmitProjectPromptBody = zod.object({
+  prompt: zod.string().min(1),
+});
+
+export const SubmitProjectPromptResponse = zod.object({
+  id: zod.number(),
+  clientId: zod.number(),
+  projectId: zod.number().nullish(),
+  prompt: zod.string(),
+  output: zod.string(),
+  tokensUsed: zod.number(),
+  model: zod.string(),
+  isPublished: zod.boolean(),
+  publishedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List files attached to this project
+ */
+export const ListProjectFilesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectFilesResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      projectId: zod.number(),
+      uploadedByClientId: zod.number(),
+      uploadedByEmail: zod.string(),
+      name: zod.string(),
+      contentType: zod.string(),
+      sizeBytes: zod.number(),
+      objectPath: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Record an uploaded file's metadata against a project
+ */
+export const AddProjectFileParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const addProjectFileBodyNameMax = 255;
+
+export const addProjectFileBodyContentTypeMax = 200;
+
+export const addProjectFileBodySizeBytesMin = 0;
+
+export const addProjectFileBodyObjectPathMax = 500;
+
+export const AddProjectFileBody = zod.object({
+  name: zod.string().min(1).max(addProjectFileBodyNameMax),
+  contentType: zod.string().min(1).max(addProjectFileBodyContentTypeMax),
+  sizeBytes: zod.number().min(addProjectFileBodySizeBytesMin),
+  objectPath: zod
+    .string()
+    .min(1)
+    .max(addProjectFileBodyObjectPathMax)
+    .describe(
+      "Object path returned by \/storage\/uploads\/request-url (e.g. \/objects\/uploads\/uuid)",
+    ),
+});
+
+/**
+ * @summary Remove a file from a project (uploader or project owner only)
+ */
+export const DeleteProjectFileParams = zod.object({
+  id: zod.coerce.number(),
+  fileId: zod.coerce.number(),
+});
+
+/**
  * @summary List consulting hour packages (3 tiers)
  */
 export const ListConsultingPackagesResponse = zod.object({
@@ -371,6 +533,35 @@ export const CreateRetainerCheckoutBody = zod.object({
 
 export const CreateRetainerCheckoutResponse = zod.object({
   url: zod.string(),
+});
+
+/**
+ * @summary Start a Stripe Checkout for the $500/mo Portal Access subscription (auth required)
+ */
+export const CreatePortalCheckoutResponse = zod.object({
+  url: zod.string(),
+});
+
+/**
+ * @summary Request a presigned URL for direct file upload to object storage
+ */
+
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string().min(1),
+  size: zod.number().min(1),
+  contentType: zod.string().min(1),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string().url(),
+  objectPath: zod.string(),
+  metadata: zod
+    .object({
+      name: zod.string().min(1),
+      size: zod.number().min(1),
+      contentType: zod.string().min(1),
+    })
+    .optional(),
 });
 
 /**
@@ -459,6 +650,15 @@ export const ListClientsResponse = zod.object({
       isAdmin: zod.boolean(),
       stripeCustomerId: zod.string().nullish(),
       status: zod.enum(["active", "suspended", "invited"]),
+      portalSubscriptionStatus: zod.enum([
+        "none",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+      ]),
+      portalCurrentPeriodEnd: zod.coerce.date().nullish(),
       createdAt: zod.coerce.date(),
     }),
   ),
@@ -493,6 +693,15 @@ export const GetClientByIdResponse = zod.object({
   isAdmin: zod.boolean(),
   stripeCustomerId: zod.string().nullish(),
   status: zod.enum(["active", "suspended", "invited"]),
+  portalSubscriptionStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  portalCurrentPeriodEnd: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 
@@ -517,6 +726,15 @@ export const AdjustClientBalanceResponse = zod.object({
   isAdmin: zod.boolean(),
   stripeCustomerId: zod.string().nullish(),
   status: zod.enum(["active", "suspended", "invited"]),
+  portalSubscriptionStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  portalCurrentPeriodEnd: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 

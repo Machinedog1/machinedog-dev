@@ -11,6 +11,13 @@ export const clientsTable = pgTable("clients", {
   isAdmin: boolean("is_admin").notNull().default(false),
   stripeCustomerId: text("stripe_customer_id"),
   status: text("status", { enum: ["active", "suspended", "invited"] }).notNull().default("invited"),
+  portalSubscriptionId: text("portal_subscription_id"),
+  portalSubscriptionStatus: text("portal_subscription_status", {
+    enum: ["none", "trialing", "active", "past_due", "canceled", "incomplete"],
+  })
+    .notNull()
+    .default("none"),
+  portalCurrentPeriodEnd: timestamp("portal_current_period_end", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

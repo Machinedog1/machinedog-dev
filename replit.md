@@ -33,7 +33,24 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Activation rule: a membership is only auto-marked `active` if a matching client row already has `status === "active"`. Anything else (no client, `invited` placeholder, `suspended`) stays `pending` until that user actually signs in.
 - `loadOrCreateClient` in `api-server/src/lib/auth.ts` calls `attachPendingProjectMemberships(clientId, email)` whenever an active client is loaded or freshly created — this promotes any pending memberships matching the user's email to `active` and stamps `acceptedAt`. First-time signers with no admin-side client invite but a pending project membership are auto-activated as a regular `active` client (zero token balance).
 - Frontend: `/projects` lists owned + shared with a "Shared with me" badge; cards link to `/projects/:id` (registered in `App.tsx`). `/projects/:id` shows cover image / summary / live URL, an owner-only edit form (title, summary, liveUrl, coverImageUrl, description, status), and an owner-only collaborators panel for invite + remove. Sidebar (`AppLayout.tsx`) now has a prominent "Buy tokens" CTA next to the token bar.
-- Pricing page has a "Portal Access — $500/mo" copy section above the retainer block (no Stripe enforcement yet).
+- Pricing page has a "Portal Access — $500/mo" section above the retainer block. The "START PORTAL ACCESS" CTA calls `POST /api/checkout/portal` (Stripe subscription mode, `kind=portal` metadata, default $500/mo, override with `STRIPE_PORTAL_USD` or `STRIPE_PRICE_PORTAL`); when the user is not signed in it redirects to `/sign-in?redirect_url=/pricing#portal-access`. When the client already has `portalSubscriptionStatus` of `active`/`trialing`, the button becomes "OPEN YOUR PORTAL" linking to `/projects`.
+
+## Per-project collaboration (comments + prompts + files)
+
+- Schema: `project_comments` (id, projectId, clientId, body, createdAt), `project_files` (id, projectId, uploadedByClientId, name, contentType, sizeBytes, objectPath, createdAt). `prompt_sessions.projectId` is a nullable FK so prompts can optionally be scoped to a project.
+- API (gated by `getViewableProject`, i.e. project owner or any active member):
+  - Comments: `GET/POST /api/projects/:id/comments`, `DELETE /api/projects/:id/comments/:commentId` (author or owner only).
+  - Project prompts: `GET /api/projects/:id/prompts`, `POST /api/projects/:id/prompts` — same Claude flow as the global console; tokens are charged to whoever runs it; the resulting `prompt_sessions` row carries `projectId` so it shows up for everyone in the project.
+  - Files: `GET/POST /api/projects/:id/files`, `DELETE /api/projects/:id/files/:fileId` (uploader or owner only). `objectPath` must start with `/objects/`.
+- Object storage: `artifacts/api-server/src/lib/{objectStorage,objectAcl}.ts` plus `routes/storage.ts` expose `POST /api/storage/uploads/request-url` returning `{ uploadURL, objectPath }`. The frontend uses a hidden `<input type=file>` + plain `fetch(uploadURL, { method: "PUT" })` (no Uppy) and then registers the file via `POST /api/projects/:id/files`.
+- Frontend: `/projects/:id` now renders `ProjectPromptPanel`, `ProjectCommentsPanel`, and `ProjectFilesPanel` below the project header (in that order). Owner can delete any comment/file; members can delete only their own.
+- Single-project auto-redirect: `AuthGuard` in `App.tsx` calls `useListMyProjects` when a non-admin lands on `/`; if the list contains exactly one project and the viewer's role is `collaborator`, it redirects to `/projects/:id`. Owners and multi-project members keep their normal landing page.
+
+## Portal Access subscription (Stripe)
+
+- New columns on `clients`: `stripeCustomerId`, `portalSubscriptionId`, `portalSubscriptionStatus` (`trialing|active|past_due|canceled|incomplete|null`), `portalCurrentPeriodEnd`.
+- `POST /api/checkout/portal` (auth'd) creates a Stripe Checkout session with `mode=subscription`, `metadata.kind=portal`, and `metadata.clientId`. Defaults to $500/mo; configurable via `STRIPE_PORTAL_USD` or `STRIPE_PRICE_PORTAL`.
+- `stripe-webhook.ts` handles both `checkout.session.completed` (kind=portal) and `customer.subscription.{created,updated,deleted}` (kind=portal in subscription metadata) — syncing `stripeCustomerId`, `portalSubscriptionId`, `portalSubscriptionStatus`, and `portalCurrentPeriodEnd`.
 
 ## Public Stripe Checkout (pricing page)
 

@@ -5,6 +5,7 @@
  * Machinedog Client Portal API
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientPortalSubscriptionStatus } from "./clientPortalSubscriptionStatus";
 import type { ClientStatus } from "./clientStatus";
 
 export interface Client {
@@ -17,5 +18,8 @@ export interface Client {
   /** @nullable */
   stripeCustomerId?: string | null;
   status: ClientStatus;
+  portalSubscriptionStatus: ClientPortalSubscriptionStatus;
+  /** @nullable */
+  portalCurrentPeriodEnd?: Date | null;
   createdAt: Date;
 }

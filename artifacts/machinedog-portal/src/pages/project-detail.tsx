@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetProject,
@@ -6,26 +6,48 @@ import {
   useListProjectMembers,
   useInviteProjectMember,
   useRemoveProjectMember,
+  useListProjectComments,
+  useAddProjectComment,
+  useDeleteProjectComment,
+  useListProjectPrompts,
+  useSubmitProjectPrompt,
+  useListProjectFiles,
+  useAddProjectFile,
+  useDeleteProjectFile,
+  useRequestUploadUrl,
+  useGetMe,
   getGetProjectQueryKey,
   getListProjectMembersQueryKey,
   getListMyProjectsQueryKey,
+  getListProjectCommentsQueryKey,
+  getListProjectPromptsQueryKey,
+  getListProjectFilesQueryKey,
+  getGetMeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ExternalLink,
+  FileUp,
+  Files,
   Loader2,
   Mail,
+  MessageSquare,
   Pencil,
   Save,
+  Send,
+  Terminal,
   Trash2,
   Users,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -313,6 +335,10 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      <ProjectPromptPanel projectId={project.id} />
+      <ProjectCommentsPanel projectId={project.id} isOwner={isOwner} />
+      <ProjectFilesPanel projectId={project.id} isOwner={isOwner} />
+
       {isOwner && (
         <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
           <div className="flex items-center gap-2">
@@ -392,6 +418,444 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "data" in err) {
+    const d = (err as { data?: { error?: string } }).data;
+    if (d?.error) return d.error;
+  }
+  if (err && typeof err === "object" && "error" in err) {
+    const e = (err as { error?: string }).error;
+    if (typeof e === "string" && e) return e;
+  }
+  return fallback;
+}
+
+function ProjectCommentsPanel({
+  projectId,
+  isOwner,
+}: {
+  projectId: number;
+  isOwner: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
+  const [body, setBody] = useState("");
+  const commentsQuery = useListProjectComments(projectId, {
+    query: { queryKey: getListProjectCommentsQueryKey(projectId) },
+  });
+  const addComment = useAddProjectComment();
+  const removeComment = useDeleteProjectComment();
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: getListProjectCommentsQueryKey(projectId) });
+
+  const handlePost = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    addComment.mutate(
+      { id: projectId, data: { body: trimmed } },
+      {
+        onSuccess: () => {
+          setBody("");
+          invalidate();
+        },
+        onError: (err) =>
+          toast({
+            variant: "destructive",
+            title: "Could not post comment",
+            description: errorMessage(err, "Try again."),
+          }),
+      },
+    );
+  };
+
+  const handleRemove = (commentId: number) => {
+    removeComment.mutate(
+      { id: projectId, commentId },
+      { onSuccess: invalidate },
+    );
+  };
+
+  const items = commentsQuery.data?.data ?? [];
+
+  return (
+    <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-mono font-bold uppercase tracking-wider">Discussion</h2>
+        <span className="text-[10px] font-mono text-muted-foreground tracking-widest ml-auto">
+          {items.length} {items.length === 1 ? "MESSAGE" : "MESSAGES"}
+        </span>
+      </div>
+
+      <form onSubmit={handlePost} className="flex flex-col gap-2">
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Share an update, question, or note for the team…"
+          rows={3}
+          className="resize-y"
+          disabled={addComment.isPending}
+        />
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            disabled={!body.trim() || addComment.isPending}
+            size="sm"
+            className="font-mono"
+          >
+            {addComment.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-2" />
+            ) : (
+              <Send className="h-3 w-3 mr-2" />
+            )}
+            POST
+          </Button>
+        </div>
+      </form>
+
+      <div className="flex flex-col gap-3">
+        {commentsQuery.isLoading ? (
+          <p className="text-xs font-mono text-muted-foreground">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs font-mono text-muted-foreground">
+            No messages yet. Start the conversation.
+          </p>
+        ) : (
+          items.map((c) => {
+            const isAuthor = me?.id === c.clientId;
+            const canDelete = isAuthor || isOwner;
+            return (
+              <div
+                key={c.id}
+                className="flex flex-col gap-1 px-4 py-3 rounded-lg glass-subtle"
+              >
+                <div className="flex items-center justify-between gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                  <span className="truncate">{c.clientEmail}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span>{format(new Date(c.createdAt), "MMM d · HH:mm")}</span>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(c.id)}
+                        className="hover:text-destructive transition-colors"
+                        aria-label="Delete comment"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm whitespace-pre-wrap break-words">{c.body}</p>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProjectPromptPanel({ projectId }: { projectId: number }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
+  const [prompt, setPrompt] = useState("");
+  const promptsQuery = useListProjectPrompts(projectId, {
+    query: { queryKey: getListProjectPromptsQueryKey(projectId) },
+  });
+  const submit = useSubmitProjectPrompt();
+  const items = promptsQuery.data?.data ?? [];
+  const outOfTokens = me ? me.tokenBalance <= 0 : false;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    submit.mutate(
+      { id: projectId, data: { prompt: trimmed } },
+      {
+        onSuccess: () => {
+          setPrompt("");
+          queryClient.invalidateQueries({
+            queryKey: getListProjectPromptsQueryKey(projectId),
+          });
+          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        },
+        onError: (err) =>
+          toast({
+            variant: "destructive",
+            title: "Prompt failed",
+            description: errorMessage(err, "Try again."),
+          }),
+      },
+    );
+  };
+
+  return (
+    <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <Terminal className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-mono font-bold uppercase tracking-wider">
+          Project Prompt Console
+        </h2>
+        <span className="text-[10px] font-mono text-muted-foreground tracking-widest ml-auto">
+          {items.length} {items.length === 1 ? "RUN" : "RUNS"}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-3">
+        Prompts run here are visible to everyone with access to this project. Tokens are charged
+        to whoever runs them.
+      </p>
+
+      {outOfTokens && (
+        <div className="text-xs font-mono text-destructive border border-destructive/40 rounded-lg p-3">
+          You&rsquo;re out of tokens.{" "}
+          <Link href="/tokens" className="underline">
+            Buy a bundle
+          </Link>{" "}
+          to run prompts here.
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <Textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Ask Claude to help with this project…"
+          rows={4}
+          className="resize-y font-mono"
+          disabled={submit.isPending || outOfTokens}
+        />
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            disabled={!prompt.trim() || submit.isPending || outOfTokens}
+            size="sm"
+            className="font-mono"
+          >
+            {submit.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-2" />
+            ) : (
+              <Zap className="h-3 w-3 mr-2" />
+            )}
+            RUN
+          </Button>
+        </div>
+      </form>
+
+      <div className="flex flex-col gap-3">
+        {promptsQuery.isLoading ? (
+          <p className="text-xs font-mono text-muted-foreground">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs font-mono text-muted-foreground">No runs yet.</p>
+        ) : (
+          items.slice(0, 20).map((s) => (
+            <details
+              key={s.id}
+              className="rounded-lg glass-subtle px-4 py-3 group"
+            >
+              <summary className="cursor-pointer flex items-center justify-between gap-2 text-xs font-mono text-muted-foreground">
+                <span className="truncate flex-1">
+                  {s.prompt.slice(0, 120)}
+                  {s.prompt.length > 120 ? "…" : ""}
+                </span>
+                <span className="shrink-0 tracking-widest">
+                  {s.tokensUsed} TOK · {format(new Date(s.createdAt), "MMM d HH:mm")}
+                </span>
+              </summary>
+              <div className="mt-3 pt-3 border-t border-border/30 text-sm prose prose-sm dark:prose-invert max-w-none">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                  Prompt
+                </div>
+                <pre className="whitespace-pre-wrap break-words bg-background/40 rounded p-2 text-xs">
+                  {s.prompt}
+                </pre>
+                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-3 mb-2">
+                  Output
+                </div>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.output}</ReactMarkdown>
+              </div>
+            </details>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProjectFilesPanel({
+  projectId,
+  isOwner,
+}: {
+  projectId: number;
+  isOwner: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
+  const filesQuery = useListProjectFiles(projectId, {
+    query: { queryKey: getListProjectFilesQueryKey(projectId) },
+  });
+  const requestUpload = useRequestUploadUrl();
+  const addFile = useAddProjectFile();
+  const removeFile = useDeleteProjectFile();
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const items = filesQuery.data?.data ?? [];
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: getListProjectFilesQueryKey(projectId) });
+
+  const handlePick = () => fileInputRef.current?.click();
+
+  const handleFile = async (file: File) => {
+    if (file.size > 50 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Max 50 MB per upload.",
+      });
+      return;
+    }
+    setUploading(true);
+    try {
+      const reservation = await requestUpload.mutateAsync({
+        data: { contentType: file.type || "application/octet-stream" },
+      });
+      const putRes = await fetch(reservation.uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!putRes.ok) {
+        throw new Error(`Upload failed (${putRes.status})`);
+      }
+      await addFile.mutateAsync({
+        id: projectId,
+        data: {
+          name: file.name,
+          contentType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          objectPath: reservation.objectPath,
+        },
+      });
+      invalidate();
+      toast({ title: "File uploaded", description: file.name });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: errorMessage(err, "Could not upload file."),
+      });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = (fileId: number) => {
+    removeFile.mutate(
+      { id: projectId, fileId },
+      { onSuccess: invalidate },
+    );
+  };
+
+  return (
+    <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <Files className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-mono font-bold uppercase tracking-wider">Files</h2>
+        <span className="text-[10px] font-mono text-muted-foreground tracking-widest ml-auto">
+          {items.length} {items.length === 1 ? "FILE" : "FILES"}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFile(f);
+          }}
+        />
+        <Button
+          type="button"
+          onClick={handlePick}
+          disabled={uploading}
+          size="sm"
+          variant="outline"
+          className="font-mono"
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin mr-2" /> UPLOADING…
+            </>
+          ) : (
+            <>
+              <FileUp className="h-3 w-3 mr-2" /> UPLOAD FILE
+            </>
+          )}
+        </Button>
+        <span className="text-[10px] font-mono text-muted-foreground tracking-widest">
+          MAX 50 MB
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {filesQuery.isLoading ? (
+          <p className="text-xs font-mono text-muted-foreground">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs font-mono text-muted-foreground">
+            No files yet. Drop in references, briefs, or assets.
+          </p>
+        ) : (
+          items.map((f) => {
+            const canDelete = isOwner || me?.id === f.uploadedByClientId;
+            return (
+              <div
+                key={f.id}
+                className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg glass-subtle"
+              >
+                <div className="flex flex-col min-w-0">
+                  <a
+                    href={f.objectPath}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-sm truncate hover:text-primary"
+                  >
+                    {f.name}
+                  </a>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                    {(f.sizeBytes / 1024).toFixed(1)} KB · {f.uploadedByEmail} ·{" "}
+                    {format(new Date(f.createdAt), "MMM d")}
+                  </span>
+                </div>
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemove(f.id)}
+                    disabled={removeFile.isPending}
+                    aria-label={`Delete ${f.name}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

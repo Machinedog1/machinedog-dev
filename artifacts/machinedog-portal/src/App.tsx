@@ -26,7 +26,8 @@ import AdminProjects from "@/pages/admin/projects";
 import AdminOrders from "@/pages/admin/orders";
 import SettingsPage from "@/pages/settings";
 
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
+import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
@@ -46,6 +47,23 @@ function SignedOut({ children }: { children: React.ReactNode }) {
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: me, isLoading, error } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
   const [location, setLocation] = useLocation();
+
+  const { data: myProjects } = useListMyProjects({
+    query: {
+      queryKey: getListMyProjectsQueryKey(),
+      enabled: !!me && !me.isAdmin && location === "/",
+      retry: false,
+    },
+  });
+
+  useEffect(() => {
+    if (!me || me.isAdmin) return;
+    if (location !== "/") return;
+    const list = myProjects?.data ?? [];
+    if (list.length === 1 && list[0]?.viewerRole === "collaborator") {
+      setLocation(`/projects/${list[0].id}`);
+    }
+  }, [me, myProjects, location, setLocation]);
 
   if (isLoading) {
     return (

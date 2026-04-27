@@ -27,6 +27,8 @@ import type {
   ConsultingPackageList,
   CreateConsultingCheckoutBody,
   CreateProjectBody,
+  CreateProjectCommentBody,
+  CreateProjectFileBody,
   CreateTokenCheckoutBody,
   ErrorResponse,
   HealthStatus,
@@ -37,6 +39,10 @@ import type {
   ListClientsParams,
   ListMyPromptsParams,
   Project,
+  ProjectComment,
+  ProjectCommentList,
+  ProjectFile,
+  ProjectFileList,
   ProjectList,
   ProjectMember,
   ProjectMemberList,
@@ -44,6 +50,8 @@ import type {
   PromptSessionList,
   PublicCheckoutBody,
   PublishPromptBody,
+  RequestUploadUrlBody,
+  RequestUploadUrlResponse,
   SubmitLeadBody,
   SubmitLeadResponse,
   SubmitPromptBody,
@@ -1382,6 +1390,698 @@ export const useRemoveProjectMember = <
 };
 
 /**
+ * @summary List comments on a project (owner or member)
+ */
+export const getListProjectCommentsUrl = (id: number) => {
+  return `/api/projects/${id}/comments`;
+};
+
+export const listProjectComments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ProjectCommentList> => {
+  return customFetch<ProjectCommentList>(getListProjectCommentsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectCommentsQueryKey = (id: number) => {
+  return [`/api/projects/${id}/comments`] as const;
+};
+
+export const getListProjectCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectComments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectCommentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectComments>>
+  > = ({ signal }) => listProjectComments(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectComments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectComments>>
+>;
+export type ListProjectCommentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List comments on a project (owner or member)
+ */
+
+export function useListProjectComments<
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectComments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectCommentsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Post a comment on a project
+ */
+export const getAddProjectCommentUrl = (id: number) => {
+  return `/api/projects/${id}/comments`;
+};
+
+export const addProjectComment = async (
+  id: number,
+  createProjectCommentBody: CreateProjectCommentBody,
+  options?: RequestInit,
+): Promise<ProjectComment> => {
+  return customFetch<ProjectComment>(getAddProjectCommentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createProjectCommentBody),
+  });
+};
+
+export const getAddProjectCommentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addProjectComment>>,
+    TError,
+    { id: number; data: BodyType<CreateProjectCommentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addProjectComment>>,
+  TError,
+  { id: number; data: BodyType<CreateProjectCommentBody> },
+  TContext
+> => {
+  const mutationKey = ["addProjectComment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addProjectComment>>,
+    { id: number; data: BodyType<CreateProjectCommentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addProjectComment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddProjectCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addProjectComment>>
+>;
+export type AddProjectCommentMutationBody = BodyType<CreateProjectCommentBody>;
+export type AddProjectCommentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Post a comment on a project
+ */
+export const useAddProjectComment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addProjectComment>>,
+    TError,
+    { id: number; data: BodyType<CreateProjectCommentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addProjectComment>>,
+  TError,
+  { id: number; data: BodyType<CreateProjectCommentBody> },
+  TContext
+> => {
+  return useMutation(getAddProjectCommentMutationOptions(options));
+};
+
+/**
+ * @summary Delete a comment (author or project owner only)
+ */
+export const getDeleteProjectCommentUrl = (id: number, commentId: number) => {
+  return `/api/projects/${id}/comments/${commentId}`;
+};
+
+export const deleteProjectComment = async (
+  id: number,
+  commentId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteProjectCommentUrl(id, commentId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteProjectCommentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProjectComment>>,
+    TError,
+    { id: number; commentId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteProjectComment>>,
+  TError,
+  { id: number; commentId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteProjectComment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteProjectComment>>,
+    { id: number; commentId: number }
+  > = (props) => {
+    const { id, commentId } = props ?? {};
+
+    return deleteProjectComment(id, commentId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteProjectCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteProjectComment>>
+>;
+
+export type DeleteProjectCommentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a comment (author or project owner only)
+ */
+export const useDeleteProjectComment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProjectComment>>,
+    TError,
+    { id: number; commentId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteProjectComment>>,
+  TError,
+  { id: number; commentId: number },
+  TContext
+> => {
+  return useMutation(getDeleteProjectCommentMutationOptions(options));
+};
+
+/**
+ * @summary List prompt sessions scoped to this project (shared across members)
+ */
+export const getListProjectPromptsUrl = (id: number) => {
+  return `/api/projects/${id}/prompts`;
+};
+
+export const listProjectPrompts = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PromptSessionList> => {
+  return customFetch<PromptSessionList>(getListProjectPromptsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectPromptsQueryKey = (id: number) => {
+  return [`/api/projects/${id}/prompts`] as const;
+};
+
+export const getListProjectPromptsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectPrompts>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectPrompts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectPromptsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectPrompts>>
+  > = ({ signal }) => listProjectPrompts(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectPrompts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectPromptsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectPrompts>>
+>;
+export type ListProjectPromptsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List prompt sessions scoped to this project (shared across members)
+ */
+
+export function useListProjectPrompts<
+  TData = Awaited<ReturnType<typeof listProjectPrompts>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectPrompts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectPromptsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit a prompt scoped to this project (charges submitter tokens)
+ */
+export const getSubmitProjectPromptUrl = (id: number) => {
+  return `/api/projects/${id}/prompts`;
+};
+
+export const submitProjectPrompt = async (
+  id: number,
+  submitPromptBody: SubmitPromptBody,
+  options?: RequestInit,
+): Promise<PromptSession> => {
+  return customFetch<PromptSession>(getSubmitProjectPromptUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitPromptBody),
+  });
+};
+
+export const getSubmitProjectPromptMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitProjectPrompt>>,
+    TError,
+    { id: number; data: BodyType<SubmitPromptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitProjectPrompt>>,
+  TError,
+  { id: number; data: BodyType<SubmitPromptBody> },
+  TContext
+> => {
+  const mutationKey = ["submitProjectPrompt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitProjectPrompt>>,
+    { id: number; data: BodyType<SubmitPromptBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return submitProjectPrompt(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitProjectPromptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitProjectPrompt>>
+>;
+export type SubmitProjectPromptMutationBody = BodyType<SubmitPromptBody>;
+export type SubmitProjectPromptMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a prompt scoped to this project (charges submitter tokens)
+ */
+export const useSubmitProjectPrompt = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitProjectPrompt>>,
+    TError,
+    { id: number; data: BodyType<SubmitPromptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitProjectPrompt>>,
+  TError,
+  { id: number; data: BodyType<SubmitPromptBody> },
+  TContext
+> => {
+  return useMutation(getSubmitProjectPromptMutationOptions(options));
+};
+
+/**
+ * @summary List files attached to this project
+ */
+export const getListProjectFilesUrl = (id: number) => {
+  return `/api/projects/${id}/files`;
+};
+
+export const listProjectFiles = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ProjectFileList> => {
+  return customFetch<ProjectFileList>(getListProjectFilesUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectFilesQueryKey = (id: number) => {
+  return [`/api/projects/${id}/files`] as const;
+};
+
+export const getListProjectFilesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectFiles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectFilesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectFiles>>
+  > = ({ signal }) => listProjectFiles(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectFiles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectFilesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectFiles>>
+>;
+export type ListProjectFilesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List files attached to this project
+ */
+
+export function useListProjectFiles<
+  TData = Awaited<ReturnType<typeof listProjectFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectFiles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectFilesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Record an uploaded file's metadata against a project
+ */
+export const getAddProjectFileUrl = (id: number) => {
+  return `/api/projects/${id}/files`;
+};
+
+export const addProjectFile = async (
+  id: number,
+  createProjectFileBody: CreateProjectFileBody,
+  options?: RequestInit,
+): Promise<ProjectFile> => {
+  return customFetch<ProjectFile>(getAddProjectFileUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createProjectFileBody),
+  });
+};
+
+export const getAddProjectFileMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addProjectFile>>,
+    TError,
+    { id: number; data: BodyType<CreateProjectFileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addProjectFile>>,
+  TError,
+  { id: number; data: BodyType<CreateProjectFileBody> },
+  TContext
+> => {
+  const mutationKey = ["addProjectFile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addProjectFile>>,
+    { id: number; data: BodyType<CreateProjectFileBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addProjectFile(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddProjectFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addProjectFile>>
+>;
+export type AddProjectFileMutationBody = BodyType<CreateProjectFileBody>;
+export type AddProjectFileMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record an uploaded file's metadata against a project
+ */
+export const useAddProjectFile = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addProjectFile>>,
+    TError,
+    { id: number; data: BodyType<CreateProjectFileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addProjectFile>>,
+  TError,
+  { id: number; data: BodyType<CreateProjectFileBody> },
+  TContext
+> => {
+  return useMutation(getAddProjectFileMutationOptions(options));
+};
+
+/**
+ * @summary Remove a file from a project (uploader or project owner only)
+ */
+export const getDeleteProjectFileUrl = (id: number, fileId: number) => {
+  return `/api/projects/${id}/files/${fileId}`;
+};
+
+export const deleteProjectFile = async (
+  id: number,
+  fileId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteProjectFileUrl(id, fileId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteProjectFileMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProjectFile>>,
+    TError,
+    { id: number; fileId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteProjectFile>>,
+  TError,
+  { id: number; fileId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteProjectFile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteProjectFile>>,
+    { id: number; fileId: number }
+  > = (props) => {
+    const { id, fileId } = props ?? {};
+
+    return deleteProjectFile(id, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteProjectFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteProjectFile>>
+>;
+
+export type DeleteProjectFileMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove a file from a project (uploader or project owner only)
+ */
+export const useDeleteProjectFile = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProjectFile>>,
+    TError,
+    { id: number; fileId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteProjectFile>>,
+  TError,
+  { id: number; fileId: number },
+  TContext
+> => {
+  return useMutation(getDeleteProjectFileMutationOptions(options));
+};
+
+/**
  * @summary List consulting hour packages (3 tiers)
  */
 export const getListConsultingPackagesUrl = () => {
@@ -1790,6 +2490,173 @@ export const useCreateRetainerCheckout = <
   TContext
 > => {
   return useMutation(getCreateRetainerCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary Start a Stripe Checkout for the $500/mo Portal Access subscription (auth required)
+ */
+export const getCreatePortalCheckoutUrl = () => {
+  return `/api/checkout/portal`;
+};
+
+export const createPortalCheckout = async (
+  options?: RequestInit,
+): Promise<CheckoutResponse> => {
+  return customFetch<CheckoutResponse>(getCreatePortalCheckoutUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCreatePortalCheckoutMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPortalCheckout>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPortalCheckout>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["createPortalCheckout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPortalCheckout>>,
+    void
+  > = () => {
+    return createPortalCheckout(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePortalCheckoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPortalCheckout>>
+>;
+
+export type CreatePortalCheckoutMutationError = ErrorType<void>;
+
+/**
+ * @summary Start a Stripe Checkout for the $500/mo Portal Access subscription (auth required)
+ */
+export const useCreatePortalCheckout = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPortalCheckout>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPortalCheckout>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCreatePortalCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary Request a presigned URL for direct file upload to object storage
+ */
+export const getRequestUploadUrlUrl = () => {
+  return `/api/storage/uploads/request-url`;
+};
+
+export const requestUploadUrl = async (
+  requestUploadUrlBody: RequestUploadUrlBody,
+  options?: RequestInit,
+): Promise<RequestUploadUrlResponse> => {
+  return customFetch<RequestUploadUrlResponse>(getRequestUploadUrlUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(requestUploadUrlBody),
+  });
+};
+
+export const getRequestUploadUrlMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    TError,
+    { data: BodyType<RequestUploadUrlBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestUploadUrl>>,
+  TError,
+  { data: BodyType<RequestUploadUrlBody> },
+  TContext
+> => {
+  const mutationKey = ["requestUploadUrl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    { data: BodyType<RequestUploadUrlBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestUploadUrl(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestUploadUrlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestUploadUrl>>
+>;
+export type RequestUploadUrlMutationBody = BodyType<RequestUploadUrlBody>;
+export type RequestUploadUrlMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request a presigned URL for direct file upload to object storage
+ */
+export const useRequestUploadUrl = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    TError,
+    { data: BodyType<RequestUploadUrlBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestUploadUrl>>,
+  TError,
+  { data: BodyType<RequestUploadUrlBody> },
+  TContext
+> => {
+  return useMutation(getRequestUploadUrlMutationOptions(options));
 };
 
 /**

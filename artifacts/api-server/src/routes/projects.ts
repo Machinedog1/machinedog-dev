@@ -1,9 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, inArray, or, ne, isNotNull } from "drizzle-orm";
+import { eq, desc, asc, and, inArray, or, ne, isNotNull, sql } from "drizzle-orm";
 import {
   db,
   projectsTable,
   projectMembersTable,
+  projectCommentsTable,
+  projectFilesTable,
+  promptSessionsTable,
   clientsTable,
   type Project,
 } from "@workspace/db";
@@ -20,10 +23,26 @@ import {
   InviteProjectMemberParams,
   InviteProjectMemberBody,
   RemoveProjectMemberParams,
+  ListProjectCommentsParams,
+  ListProjectCommentsResponse,
+  AddProjectCommentParams,
+  AddProjectCommentBody,
+  DeleteProjectCommentParams,
+  ListProjectPromptsParams,
+  ListProjectPromptsResponse,
+  SubmitProjectPromptParams,
+  SubmitProjectPromptBody,
+  SubmitProjectPromptResponse,
+  ListProjectFilesParams,
+  ListProjectFilesResponse,
+  AddProjectFileParams,
+  AddProjectFileBody,
+  DeleteProjectFileParams,
 } from "@workspace/api-zod";
 import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
 import { sendProjectInviteEmail } from "../lib/project-invites";
 import { logger } from "../lib/logger";
+import { runClaudePrompt } from "../lib/anthropic";
 
 const router: IRouter = Router();
 
@@ -372,6 +391,386 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    res.status(204).end();
+  },
+);
+
+// ─── Comments ──────────────────────────────────────────────────────────────
+
+router.get(
+  "/projects/:id/comments",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = ListProjectCommentsParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const rows = await db
+      .select({
+        id: projectCommentsTable.id,
+        projectId: projectCommentsTable.projectId,
+        clientId: projectCommentsTable.clientId,
+        clientEmail: clientsTable.email,
+        body: projectCommentsTable.body,
+        createdAt: projectCommentsTable.createdAt,
+      })
+      .from(projectCommentsTable)
+      .leftJoin(clientsTable, eq(clientsTable.id, projectCommentsTable.clientId))
+      .where(eq(projectCommentsTable.projectId, project.id))
+      .orderBy(asc(projectCommentsTable.createdAt));
+    res.json(
+      ListProjectCommentsResponse.parse({
+        data: rows.map((r) => ({ ...r, clientEmail: r.clientEmail ?? "" })),
+      }),
+    );
+  },
+);
+
+router.post(
+  "/projects/:id/comments",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = AddProjectCommentParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const body = AddProjectCommentBody.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: body.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const trimmed = body.data.body.trim();
+    if (!trimmed) {
+      res.status(400).json({ error: "Comment cannot be empty" });
+      return;
+    }
+    const [row] = await db
+      .insert(projectCommentsTable)
+      .values({
+        projectId: project.id,
+        clientId: req.client!.id,
+        body: trimmed,
+      })
+      .returning();
+    res.status(201).json({
+      id: row.id,
+      projectId: row.projectId,
+      clientId: row.clientId,
+      clientEmail: req.client!.email,
+      body: row.body,
+      createdAt: row.createdAt,
+    });
+  },
+);
+
+router.delete(
+  "/projects/:id/comments/:commentId",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = DeleteProjectCommentParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [comment] = await db
+      .select()
+      .from(projectCommentsTable)
+      .where(
+        and(
+          eq(projectCommentsTable.id, params.data.commentId),
+          eq(projectCommentsTable.projectId, project.id),
+        ),
+      );
+    if (!comment) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const isAuthor = comment.clientId === req.client!.id;
+    const isOwner = project.viewerRole === "owner";
+    if (!isAuthor && !isOwner) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    await db.delete(projectCommentsTable).where(eq(projectCommentsTable.id, comment.id));
+    res.status(204).end();
+  },
+);
+
+// ─── Project-scoped prompt console ─────────────────────────────────────────
+
+router.get(
+  "/projects/:id/prompts",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = ListProjectPromptsParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const rows = await db
+      .select()
+      .from(promptSessionsTable)
+      .where(eq(promptSessionsTable.projectId, project.id))
+      .orderBy(desc(promptSessionsTable.createdAt))
+      .limit(100);
+    res.json(ListProjectPromptsResponse.parse({ data: rows, total: rows.length }));
+  },
+);
+
+router.post(
+  "/projects/:id/prompts",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = SubmitProjectPromptParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const body = SubmitProjectPromptBody.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: body.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const client = req.client!;
+    if (client.tokenBalance <= 0) {
+      res.status(402).json({
+        error: "Insufficient tokens. Please purchase a bundle.",
+        tokenBalance: client.tokenBalance,
+      });
+      return;
+    }
+
+    let result;
+    try {
+      result = await runClaudePrompt(body.data.prompt);
+    } catch (err) {
+      req.log.error({ err }, "Claude prompt failed");
+      res.status(502).json({ error: "AI request failed. No tokens were charged." });
+      return;
+    }
+
+    const tokensUsed = Math.min(result.totalTokens, client.tokenBalance);
+    await db
+      .update(clientsTable)
+      .set({
+        tokenBalance: sql`GREATEST(${clientsTable.tokenBalance} - ${tokensUsed}, 0)`,
+        totalTokensUsed: sql`${clientsTable.totalTokensUsed} + ${tokensUsed}`,
+      })
+      .where(eq(clientsTable.id, client.id));
+
+    const [session] = await db
+      .insert(promptSessionsTable)
+      .values({
+        clientId: client.id,
+        projectId: project.id,
+        prompt: body.data.prompt,
+        output: result.output,
+        tokensUsed,
+        model: result.model,
+      })
+      .returning();
+
+    res.json(SubmitProjectPromptResponse.parse(session));
+  },
+);
+
+// ─── Project files ─────────────────────────────────────────────────────────
+
+router.get(
+  "/projects/:id/files",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = ListProjectFilesParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const rows = await db
+      .select({
+        id: projectFilesTable.id,
+        projectId: projectFilesTable.projectId,
+        uploadedByClientId: projectFilesTable.uploadedByClientId,
+        uploadedByEmail: clientsTable.email,
+        name: projectFilesTable.name,
+        contentType: projectFilesTable.contentType,
+        sizeBytes: projectFilesTable.sizeBytes,
+        objectPath: projectFilesTable.objectPath,
+        createdAt: projectFilesTable.createdAt,
+      })
+      .from(projectFilesTable)
+      .leftJoin(clientsTable, eq(clientsTable.id, projectFilesTable.uploadedByClientId))
+      .where(eq(projectFilesTable.projectId, project.id))
+      .orderBy(desc(projectFilesTable.createdAt));
+    res.json(
+      ListProjectFilesResponse.parse({
+        data: rows.map((r) => ({ ...r, uploadedByEmail: r.uploadedByEmail ?? "" })),
+      }),
+    );
+  },
+);
+
+router.post(
+  "/projects/:id/files",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = AddProjectFileParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const body = AddProjectFileBody.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: body.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (!body.data.objectPath.startsWith("/objects/")) {
+      res.status(400).json({ error: "Invalid object path" });
+      return;
+    }
+    const [row] = await db
+      .insert(projectFilesTable)
+      .values({
+        projectId: project.id,
+        uploadedByClientId: req.client!.id,
+        name: body.data.name,
+        contentType: body.data.contentType,
+        sizeBytes: body.data.sizeBytes,
+        objectPath: body.data.objectPath,
+      })
+      .returning();
+    res.status(201).json({
+      id: row.id,
+      projectId: row.projectId,
+      uploadedByClientId: row.uploadedByClientId,
+      uploadedByEmail: req.client!.email,
+      name: row.name,
+      contentType: row.contentType,
+      sizeBytes: row.sizeBytes,
+      objectPath: row.objectPath,
+      createdAt: row.createdAt,
+    });
+  },
+);
+
+router.delete(
+  "/projects/:id/files/:fileId",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = DeleteProjectFileParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.client!.id,
+      req.client!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [file] = await db
+      .select()
+      .from(projectFilesTable)
+      .where(
+        and(
+          eq(projectFilesTable.id, params.data.fileId),
+          eq(projectFilesTable.projectId, project.id),
+        ),
+      );
+    if (!file) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const isUploader = file.uploadedByClientId === req.client!.id;
+    const isOwner = project.viewerRole === "owner";
+    if (!isUploader && !isOwner) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    await db.delete(projectFilesTable).where(eq(projectFilesTable.id, file.id));
     res.status(204).end();
   },
 );

@@ -9,6 +9,7 @@ import adminRouter from "./admin";
 import intakeRouter from "./intake";
 import leadsRouter from "./leads";
 import checkoutRouter from "./checkout";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(consultingRouter);
 router.use(adminRouter);
 router.use(leadsRouter);
 router.use(checkoutRouter);
+router.use(storageRouter);
 
 export default router;

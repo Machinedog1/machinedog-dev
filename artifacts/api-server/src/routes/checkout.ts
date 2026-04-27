@@ -1,12 +1,15 @@
 import { Router, type IRouter } from "express";
-import { db, buildOrdersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { db, buildOrdersTable, clientsTable } from "@workspace/db";
 import {
   CreateBuildCheckoutBody,
   CreateBuildCheckoutResponse,
   CreateRetainerCheckoutBody,
   CreateRetainerCheckoutResponse,
+  CreatePortalCheckoutResponse,
 } from "@workspace/api-zod";
 import { getStripe, publicOrigin } from "../lib/stripe";
+import { requireAuth, loadOrCreateClient } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -60,6 +63,11 @@ const BUILD_PRICE_USD = (() => {
 const RETAINER_PRICE_USD = (() => {
   const raw = Number(process.env.STRIPE_RETAINER_USD);
   return Number.isFinite(raw) && raw > 0 ? raw : 1_200;
+})();
+
+const PORTAL_PRICE_USD = (() => {
+  const raw = Number(process.env.STRIPE_PORTAL_USD);
+  return Number.isFinite(raw) && raw > 0 ? raw : 500;
 })();
 
 router.post("/checkout/build", async (req, res): Promise<void> => {
@@ -207,5 +215,85 @@ router.post("/checkout/retainer", async (req, res): Promise<void> => {
     res.status(500).json({ error: "Could not start checkout. Please try again." });
   }
 });
+
+router.post(
+  "/checkout/portal",
+  requireAuth,
+  loadOrCreateClient,
+  async (req, res): Promise<void> => {
+    if (!req.client) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (isRateLimited(clientIp(req))) {
+      res.status(429).json({ error: "Too many checkout attempts. Please try again later." });
+      return;
+    }
+
+    const stripe = getStripe();
+    if (!stripe) {
+      res
+        .status(503)
+        .json({ error: "Payments are not yet configured. Please contact us to enable Portal Access." });
+      return;
+    }
+
+    const origin = publicOrigin(req);
+    const amountCents = Math.round(PORTAL_PRICE_USD * 100);
+    const explicitPriceId = process.env.STRIPE_PRICE_PORTAL?.trim();
+    const customerArgs = req.client.stripeCustomerId
+      ? { customer: req.client.stripeCustomerId }
+      : { customer_email: req.client.email };
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        payment_method_types: ["card"],
+        ...customerArgs,
+        line_items: explicitPriceId
+          ? [{ quantity: 1, price: explicitPriceId }]
+          : [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: "usd",
+                  unit_amount: amountCents,
+                  recurring: { interval: "month" },
+                  product_data: {
+                    name: "Machinedog · Portal Access",
+                    description:
+                      "Monthly Portal Access — invite-only client portal, shared prompt console, comments, file uploads.",
+                  },
+                },
+              },
+            ],
+        billing_address_collection: "auto",
+        allow_promotion_codes: true,
+        metadata: {
+          kind: "portal",
+          clientId: String(req.client.id),
+        },
+        subscription_data: {
+          metadata: {
+            kind: "portal",
+            clientId: String(req.client.id),
+          },
+        },
+        success_url: `${origin}/thank-you?kind=portal&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/pricing?status=cancelled#portal`,
+      });
+
+      if (!session.url) {
+        res.status(500).json({ error: "Stripe did not return a checkout URL" });
+        return;
+      }
+      res.json(CreatePortalCheckoutResponse.parse({ url: session.url }));
+    } catch (err) {
+      req.log.error({ err }, "Failed to create portal checkout session");
+      res.status(500).json({ error: "Could not start checkout. Please try again." });
+    }
+  },
+);
 
 export default router;

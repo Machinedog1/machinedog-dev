@@ -23,6 +23,18 @@ export const ClientStatus = {
   invited: "invited",
 } as const;
 
+export type ClientPortalSubscriptionStatus =
+  (typeof ClientPortalSubscriptionStatus)[keyof typeof ClientPortalSubscriptionStatus];
+
+export const ClientPortalSubscriptionStatus = {
+  none: "none",
+  trialing: "trialing",
+  active: "active",
+  past_due: "past_due",
+  canceled: "canceled",
+  incomplete: "incomplete",
+} as const;
+
 export interface Client {
   id: number;
   userId: string;
@@ -33,6 +45,9 @@ export interface Client {
   /** @nullable */
   stripeCustomerId?: string | null;
   status: ClientStatus;
+  portalSubscriptionStatus: ClientPortalSubscriptionStatus;
+  /** @nullable */
+  portalCurrentPeriodEnd?: string | null;
   createdAt: string;
 }
 
@@ -44,6 +59,8 @@ export interface ClientList {
 export interface PromptSession {
   id: number;
   clientId: number;
+  /** @nullable */
+  projectId?: number | null;
   prompt: string;
   output: string;
   tokensUsed: number;
@@ -207,6 +224,79 @@ export interface ProjectMemberList {
 
 export interface InviteProjectMemberBody {
   email: string;
+}
+
+export interface ProjectComment {
+  id: number;
+  projectId: number;
+  clientId: number;
+  clientEmail: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ProjectCommentList {
+  data: ProjectComment[];
+}
+
+export interface CreateProjectCommentBody {
+  /**
+   * @minLength 1
+   * @maxLength 5000
+   */
+  body: string;
+}
+
+export interface ProjectFile {
+  id: number;
+  projectId: number;
+  uploadedByClientId: number;
+  uploadedByEmail: string;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  objectPath: string;
+  createdAt: string;
+}
+
+export interface ProjectFileList {
+  data: ProjectFile[];
+}
+
+export interface CreateProjectFileBody {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  contentType: string;
+  /** @minimum 0 */
+  sizeBytes: number;
+  /**
+   * Object path returned by /storage/uploads/request-url (e.g. /objects/uploads/uuid)
+   * @minLength 1
+   * @maxLength 500
+   */
+  objectPath: string;
+}
+
+export interface RequestUploadUrlBody {
+  /** @minLength 1 */
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  /** @minLength 1 */
+  contentType: string;
+}
+
+export interface RequestUploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+  metadata?: RequestUploadUrlBody;
 }
 
 export interface ConsultingPackage {

@@ -9,6 +9,8 @@
 export interface PromptSession {
   id: number;
   clientId: number;
+  /** @nullable */
+  projectId?: number | null;
   prompt: string;
   output: string;
   tokensUsed: number;

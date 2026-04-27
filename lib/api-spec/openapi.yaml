@@ -26,6 +26,8 @@ tags:
     description: Public lead capture (e.g. pricing-page contact form)
   - name: checkout
     description: Public Stripe Checkout entry points (no auth)
+  - name: storage
+    description: Object storage upload and serving endpoints
 
 paths:
   /healthz:
@@ -340,6 +342,172 @@ paths:
         "204":
           description: Member removed
 
+  /projects/{id}/comments:
+    get:
+      operationId: listProjectComments
+      tags: [projects]
+      summary: List comments on a project (owner or member)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectCommentList"
+    post:
+      operationId: addProjectComment
+      tags: [projects]
+      summary: Post a comment on a project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectCommentBody"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectComment"
+
+  /projects/{id}/comments/{commentId}:
+    delete:
+      operationId: deleteProjectComment
+      tags: [projects]
+      summary: Delete a comment (author or project owner only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Comment deleted
+
+  /projects/{id}/prompts:
+    get:
+      operationId: listProjectPrompts
+      tags: [projects]
+      summary: List prompt sessions scoped to this project (shared across members)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project prompts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptSessionList"
+    post:
+      operationId: submitProjectPrompt
+      tags: [projects]
+      summary: Submit a prompt scoped to this project (charges submitter tokens)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitPromptBody"
+      responses:
+        "200":
+          description: Prompt result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptSession"
+
+  /projects/{id}/files:
+    get:
+      operationId: listProjectFiles
+      tags: [projects]
+      summary: List files attached to this project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectFileList"
+    post:
+      operationId: addProjectFile
+      tags: [projects]
+      summary: Record an uploaded file's metadata against a project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectFileBody"
+      responses:
+        "201":
+          description: Created file record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectFile"
+
+  /projects/{id}/files/{fileId}:
+    delete:
+      operationId: deleteProjectFile
+      tags: [projects]
+      summary: Remove a file from a project (uploader or project owner only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: fileId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: File removed
+
   # ─── Consulting packages ───────────────────────────────────────────────────
 
   /consulting/packages:
@@ -430,6 +598,44 @@ paths:
                 $ref: "#/components/schemas/CheckoutResponse"
         "503":
           description: Stripe is not configured
+
+  /checkout/portal:
+    post:
+      operationId: createPortalCheckout
+      tags: [checkout]
+      summary: Start a Stripe Checkout for the $500/mo Portal Access subscription (auth required)
+      responses:
+        "200":
+          description: Stripe checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "401":
+          description: Not signed in
+        "503":
+          description: Stripe is not configured
+
+  # ─── Storage (object uploads) ──────────────────────────────────────────────
+
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned URL for direct file upload to object storage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUploadUrlBody"
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestUploadUrlResponse"
 
   # ─── Public lead capture ───────────────────────────────────────────────────
 
@@ -635,10 +841,16 @@ components:
         status:
           type: string
           enum: [active, suspended, invited]
+        portalSubscriptionStatus:
+          type: string
+          enum: [none, trialing, active, past_due, canceled, incomplete]
+        portalCurrentPeriodEnd:
+          type: ["string", "null"]
+          format: date-time
         createdAt:
           type: string
           format: date-time
-      required: [id, userId, email, tokenBalance, totalTokensUsed, isAdmin, status, createdAt]
+      required: [id, userId, email, tokenBalance, totalTokensUsed, isAdmin, status, portalSubscriptionStatus, createdAt]
 
     ClientList:
       type: object
@@ -658,6 +870,8 @@ components:
           type: integer
         clientId:
           type: integer
+        projectId:
+          type: ["integer", "null"]
         prompt:
           type: string
         output:
@@ -886,6 +1100,131 @@ components:
           type: string
           format: email
       required: [email]
+
+    ProjectComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        clientId:
+          type: integer
+        clientEmail:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, projectId, clientId, clientEmail, body, createdAt]
+
+    ProjectCommentList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectComment"
+      required: [data]
+
+    CreateProjectCommentBody:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 5000
+      required: [body]
+
+    ProjectFile:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        uploadedByClientId:
+          type: integer
+        uploadedByEmail:
+          type: string
+        name:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        objectPath:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - uploadedByClientId
+        - uploadedByEmail
+        - name
+        - contentType
+        - sizeBytes
+        - objectPath
+        - createdAt
+
+    ProjectFileList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectFile"
+      required: [data]
+
+    CreateProjectFileBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 200
+        sizeBytes:
+          type: integer
+          minimum: 0
+        objectPath:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Object path returned by /storage/uploads/request-url (e.g. /objects/uploads/uuid)
+      required: [name, contentType, sizeBytes, objectPath]
+
+    RequestUploadUrlBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+      required: [name, size, contentType]
+
+    RequestUploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/RequestUploadUrlBody"
+      required: [uploadURL, objectPath]
 
     ConsultingPackage:
       type: object
