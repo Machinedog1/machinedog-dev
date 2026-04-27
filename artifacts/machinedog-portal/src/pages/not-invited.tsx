@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@clerk/react";
-import { ShieldAlert, Terminal } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
+import { Logo } from "@/components/Logo";
 
 export default function NotInvitedPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center">
-      <div className="mb-8 flex items-center justify-center gap-3 font-mono font-bold tracking-tight text-2xl opacity-50">
-        <Terminal className="h-8 w-8 text-primary" />
-        <span>MACHINEDOG.DEV</span>
+      <div className="mb-8 opacity-80">
+        <Logo size="lg" href={null} />
       </div>
       
       <div className="max-w-md w-full bg-card border border-border p-8 rounded-lg shadow-xl flex flex-col items-center">

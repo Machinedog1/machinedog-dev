@@ -1,7 +1,7 @@
 import { SignUp } from "@clerk/react";
-import { Terminal } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { dark } from "@clerk/themes";
+import { Logo } from "@/components/Logo";
 
 export default function SignUpPage() {
   const { theme } = useTheme();
@@ -10,9 +10,8 @@ export default function SignUpPage() {
     <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-4 relative">
       <div className="bg-mesh" />
       <div className="bg-grid" />
-      <div className="mb-8 flex items-center gap-3 font-mono font-bold tracking-tight text-2xl z-10 text-foreground">
-        <Terminal className="h-8 w-8 text-primary" />
-        <span>MACHINEDOG.DEV</span>
+      <div className="mb-8 z-10">
+        <Logo size="lg" />
       </div>
       <div className="w-full max-w-md z-10">
         <SignUp 
