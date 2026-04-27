@@ -43,11 +43,15 @@ export default function PromptConsole() {
               : "This prompt is no longer published.",
           });
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
+          const message =
+            (err && typeof err === "object" && "error" in err
+              ? String((err as { error?: unknown }).error ?? "")
+              : "") || "Could not update publish state.";
           toast({
             variant: "destructive",
             title: "Publish failed",
-            description: err?.error || "Could not update publish state.",
+            description: message,
           });
         },
       }
@@ -78,9 +82,12 @@ export default function PromptConsole() {
             description: `Used ${data.tokensUsed} tokens`,
           });
         },
-        onError: (err: any) => {
-          // If 402, redirect to tokens
-          if (err?.error === "Insufficient token balance" || err?.tokenBalance !== undefined) {
+        onError: (err: unknown) => {
+          const errObj =
+            err && typeof err === "object" ? (err as Record<string, unknown>) : {};
+          const errorMsg = typeof errObj.error === "string" ? errObj.error : "";
+          const hasTokenBalance = "tokenBalance" in errObj;
+          if (errorMsg === "Insufficient token balance" || hasTokenBalance) {
             toast({
               variant: "destructive",
               title: "Insufficient Balance",
@@ -91,7 +98,7 @@ export default function PromptConsole() {
             toast({
               variant: "destructive",
               title: "Error",
-              description: err?.error || "Failed to execute prompt",
+              description: errorMsg || "Failed to execute prompt",
             });
           }
         }
