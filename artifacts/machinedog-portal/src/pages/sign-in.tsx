@@ -44,12 +44,13 @@ export default function SignInPage() {
       className="dark relative min-h-screen w-full overflow-hidden text-white"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* DESKTOP full-bleed husky portrait — eye-focused crop, hidden on mobile */}
+      {/* DESKTOP full-bleed husky portrait — eye-focused crop, heavily faded into the background */}
       <div
         className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
         style={{
           backgroundImage: `url(${huskyPortrait})`,
-          filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+          filter: "saturate(0.85) contrast(0.95) brightness(0.45)",
+          opacity: 0.35,
         }}
       />
 
@@ -121,7 +122,8 @@ export default function SignInPage() {
             className="absolute inset-0 h-full w-full object-cover"
             style={{
               objectPosition: "50% 30%",
-              filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+              filter: "saturate(0.85) contrast(0.95) brightness(0.5)",
+              opacity: 0.45,
             }}
           />
           {/* Cyan halo over the eyes */}
