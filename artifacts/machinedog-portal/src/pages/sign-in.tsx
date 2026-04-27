@@ -14,40 +14,6 @@ export default function SignInPage() {
       className="dark relative min-h-screen w-full overflow-hidden text-white"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* MOBILE husky hero — fixed-aspect top portrait so the face is always visible.
-          Hidden on lg+ where we use the full-bleed layout below.
-          Bounded height keeps the face crop consistent across very short / very tall mobile viewports. */}
-      <div className="lg:hidden absolute inset-x-0 top-0 h-[60vh] min-h-[360px] max-h-[520px] overflow-hidden">
-        <img
-          src={huskyPortrait}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{
-            objectPosition: "50% 28%",
-            filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
-          }}
-        />
-        {/* Cyan halo over the eyes */}
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none mix-blend-screen"
-          style={{
-            background:
-              "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
-          }}
-        />
-        {/* Bottom fade so content underneath reads cleanly */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 50%, hsla(220,45%,3%,1) 100%)",
-          }}
-        />
-      </div>
-
       {/* DESKTOP full-bleed husky portrait — eye-focused crop, hidden on mobile */}
       <div
         className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
@@ -115,13 +81,45 @@ export default function SignInPage() {
           </nav>
         </header>
 
-        {/* Main grid: headline left, glass card right (stacks on mobile, headline first).
-            On mobile, content begins below the husky hero (matches the bounded hero height). */}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-[calc(min(60vh,520px)-12px)] sm:pt-[calc(min(60vh,520px)-12px)] lg:pt-0">
+        {/* MOBILE husky hero — normal-flow block between header and main so layout is bullet-proof.
+            Hidden on lg+ where the desktop full-bleed bg above takes over. */}
+        <div className="lg:hidden relative w-full h-[58vh] min-h-[340px] max-h-[500px] overflow-hidden mt-3">
+          <img
+            src={huskyPortrait}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{
+              objectPosition: "50% 30%",
+              filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+            }}
+          />
+          {/* Cyan halo over the eyes */}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none mix-blend-screen"
+            style={{
+              background:
+                "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
+            }}
+          />
+          {/* Bottom fade so content underneath reads cleanly */}
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 55%, hsla(220,45%,3%,1) 100%)",
+            }}
+          />
+        </div>
+
+        {/* Main grid: headline left, glass card right (stacks on mobile, headline first). */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
           {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
           <div className="order-1 lg:order-1 w-full max-w-xl">
             <div
-              className="relative rounded-[28px] p-6 sm:p-8 overflow-hidden"
+              className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
               style={{
                 background:
                   "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
@@ -160,10 +158,11 @@ export default function SignInPage() {
                   Invite-only AI atelier
                 </div>
                 <h1
-                  className="text-white uppercase font-extrabold leading-[0.92] tracking-tight break-words"
+                  className="text-white uppercase font-extrabold leading-[0.95] tracking-tight break-words"
                   style={{
-                    fontSize: "clamp(1.75rem, 7.5vw, 4.5rem)",
+                    fontSize: "clamp(1.5rem, 7vw, 4.5rem)",
                     textShadow: "0 4px 40px rgba(0,0,0,0.45)",
+                    letterSpacing: "-0.01em",
                   }}
                 >
                   We forge
