@@ -14,34 +14,67 @@ export default function SignInPage() {
       className="dark relative min-h-screen w-full overflow-hidden text-white"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* Full-bleed husky portrait — face-focused on mobile, eye-focused on desktop */}
+      {/* MOBILE husky hero — fixed-aspect top portrait so the face is always visible.
+          Hidden on lg+ where we use the full-bleed layout below. */}
+      <div className="lg:hidden absolute inset-x-0 top-0 h-[68vh] overflow-hidden">
+        <img
+          src={huskyPortrait}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{
+            objectPosition: "50% 22%",
+            filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+          }}
+        />
+        {/* Cyan halo over the eyes */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none mix-blend-screen"
+          style={{
+            background:
+              "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
+          }}
+        />
+        {/* Bottom fade so content underneath reads cleanly */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 50%, hsla(220,45%,3%,1) 100%)",
+          }}
+        />
+      </div>
+
+      {/* DESKTOP full-bleed husky portrait — eye-focused crop, hidden on mobile */}
       <div
-        className="absolute inset-0 bg-cover bg-no-repeat bg-[position:50%_62%] lg:bg-[position:50%_32%]"
+        className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
         style={{
           backgroundImage: `url(${huskyPortrait})`,
           filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
         }}
       />
 
-      {/* Cyan halo behind the eyes — repositioned for mobile face crop vs desktop */}
+      {/* Desktop cyan halo behind the eyes */}
       <div
-        className="absolute inset-0 pointer-events-none mix-blend-screen"
+        className="hidden lg:block absolute inset-0 pointer-events-none mix-blend-screen"
         style={{
           background:
             "radial-gradient(ellipse 70% 35% at 52% 38%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
         }}
       />
 
-      {/* Vignette / bottom fade for legibility */}
+      {/* Desktop vignette / bottom fade for legibility */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="hidden lg:block absolute inset-0 pointer-events-none"
         style={{
           background:
             "radial-gradient(ellipse at 50% 35%, transparent 0%, hsla(220,45%,3%,0.35) 60%, hsla(220,45%,3%,0.85) 100%)",
         }}
       />
       <div
-        className="absolute inset-x-0 bottom-0 h-1/2 pointer-events-none"
+        className="hidden lg:block absolute inset-x-0 bottom-0 h-1/2 pointer-events-none"
         style={{
           background:
             "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 55%, hsla(220,45%,3%,0.95) 100%)",
@@ -81,42 +114,79 @@ export default function SignInPage() {
           </nav>
         </header>
 
-        {/* Main grid: headline left, glass card right (stacks on mobile, headline first) */}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-8 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
-          {/* Headline */}
-          <div className="max-w-xl order-1 lg:order-1">
+        {/* Main grid: headline left, glass card right (stacks on mobile, headline first).
+            On mobile, content begins below the husky hero (~52vh of top space reserved for the portrait). */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-[52vh] sm:pt-[44vh] lg:pt-0">
+          {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
+          <div className="order-1 lg:order-1 w-full max-w-xl">
             <div
-              className="mb-4 text-[11px] sm:text-xs font-mono tracking-[0.28em] uppercase"
-              style={{ color: "hsl(200 95% 70%)" }}
-            >
-              Invite-only AI atelier
-            </div>
-            <h1
-              className="text-white uppercase font-extrabold leading-[0.92] tracking-tight"
+              className="relative rounded-[28px] p-6 sm:p-8 overflow-hidden"
               style={{
-                fontSize: "clamp(2.5rem, 6.4vw, 4.75rem)",
-                textShadow: "0 4px 40px rgba(0,0,0,0.45)",
+                background:
+                  "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                backdropFilter: "blur(40px) saturate(180%)",
+                WebkitBackdropFilter: "blur(40px) saturate(180%)",
+                boxShadow:
+                  "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
               }}
             >
-              We forge
-              <br />
-              <span
+              {/* Top rim highlight */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-px"
                 style={{
-                  WebkitTextFillColor: "transparent",
-                  WebkitBackgroundClip: "text",
-                  backgroundImage:
-                    "linear-gradient(135deg, hsl(200 95% 65%) 0%, hsl(254 95% 78%) 100%)",
+                  background:
+                    "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
                 }}
-              >
-                digital
-              </span>
-              <br />
-              intelligence
-            </h1>
-            <p className="mt-6 max-w-md text-base sm:text-lg leading-relaxed text-white/75">
-              Machinedog.Dev is a private engineering atelier. Sign in with your
-              invited account to access prompts, projects, and consulting hours.
-            </p>
+              />
+              {/* Soft cyan inner glow */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -top-24 -left-20 h-64 w-64 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(circle, hsla(200,95%,60%,0.30) 0%, transparent 70%)",
+                  filter: "blur(8px)",
+                }}
+              />
+
+              <div className="relative">
+                <div
+                  className="mb-4 text-[11px] sm:text-xs font-mono tracking-[0.28em] uppercase"
+                  style={{ color: "hsl(200 95% 70%)" }}
+                >
+                  Invite-only AI atelier
+                </div>
+                <h1
+                  className="text-white uppercase font-extrabold leading-[0.92] tracking-tight"
+                  style={{
+                    fontSize: "clamp(2.25rem, 6vw, 4.5rem)",
+                    textShadow: "0 4px 40px rgba(0,0,0,0.45)",
+                  }}
+                >
+                  We forge
+                  <br />
+                  <span
+                    style={{
+                      WebkitTextFillColor: "transparent",
+                      WebkitBackgroundClip: "text",
+                      backgroundImage:
+                        "linear-gradient(135deg, hsl(200 95% 65%) 0%, hsl(254 95% 78%) 100%)",
+                    }}
+                  >
+                    digital
+                  </span>
+                  <br />
+                  intelligence
+                </h1>
+                <p className="mt-5 max-w-md text-base sm:text-lg leading-relaxed text-white/75">
+                  Machinedog.Dev is a private engineering atelier. Sign in with
+                  your invited account to access prompts, projects, and
+                  consulting hours.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Apple-style glass sign-in card */}
