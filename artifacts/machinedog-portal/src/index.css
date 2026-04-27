@@ -1,0 +1,316 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-border: var(--primary-border);
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: var(--secondary-border);
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: var(--muted-border);
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: var(--accent-border);
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-border: var(--destructive-border);
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-primary-border: var(--sidebar-primary-border);
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-accent-border: var(--sidebar-accent-border);
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  --font-mono: var(--app-font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  /* Machinedog Light Theme - Pearlescent Glass with Cyber Cyan */
+  --background: 210 20% 98%; /* Very light grey/blue */
+  --foreground: 215 28% 15%; /* Deep slate */
+
+  --card: 210 20% 98%;
+  --card-foreground: 215 28% 15%;
+  --card-border: 210 15% 90%;
+
+  --popover: 210 20% 98%;
+  --popover-foreground: 215 28% 15%;
+  --popover-border: 210 15% 90%;
+
+  --primary: 200 80% 55%; /* Machinedog Cyber Cyan */
+  --primary-foreground: 0 0% 100%;
+  --primary-bright: 199 90% 65%;
+  --accent-violet: 254 90% 72%;
+
+  --secondary: 210 15% 92%;
+  --secondary-foreground: 215 28% 15%;
+
+  --muted: 210 15% 92%;
+  --muted-foreground: 215 15% 45%;
+
+  --accent: 210 15% 90%;
+  --accent-foreground: 215 28% 15%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 210 15% 90%;
+  --input: 210 15% 92%;
+  --ring: 200 80% 55%;
+
+  --sidebar: 210 20% 96%;
+  --sidebar-foreground: 215 28% 15%;
+  --sidebar-border: 210 15% 85%;
+  --sidebar-primary: 200 80% 55%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 15% 90%;
+  --sidebar-accent-foreground: 215 28% 15%;
+  --sidebar-ring: 200 80% 55%;
+
+  --app-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', 'Consolas', monospace;
+  
+  --radius: 0.75rem; /* Slightly rounder for glass */
+  
+  /* Glass colors */
+  --glass-bg: 0 0% 100%;
+  --glass-bg-alpha: 0.6;
+  --glass-ring: 0 0% 0%;
+  --glass-ring-alpha: 0.05;
+  --glass-highlight: 0 0% 100%;
+  --glass-highlight-alpha: 0.5;
+}
+
+.dark {
+  /* Machinedog Dark Theme - Cyber Husky */
+  --background: 220 35% 4%; /* near-black with blue undertone */
+  --foreground: 210 30% 92%; /* near-white */
+
+  --card: 220 30% 7%;
+  --card-foreground: 210 30% 92%;
+  --card-border: 215 25% 16%;
+
+  --popover: 220 30% 7%;
+  --popover-foreground: 210 30% 92%;
+  --popover-border: 215 25% 16%;
+
+  --primary: 200 90% 60%; /* Cyber Cyan */
+  --primary-foreground: 220 40% 6%;
+  --primary-bright: 199 95% 70%;
+  --accent-violet: 254 95% 75%;
+
+  --secondary: 215 25% 14%;
+  --secondary-foreground: 210 30% 92%;
+
+  --muted: 215 25% 14%;
+  --muted-foreground: 215 18% 68%;
+
+  --accent: 215 25% 18%;
+  --accent-foreground: 210 30% 95%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 215 25% 16%;
+  --input: 215 25% 14%;
+  --ring: 200 90% 60%;
+
+  --sidebar: 220 35% 5%;
+  --sidebar-foreground: 210 30% 92%;
+  --sidebar-border: 215 25% 14%;
+  --sidebar-primary: 200 90% 60%;
+  --sidebar-primary-foreground: 220 40% 6%;
+  --sidebar-accent: 215 25% 14%;
+  --sidebar-accent-foreground: 210 30% 95%;
+  --sidebar-ring: 200 90% 60%;
+  
+  /* Glass colors */
+  --glass-bg: 0 0% 100%;
+  --glass-bg-alpha: 0.03;
+  --glass-ring: 0 0% 100%;
+  --glass-ring-alpha: 0.1;
+  --glass-highlight: 0 0% 100%;
+  --glass-highlight-alpha: 0.05;
+}
+
+@layer components {
+  .glass {
+    @apply bg-[hsla(var(--glass-bg),var(--glass-bg-alpha))] backdrop-blur-xl backdrop-saturate-150 
+           ring-1 ring-inset ring-[hsla(var(--glass-ring),var(--glass-ring-alpha))] 
+           shadow-sm 
+           relative overflow-hidden;
+    box-shadow: 0 4px 24px -1px rgba(0,0,0,0.1), inset 0 1px 0 hsla(var(--glass-highlight), var(--glass-highlight-alpha));
+  }
+  
+  .glass-subtle {
+    @apply bg-[hsla(var(--glass-bg),calc(var(--glass-bg-alpha)*0.5))] backdrop-blur-lg backdrop-saturate-150 
+           ring-1 ring-inset ring-[hsla(var(--glass-ring),var(--glass-ring-alpha))] 
+           shadow-sm 
+           relative overflow-hidden;
+    box-shadow: 0 2px 12px -1px rgba(0,0,0,0.05), inset 0 1px 0 hsla(var(--glass-highlight), calc(var(--glass-highlight-alpha)*0.5));
+  }
+
+  .glass-strong {
+    @apply bg-[hsla(var(--glass-bg),calc(var(--glass-bg-alpha)*1.5))] backdrop-blur-2xl backdrop-saturate-200 
+           ring-1 ring-inset ring-[hsla(var(--glass-ring),calc(var(--glass-ring-alpha)*1.5))] 
+           shadow-md 
+           relative overflow-hidden;
+    box-shadow: 0 8px 32px -1px rgba(0,0,0,0.15), inset 0 1px 0 hsla(var(--glass-highlight), var(--glass-highlight-alpha));
+  }
+
+  .glass-input {
+    @apply bg-[hsla(var(--glass-ring),calc(var(--glass-ring-alpha)*0.5))] backdrop-blur-md 
+           ring-1 ring-inset ring-[hsla(var(--glass-ring),var(--glass-ring-alpha))]
+           shadow-inner;
+  }
+
+  /* Specular shimmer for interactive glass cards */
+  .glass-interactive {
+    @apply bg-[hsla(var(--glass-bg),var(--glass-bg-alpha))] backdrop-blur-xl backdrop-saturate-150
+           ring-1 ring-inset ring-[hsla(var(--glass-ring),var(--glass-ring-alpha))]
+           shadow-sm relative overflow-hidden transition-all duration-300;
+    box-shadow: 0 4px 24px -1px rgba(0,0,0,0.1), inset 0 1px 0 hsla(var(--glass-highlight), var(--glass-highlight-alpha));
+  }
+  .glass-interactive::before {
+    content: "";
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[hsla(var(--glass-highlight),calc(var(--glass-highlight-alpha)*2))] to-transparent opacity-0 transition-all duration-500 z-10 pointer-events-none;
+    transform: skewX(-20deg) translateX(-150%);
+  }
+  .glass-interactive:hover::before {
+    @apply opacity-100;
+    transform: skewX(-20deg) translateX(150%);
+  }
+  .glass-interactive:hover {
+    @apply shadow-md -translate-y-0.5;
+  }
+}
+
+@keyframes gradient-drift {
+  0% { transform: scale(1) translate(0, 0); }
+  33% { transform: scale(1.1) translate(2%, 2%); }
+  66% { transform: scale(0.9) translate(-2%, -2%); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+
+.bg-mesh {
+  position: fixed;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  z-index: -1;
+  background: 
+    radial-gradient(circle at 15% 50%, hsla(var(--primary), 0.08), transparent 50%),
+    radial-gradient(circle at 85% 30%, hsla(var(--primary), 0.05), transparent 50%);
+  animation: gradient-drift 20s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: 
+    radial-gradient(hsla(var(--foreground), 0.1) 1px, transparent 1px),
+    radial-gradient(hsla(var(--foreground), 0.1) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@layer utilities {
+  .text-headline {
+    font-family: var(--app-font-sans);
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 0.95;
+    text-transform: uppercase;
+  }
+  .text-eyebrow {
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+  }
+  .text-gradient-cyber {
+    background: linear-gradient(
+      105deg,
+      hsl(var(--primary-bright)) 0%,
+      hsl(var(--primary)) 35%,
+      hsl(var(--accent-violet)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glow-cyan {
+    box-shadow:
+      0 0 0 1px hsla(var(--primary), 0.35),
+      0 12px 60px -10px hsla(var(--primary), 0.45),
+      0 4px 18px -6px hsla(var(--primary), 0.5);
+  }
+  .ring-cyan {
+    box-shadow: 0 0 0 1px hsla(var(--primary), 0.4),
+      0 0 28px -2px hsla(var(--primary), 0.45);
+  }
+}
+
+@layer base {
+  body {
+    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--accent));
+  }
+}

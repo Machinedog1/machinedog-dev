@@ -1,0 +1,137 @@
+You are a senior full-stack developer and UX designer. Modify or create a modern pricing page for a consulting/service business that builds AI-powered custom apps and websites.
+
+GOAL:
+Add a premium pricing structure with clear positioning, conversion-focused layout, and a required monthly retainer.
+
+STACK:
+- React (Next.js preferred) OR simple HTML/CSS/JS if no framework exists
+- Clean, modern “Apple Glass” UI (minimal, soft shadows, blur, gradients)
+- Mobile-first responsive design
+
+PAGE TITLE:
+"Custom App & AI System Development"
+
+HERO SECTION:
+Headline:
+"We Build the System Your Business Runs On"
+
+Subheadline:
+"Custom AI-powered apps and websites designed to replace manual work and generate revenue from day one."
+
+CTA BUTTON:
+"Start Your Build"
+
+---
+
+PRICING SECTION (MAIN FOCUS):
+
+Create a featured pricing card labeled:
+
+"Premium Build Starter"
+
+Price:
+"$25,000"
+
+Subtitle:
+"Complete Business System Build"
+
+Include bullet points:
+- Custom app or website (fully built)
+- Backend + database integration
+- User authentication system
+- Admin dashboard
+- AI-powered workflows (Claude/OpenAI integration)
+- Payment system integration (Stripe or equivalent)
+- Automation workflows (lead → conversion → fulfillment)
+- Mobile + desktop optimized UI
+- Deployment + launch support
+
+Timeline:
+"4–8 Week Delivery"
+
+---
+
+RETAINER SECTION (VERY IMPORTANT):
+
+Create a second highlighted card or section directly below pricing:
+
+Title:
+"Growth & Optimization Retainer"
+
+Price:
+"$1,200/month"
+
+Subtitle:
+"Required to Maintain and Improve Your System"
+
+Include bullet points:
+- Ongoing feature updates
+- AI prompt tuning & optimization
+- Performance monitoring & improvements
+- Bug fixes and system support
+- Continuous enhancements based on usage
+
+Add a note:
+"This ensures your system continues to improve and adapt as your business grows."
+
+---
+
+POSITIONING SECTION:
+
+Add a section with this statement:
+
+"We don’t build websites. We build automated systems that replace manual work and create scalable revenue streams."
+
+---
+
+OPTIONAL ADD-ONS SECTION:
+
+Create a simple list:
+
+- Additional integrations: $2,000 – $5,000
+- Advanced AI agents: $3,000 – $10,000
+- Mobile app version: $5,000 – $15,000
+- White-label SaaS setup: $10,000+
+
+---
+
+CTA SECTION (BOTTOM):
+
+Headline:
+"Ready to Build Your System?"
+
+Button:
+"Schedule a Call"
+
+---
+
+STYLE REQUIREMENTS:
+
+- Use glassmorphism (backdrop blur, transparency)
+- Rounded cards, soft shadows
+- Clean typography (Inter or SF Pro style)
+- Spacing should feel premium (like Apple or Stripe websites)
+
+---
+
+FUNCTIONALITY:
+
+- Buttons should scroll to contact form or trigger modal
+- Make pricing cards visually distinct (Premium highlighted)
+- Ensure fast load and clean component structure
+
+---
+
+OUTPUT:
+
+- If project exists: modify/add a Pricing page component
+- If no project: generate full standalone pricing page
+- Provide clean, readable, production-ready code
+
+---
+
+IMPORTANT:
+Do NOT make this look cheap or like a freelancer site.
+This should feel like a $25,000+ premium service.
+
+Return complete code.

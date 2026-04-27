@@ -1,0 +1,103 @@
+import { Router, type IRouter } from "express";
+import { eq, desc, and, sql } from "drizzle-orm";
+import { db, promptSessionsTable, clientsTable } from "@workspace/db";
+import {
+  ListMyPromptsQueryParams,
+  ListMyPromptsResponse,
+  SubmitPromptBody,
+  SubmitPromptResponse,
+  GetPromptParams,
+  GetPromptResponse,
+} from "@workspace/api-zod";
+import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
+import { runClaudePrompt } from "../lib/anthropic";
+
+const router: IRouter = Router();
+
+router.get("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, async (req, res): Promise<void> => {
+  const params = ListMyPromptsQueryParams.safeParse(req.query);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const { limit, offset } = params.data;
+  const rows = await db
+    .select()
+    .from(promptSessionsTable)
+    .where(eq(promptSessionsTable.clientId, req.client!.id))
+    .orderBy(desc(promptSessionsTable.createdAt))
+    .limit(limit)
+    .offset(offset);
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(promptSessionsTable)
+    .where(eq(promptSessionsTable.clientId, req.client!.id));
+  res.json(ListMyPromptsResponse.parse({ data: rows, total: Number(count) }));
+});
+
+router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, async (req, res): Promise<void> => {
+  const parsed = SubmitPromptBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const client = req.client!;
+  if (client.tokenBalance <= 0) {
+    res.status(402).json({ error: "Insufficient tokens. Please purchase a bundle.", tokenBalance: client.tokenBalance });
+    return;
+  }
+
+  let result;
+  try {
+    result = await runClaudePrompt(parsed.data.prompt);
+  } catch (err) {
+    req.log.error({ err }, "Claude prompt failed");
+    res.status(502).json({ error: "AI request failed. No tokens were charged." });
+    return;
+  }
+
+  // Deduct tokens atomically; never allow negative
+  const tokensUsed = Math.min(result.totalTokens, client.tokenBalance);
+  const [updatedClient] = await db
+    .update(clientsTable)
+    .set({
+      tokenBalance: sql`GREATEST(${clientsTable.tokenBalance} - ${tokensUsed}, 0)`,
+      totalTokensUsed: sql`${clientsTable.totalTokensUsed} + ${tokensUsed}`,
+    })
+    .where(eq(clientsTable.id, client.id))
+    .returning();
+
+  const [session] = await db
+    .insert(promptSessionsTable)
+    .values({
+      clientId: client.id,
+      prompt: parsed.data.prompt,
+      output: result.output,
+      tokensUsed,
+      model: result.model,
+    })
+    .returning();
+
+  req.log.info({ sessionId: session.id, tokensUsed, balance: updatedClient.tokenBalance }, "Prompt completed");
+
+  res.json(SubmitPromptResponse.parse(session));
+});
+
+router.get("/prompts/:id", requireAuth, loadOrCreateClient, async (req, res): Promise<void> => {
+  const params = GetPromptParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [row] = await db
+    .select()
+    .from(promptSessionsTable)
+    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.clientId, req.client!.id)));
+  if (!row) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(GetPromptResponse.parse(row));
+});
+
+export default router;

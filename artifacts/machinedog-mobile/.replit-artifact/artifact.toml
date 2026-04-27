@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/machinedog-mobile/"
+title = "Machinedog Mobile"
+version = "1.0.0"
+id = "artifacts/machinedog-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/machinedog-mobile/" ]
+localPort = 25408
+
+[services.development]
+run = "pnpm --filter @workspace/machinedog-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/machinedog-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/machinedog-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "25408"
+BASE_PATH = "/machinedog-mobile/"

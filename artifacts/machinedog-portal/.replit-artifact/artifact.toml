@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Machinedog Portal"
+version = "1.0.0"
+id = "artifacts/machinedog-portal"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20754
+
+[services.development]
+run = "pnpm --filter @workspace/machinedog-portal run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/machinedog-portal", "run", "build" ]
+publicDir = "artifacts/machinedog-portal/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20754"
+BASE_PATH = "/"
