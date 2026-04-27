@@ -8,6 +8,7 @@ import {
   tokenPurchasesTable,
   projectsTable,
   consultingBookingsTable,
+  buildOrdersTable,
 } from "@workspace/db";
 import {
   GetAdminStatsResponse,
@@ -21,6 +22,8 @@ import {
   AdjustClientBalanceBody,
   AdjustClientBalanceResponse,
   ListAllProjectsResponse,
+  ListAllBuildOrdersQueryParams,
+  ListAllBuildOrdersResponse,
 } from "@workspace/api-zod";
 import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
 
@@ -55,6 +58,13 @@ router.get("/admin/stats", async (_req, res): Promise<void> => {
     })
     .from(consultingBookingsTable)
     .where(eq(consultingBookingsTable.status, "active"));
+  const [orderAgg] = await db
+    .select({
+      totalPaidBuilds: sql<number>`COALESCE(sum(case when ${buildOrdersTable.kind} = 'build' and ${buildOrdersTable.status} = 'completed' then 1 else 0 end),0)::int`,
+      activeRetainers: sql<number>`COALESCE(sum(case when ${buildOrdersTable.kind} = 'retainer' and ${buildOrdersTable.status} = 'active' then 1 else 0 end),0)::int`,
+      totalRevenueOrders: sql<number>`COALESCE(sum(case when ${buildOrdersTable.status} in ('completed','active') then ${buildOrdersTable.amountCents} else 0 end),0)::bigint`,
+    })
+    .from(buildOrdersTable);
   const [{ totalPrompts }] = await db
     .select({ totalPrompts: sql<number>`count(*)::int` })
     .from(promptSessionsTable);
@@ -78,7 +88,7 @@ router.get("/admin/stats", async (_req, res): Promise<void> => {
   const recentPurchases = await db
     .select({
       type: sql<string>`'token_purchase'`,
-      description: sql<string>`'Purchased ' || ${tokenPurchasesTable.bundleKey} bundle (' || ${tokenPurchasesTable.tokensAdded} || ' tokens)'`,
+      description: sql<string>`'Purchased ' || ${tokenPurchasesTable.bundleKey} || ' bundle (' || ${tokenPurchasesTable.tokensAdded} || ' tokens)'`,
       clientEmail: clientsTable.email,
       createdAt: tokenPurchasesTable.createdAt,
     })
@@ -90,7 +100,7 @@ router.get("/admin/stats", async (_req, res): Promise<void> => {
   const recentBookings = await db
     .select({
       type: sql<string>`'consulting_booking'`,
-      description: sql<string>`'Booked ' || ${consultingBookingsTable.packageKey} (' || ${consultingBookingsTable.hoursTotal} || ' hrs)'`,
+      description: sql<string>`'Booked ' || ${consultingBookingsTable.packageKey} || ' (' || ${consultingBookingsTable.hoursTotal} || ' hrs)'`,
       clientEmail: clientsTable.email,
       createdAt: consultingBookingsTable.createdAt,
     })
@@ -99,7 +109,23 @@ router.get("/admin/stats", async (_req, res): Promise<void> => {
     .orderBy(desc(consultingBookingsTable.createdAt))
     .limit(10);
 
-  const recentActivity = [...recentPrompts, ...recentPurchases, ...recentBookings]
+  const recentOrders = await db
+    .select({
+      type: sql<string>`case when ${buildOrdersTable.kind} = 'retainer' then 'retainer_order' else 'build_order' end`,
+      description: sql<string>`(case when ${buildOrdersTable.kind} = 'retainer' then 'Retainer ' else 'Build ' end) || ${buildOrdersTable.status} || ' ($' || (${buildOrdersTable.amountCents} / 100)::text || ')'`,
+      clientEmail: buildOrdersTable.email,
+      createdAt: buildOrdersTable.createdAt,
+    })
+    .from(buildOrdersTable)
+    .orderBy(desc(buildOrdersTable.createdAt))
+    .limit(10);
+
+  const recentActivity = [
+    ...recentPrompts,
+    ...recentPurchases,
+    ...recentBookings,
+    ...recentOrders,
+  ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 25);
 
@@ -109,10 +135,15 @@ router.get("/admin/stats", async (_req, res): Promise<void> => {
       activeClients: Number(activeClients),
       totalTokensUsed: Number(tokenAgg.totalTokensUsed),
       totalTokensPurchased: Number(purchaseAgg.totalTokensPurchased),
-      totalRevenueCents: Number(purchaseAgg.totalRevenueTokens) + Number(bookingAgg.totalRevenueConsulting),
+      totalRevenueCents:
+        Number(purchaseAgg.totalRevenueTokens) +
+        Number(bookingAgg.totalRevenueConsulting) +
+        Number(orderAgg.totalRevenueOrders),
       totalPrompts: Number(totalPrompts),
       totalProjects: Number(totalProjects),
       totalConsultingHoursBooked: Number(bookingAgg.totalConsultingHoursBooked),
+      totalPaidBuilds: Number(orderAgg.totalPaidBuilds),
+      activeRetainers: Number(orderAgg.activeRetainers),
       recentActivity,
     }),
   );
@@ -233,6 +264,25 @@ router.get("/admin/projects", async (_req, res): Promise<void> => {
     .from(projectsTable)
     .orderBy(desc(projectsTable.updatedAt));
   res.json(ListAllProjectsResponse.parse({ data: rows }));
+});
+
+router.get("/admin/orders", async (req, res): Promise<void> => {
+  const params = ListAllBuildOrdersQueryParams.safeParse(req.query);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const { limit, offset } = params.data;
+  const rows = await db
+    .select()
+    .from(buildOrdersTable)
+    .orderBy(desc(buildOrdersTable.createdAt))
+    .limit(limit)
+    .offset(offset);
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(buildOrdersTable);
+  res.json(ListAllBuildOrdersResponse.parse({ data: rows, total: Number(count) }));
 });
 
 export default router;

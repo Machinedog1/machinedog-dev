@@ -329,6 +329,14 @@ export const GetAdminStatsResponse = zod.object({
   totalPrompts: zod.number(),
   totalProjects: zod.number(),
   totalConsultingHoursBooked: zod.number(),
+  totalPaidBuilds: zod
+    .number()
+    .describe(
+      "Number of build_orders with kind=build that have completed payment",
+    ),
+  activeRetainers: zod
+    .number()
+    .describe("Number of build_orders with kind=retainer in active status"),
   recentActivity: zod.array(
     zod.object({
       type: zod.string(),
@@ -438,4 +446,39 @@ export const ListAllProjectsResponse = zod.object({
       updatedAt: zod.coerce.date(),
     }),
   ),
+});
+
+/**
+ * @summary List paid build deposits and retainer subscriptions (admin only)
+ */
+export const listAllBuildOrdersQueryLimitDefault = 100;
+export const listAllBuildOrdersQueryOffsetDefault = 0;
+
+export const ListAllBuildOrdersQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAllBuildOrdersQueryLimitDefault),
+  offset: zod.coerce.number().default(listAllBuildOrdersQueryOffsetDefault),
+});
+
+export const ListAllBuildOrdersResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      kind: zod.enum(["build", "retainer"]),
+      email: zod.string().nullish(),
+      name: zod.string().nullish(),
+      company: zod.string().nullish(),
+      amountCents: zod.number(),
+      currency: zod.string(),
+      source: zod.string(),
+      status: zod.enum(["pending", "completed", "active", "cancelled"]),
+      stripeSessionId: zod.string(),
+      stripeCustomerId: zod.string().nullish(),
+      stripeSubscriptionId: zod.string().nullish(),
+      stripePaymentIntentId: zod.string().nullish(),
+      completedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
 });

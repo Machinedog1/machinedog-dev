@@ -19,6 +19,7 @@ import type {
 import type {
   AdjustBalanceBody,
   AdminStats,
+  BuildOrderList,
   CheckoutResponse,
   Client,
   ClientList,
@@ -31,6 +32,7 @@ import type {
   HealthStatus,
   InviteClientBody,
   InviteResponse,
+  ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
   Project,
@@ -2022,6 +2024,103 @@ export function useListAllProjects<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListAllProjectsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List paid build deposits and retainer subscriptions (admin only)
+ */
+export const getListAllBuildOrdersUrl = (params?: ListAllBuildOrdersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/orders?${stringifiedParams}`
+    : `/api/admin/orders`;
+};
+
+export const listAllBuildOrders = async (
+  params?: ListAllBuildOrdersParams,
+  options?: RequestInit,
+): Promise<BuildOrderList> => {
+  return customFetch<BuildOrderList>(getListAllBuildOrdersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAllBuildOrdersQueryKey = (
+  params?: ListAllBuildOrdersParams,
+) => {
+  return [`/api/admin/orders`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAllBuildOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAllBuildOrders>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAllBuildOrdersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAllBuildOrders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAllBuildOrdersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAllBuildOrders>>
+  > = ({ signal }) => listAllBuildOrders(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAllBuildOrders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAllBuildOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAllBuildOrders>>
+>;
+export type ListAllBuildOrdersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List paid build deposits and retainer subscriptions (admin only)
+ */
+
+export function useListAllBuildOrders<
+  TData = Awaited<ReturnType<typeof listAllBuildOrders>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAllBuildOrdersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAllBuildOrders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAllBuildOrdersQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -205,7 +205,60 @@ export interface AdminStats {
   totalPrompts: number;
   totalProjects: number;
   totalConsultingHoursBooked: number;
+  /** Number of build_orders with kind=build that have completed payment */
+  totalPaidBuilds: number;
+  /** Number of build_orders with kind=retainer in active status */
+  activeRetainers: number;
   recentActivity: ActivityItem[];
+}
+
+export type BuildOrderKind =
+  (typeof BuildOrderKind)[keyof typeof BuildOrderKind];
+
+export const BuildOrderKind = {
+  build: "build",
+  retainer: "retainer",
+} as const;
+
+export type BuildOrderStatus =
+  (typeof BuildOrderStatus)[keyof typeof BuildOrderStatus];
+
+export const BuildOrderStatus = {
+  pending: "pending",
+  completed: "completed",
+  active: "active",
+  cancelled: "cancelled",
+} as const;
+
+export interface BuildOrder {
+  id: number;
+  kind: BuildOrderKind;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  company?: string | null;
+  amountCents: number;
+  currency: string;
+  source: string;
+  status: BuildOrderStatus;
+  stripeSessionId: string;
+  /** @nullable */
+  stripeCustomerId?: string | null;
+  /** @nullable */
+  stripeSubscriptionId?: string | null;
+  /** @nullable */
+  stripePaymentIntentId?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BuildOrderList {
+  data: BuildOrder[];
+  total: number;
 }
 
 export interface InviteClientBody {
@@ -274,6 +327,11 @@ export type ListMyPromptsParams = {
 };
 
 export type ListClientsParams = {
+  limit?: number;
+  offset?: number;
+};
+
+export type ListAllBuildOrdersParams = {
   limit?: number;
   offset?: number;
 };

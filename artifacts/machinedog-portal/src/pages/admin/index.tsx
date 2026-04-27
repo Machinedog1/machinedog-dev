@@ -1,5 +1,6 @@
 import { useGetAdminStats } from "@workspace/api-client-react";
-import { ShieldAlert, Users, Coins, Briefcase, Activity, FolderGit2 } from "lucide-react";
+import { ShieldAlert, Users, Coins, Briefcase, Activity, FolderGit2, Package, Repeat } from "lucide-react";
+import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
@@ -60,6 +61,24 @@ export default function AdminDashboard() {
               value={stats.totalConsultingHoursBooked.toString()}
               icon={<Briefcase className="h-4 w-4 text-primary" />}
             />
+            <Link href="/admin/orders">
+              <div className="cursor-pointer">
+                <StatCard
+                  title="PAID_BUILDS"
+                  value={stats.totalPaidBuilds.toLocaleString()}
+                  icon={<Package className="h-4 w-4 text-primary" />}
+                />
+              </div>
+            </Link>
+            <Link href="/admin/orders">
+              <div className="cursor-pointer">
+                <StatCard
+                  title="ACTIVE_RETAINERS"
+                  value={stats.activeRetainers.toLocaleString()}
+                  icon={<Repeat className="h-4 w-4 text-primary" />}
+                />
+              </div>
+            </Link>
           </div>
 
           <div className="space-y-4">

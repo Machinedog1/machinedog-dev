@@ -16,5 +16,9 @@ export interface AdminStats {
   totalPrompts: number;
   totalProjects: number;
   totalConsultingHoursBooked: number;
+  /** Number of build_orders with kind=build that have completed payment */
+  totalPaidBuilds: number;
+  /** Number of build_orders with kind=retainer in active status */
+  activeRetainers: number;
   recentActivity: ActivityItem[];
 }

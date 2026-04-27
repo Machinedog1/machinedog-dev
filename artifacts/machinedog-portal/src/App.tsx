@@ -21,6 +21,7 @@ import ConsultingPage from "@/pages/consulting";
 import AdminDashboard from "@/pages/admin/index";
 import AdminClients from "@/pages/admin/clients";
 import AdminProjects from "@/pages/admin/projects";
+import AdminOrders from "@/pages/admin/orders";
 import SettingsPage from "@/pages/settings";
 
 import { useGetMe } from "@workspace/api-client-react";
@@ -117,6 +118,9 @@ function Router() {
       </Route>
       <Route path="/admin/projects">
         <AuthGuard><AdminGuard><AdminProjects /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/orders">
+        <AuthGuard><AdminGuard><AdminOrders /></AdminGuard></AuthGuard>
       </Route>
 
       <Route component={NotFound} />

@@ -47,6 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/admin", label: "Dashboard", icon: ShieldAlert },
     { href: "/admin/clients", label: "Clients", icon: ShieldAlert },
     { href: "/admin/projects", label: "All Projects", icon: ShieldAlert },
+    { href: "/admin/orders", label: "Orders", icon: ShieldAlert },
   ];
 
   return (
