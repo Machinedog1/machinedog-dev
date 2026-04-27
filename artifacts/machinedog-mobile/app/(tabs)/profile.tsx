@@ -225,8 +225,7 @@ export default function ProfileScreen() {
           paddingHorizontal: 32,
         }}
       >
-        Machinedog.Dev · Built on Claude. Invite-only access governed by your
-        account agreement.
+        Machinedog.Dev · Invite-only access governed by your account agreement.
       </Text>
     </ScreenShell>
   );

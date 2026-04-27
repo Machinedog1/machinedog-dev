@@ -44,7 +44,7 @@ const premiumFeatures: Array<{ icon: React.ElementType; label: string }> = [
   { icon: Database, label: "Backend + database integration" },
   { icon: Shield, label: "User authentication system" },
   { icon: Workflow, label: "Admin dashboard" },
-  { icon: Sparkles, label: "AI-powered workflows (Claude / OpenAI integration)" },
+  { icon: Sparkles, label: "AI-powered workflows (Machinedog AI integration)" },
   { icon: CreditCard, label: "Payment system integration (Stripe or equivalent)" },
   { icon: Zap, label: "Automation workflows (lead → conversion → fulfillment)" },
   { icon: Smartphone, label: "Mobile + desktop optimized UI" },
@@ -589,7 +589,7 @@ export default function PricingPage() {
                 Machinedog.Dev Portal Membership
               </h3>
               <p className="text-muted-foreground max-w-xl mb-4">
-                Your private workspace to run Claude prompts, attach the projects we build for
+                Your private workspace to run Machinedog prompts, attach the projects we build for
                 you (e.g. BeeSuite.farm), and invite your own clients to collaborate.
               </p>
               <ul className="space-y-2 text-sm">

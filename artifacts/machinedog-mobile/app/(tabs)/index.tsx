@@ -58,7 +58,7 @@ export default function ConsoleScreen() {
           (error as { response?: { data?: { error?: string } } })?.response
             ?.data?.error ??
           (error as Error)?.message ??
-          "Something went wrong while reaching Claude.";
+          "Something went wrong while reaching Machinedog.";
         setErrorMessage(message);
         setResponse(null);
       },
@@ -125,7 +125,7 @@ export default function ConsoleScreen() {
               { color: colors.foreground, fontSize: r.font(20, 22, 30) },
             ]}
           >
-            What should Claude do today?
+            What should Machinedog do today?
           </Text>
           <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
             Each request is metered against your token bundle. Be specific —

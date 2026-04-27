@@ -53,7 +53,7 @@ export default function TokensPage() {
           </div>
           <div className="glass-subtle p-4 rounded-xl border border-border/20 text-sm font-mono max-w-sm w-full relative z-10">
             <div className="flex justify-between mb-2">
-              <span className="text-foreground">Claude 3.5 Sonnet</span>
+              <span className="text-foreground">Machinedog AI</span>
               <span className="text-primary font-bold">Active</span>
             </div>
             <div className="text-xs text-muted-foreground border-t border-border/20 pt-2 mt-2">

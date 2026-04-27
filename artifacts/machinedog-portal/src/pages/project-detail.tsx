@@ -628,7 +628,7 @@ function ProjectPromptPanel({ projectId }: { projectId: number }) {
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ask Claude to help with this project…"
+          placeholder="Ask Machinedog to help with this project…"
           rows={4}
           className="resize-y font-mono"
           disabled={submit.isPending || outOfTokens}
