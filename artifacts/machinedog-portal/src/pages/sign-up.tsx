@@ -1,14 +1,87 @@
-import { SignUp } from "@clerk/react";
-import { useTheme } from "@/hooks/use-theme";
-import { dark } from "@clerk/themes";
+import { useSignUp } from "@clerk/react";
+import { useState, type FormEvent } from "react";
+import { useLocation } from "wouter";
+import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import huskyPortrait from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777252211433.png";
 
 export default function SignUpPage() {
-  const { theme } = useTheme();
   const intakeHref = `${import.meta.env.BASE_URL}intake`.replace(/\/+/g, "/");
   const workHref = `${import.meta.env.BASE_URL}work`.replace(/\/+/g, "/");
   const signInHref = `${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/");
+  const homeHref = `${import.meta.env.BASE_URL}`.replace(/\/+/g, "/");
+
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const [, setLocation] = useLocation();
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+
+  const isSubmitting = fetchStatus === "fetching";
+
+  const needsVerification =
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields?.includes("email_address") &&
+    (!signUp.missingFields || signUp.missingFields.length === 0);
+
+  const canCreate =
+    emailAddress.trim().length > 0 && password.length >= 8 && !isSubmitting;
+  const canVerify = code.length === 6 && !isSubmitting;
+
+  const handleCreate = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!canCreate) return;
+    setSendError(null);
+    const { error } = await signUp.password({
+      emailAddress: emailAddress.trim(),
+      password,
+    });
+    if (error) return;
+    const sendResult = await signUp.verifications.sendEmailCode();
+    if (sendResult?.error) {
+      setSendError(
+        sendResult.error.message ||
+          "We couldn't send the verification code. Please try again.",
+      );
+    }
+  };
+
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!canVerify) return;
+    const { error } = await signUp.verifications.verifyEmailCode({ code });
+    if (error) return;
+    if (signUp.status !== "complete") return;
+    await signUp.finalize({
+      navigate: ({
+        decorateUrl,
+      }: {
+        decorateUrl: (path: string) => string;
+      }) => {
+        setLocation(decorateUrl(homeHref));
+      },
+    });
+  };
+
+  const handleResend = async () => {
+    if (isSubmitting) return;
+    setSendError(null);
+    setResendNotice(null);
+    const sendResult = await signUp.verifications.sendEmailCode();
+    if (sendResult?.error) {
+      setSendError(
+        sendResult.error.message ||
+          "We couldn't resend the code. Please try again.",
+      );
+    } else {
+      setResendNotice("New code sent. Check your inbox.");
+    }
+  };
+
+  const fieldError = errors?.fields ?? {};
+  const globalError = sendError ?? errors?.global?.[0]?.message ?? null;
 
   return (
     <div
@@ -191,9 +264,9 @@ export default function SignUpPage() {
           </div>
 
           {/* Apple-style glass sign-up card */}
-          <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto">
+          <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0">
             <div
-              className="relative rounded-[28px] p-6 sm:p-8 overflow-hidden"
+              className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
               style={{
                 background:
                   "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
@@ -225,79 +298,230 @@ export default function SignUpPage() {
               />
 
               <div className="relative">
-                <div className="mb-1 text-[11px] font-mono tracking-[0.24em] uppercase text-white/60">
-                  New to the kennel
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-6">
-                  Create your account
-                </h2>
+                {needsVerification ? (
+                  <>
+                    <div className="mb-1 text-[11px] font-mono tracking-[0.24em] uppercase text-white/60">
+                      One more step
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
+                      Verify your email
+                    </h2>
+                    <p className="text-sm text-white/65 mb-6 break-words">
+                      We just sent a 6-digit code to{" "}
+                      <span className="text-white/90 font-medium">
+                        {emailAddress}
+                      </span>
+                      .
+                    </p>
 
-                <SignUp
-                  routing="path"
-                  path="/sign-up"
-                  signInUrl="/sign-in"
-                  fallbackRedirectUrl="/"
-                  appearance={{
-                    baseTheme: theme === "dark" ? dark : undefined,
-                    variables: {
-                      colorPrimary: "#3FB1F0",
-                      colorBackground: "transparent",
-                      colorInput: "rgba(255,255,255,0.06)",
-                      colorInputForeground: "#FFFFFF",
-                      colorForeground: "#F1F6FB",
-                      colorTextSecondary: "rgba(255,255,255,0.65)",
-                      fontFamily: "'Inter', sans-serif",
-                      borderRadius: "0.875rem",
-                    },
-                    elements: {
-                      rootBox: "w-full",
-                      cardBox:
-                        "!bg-transparent !border-0 !shadow-none !backdrop-blur-none w-full",
-                      card: "!bg-transparent !shadow-none !p-0 !border-0",
-                      header: "hidden",
-                      headerTitle: "hidden",
-                      headerSubtitle: "hidden",
-                      logoBox: "hidden",
-                      socialButtonsBlockButton:
-                        "!border !border-white/15 !bg-white/5 !text-white hover:!bg-white/10 !backdrop-blur",
-                      socialButtonsBlockButtonText:
-                        "!text-white !font-semibold",
-                      dividerLine: "!bg-white/15",
-                      dividerText:
-                        "!text-white/50 !text-[10px] !tracking-[0.24em] !uppercase !font-mono",
-                      formFieldLabel:
-                        "!text-[10px] !font-semibold !text-white/60 !tracking-[0.22em] !uppercase",
-                      formFieldInput:
-                        "!bg-white/5 !border !border-white/15 !text-white placeholder:!text-white/40 focus:!ring-2 focus:!ring-primary/60 focus:!border-primary/40 !backdrop-blur",
-                      formButtonPrimary:
-                        "!bg-gradient-to-r !from-[#3FB1F0] !to-[#7C7BF7] hover:!opacity-95 !text-white !font-semibold !shadow-lg !shadow-primary/30 !normal-case !text-sm !tracking-wide",
-                      footer: "!hidden",
-                      footerAction: "!hidden",
-                      footerActionText: "!hidden",
-                      footerActionLink: "!hidden",
-                      formFieldInputShowPasswordButton:
-                        "!text-white/60 hover:!text-white",
-                      identityPreview:
-                        "!bg-white/5 !border !border-white/10 !backdrop-blur",
-                      identityPreviewText: "!text-white",
-                      identityPreviewEditButtonIcon:
-                        "!text-white/60 hover:!text-white",
-                      formFieldAction: "!text-primary hover:!text-primary/80",
-                      otpCodeFieldInput:
-                        "!bg-white/5 !border !border-white/15 !text-white",
-                      alert:
-                        "!bg-white/5 !border !border-white/15 !text-white",
-                      alertText: "!text-white",
-                    },
-                  }}
-                />
+                    <form
+                      onSubmit={handleVerify}
+                      className="flex flex-col gap-4"
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        <label
+                          htmlFor="code"
+                          className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/60"
+                        >
+                          Verification code
+                        </label>
+                        <input
+                          id="code"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          maxLength={6}
+                          placeholder="000000"
+                          value={code}
+                          onChange={(e) =>
+                            setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                          }
+                          className="w-full rounded-[14px] px-4 py-3 text-center text-[22px] font-semibold tracking-[0.5em] text-white placeholder:text-white/30 outline-none transition focus:ring-2 focus:ring-[#3FB1F0]/60"
+                          style={{
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.14)",
+                            backdropFilter: "blur(20px)",
+                            WebkitBackdropFilter: "blur(20px)",
+                          }}
+                        />
+                        {fieldError.code && (
+                          <p className="text-[12px] text-rose-300/90 mt-0.5">
+                            {fieldError.code.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {globalError && (
+                        <div
+                          className="rounded-[12px] px-3.5 py-2.5 text-[13px] text-rose-100"
+                          style={{
+                            background: "rgba(244,63,94,0.10)",
+                            border: "1px solid rgba(244,63,94,0.35)",
+                          }}
+                        >
+                          {globalError}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={!canVerify}
+                        className="mt-1 inline-flex items-center justify-center gap-2 rounded-[14px] py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:opacity-95"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
+                          boxShadow:
+                            "0 12px 32px -8px hsla(200,95%,55%,0.55)",
+                        }}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            Verify and continue{" "}
+                            <span aria-hidden>→</span>
+                          </>
+                        )}
+                      </button>
+
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleResend}
+                          disabled={isSubmitting}
+                          className="text-[12px] text-white/60 hover:text-white/90 transition disabled:opacity-50"
+                        >
+                          Resend code
+                        </button>
+                        {resendNotice && (
+                          <span
+                            className="text-[12px]"
+                            style={{ color: "hsl(200 95% 70%)" }}
+                            role="status"
+                          >
+                            {resendNotice}
+                          </span>
+                        )}
+                      </div>
+                    </form>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-1 text-[11px] font-mono tracking-[0.24em] uppercase text-white/60">
+                      New to the kennel
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-6">
+                      Create your account
+                    </h2>
+
+                    <form
+                      onSubmit={handleCreate}
+                      className="flex flex-col gap-4"
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        <label
+                          htmlFor="email"
+                          className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/60"
+                        >
+                          Email address
+                        </label>
+                        <input
+                          id="email"
+                          type="email"
+                          autoComplete="email"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          placeholder="you@company.com"
+                          value={emailAddress}
+                          onChange={(e) => setEmailAddress(e.target.value)}
+                          className="w-full rounded-[14px] px-4 py-3 text-[15px] text-white placeholder:text-white/40 outline-none transition focus:ring-2 focus:ring-[#3FB1F0]/60"
+                          style={{
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.14)",
+                            backdropFilter: "blur(20px)",
+                            WebkitBackdropFilter: "blur(20px)",
+                          }}
+                        />
+                        {fieldError.emailAddress && (
+                          <p className="text-[12px] text-rose-300/90 mt-0.5">
+                            {fieldError.emailAddress.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label
+                          htmlFor="password"
+                          className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/60"
+                        >
+                          Password
+                        </label>
+                        <input
+                          id="password"
+                          type="password"
+                          autoComplete="new-password"
+                          placeholder="At least 8 characters"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full rounded-[14px] px-4 py-3 text-[15px] text-white placeholder:text-white/40 outline-none transition focus:ring-2 focus:ring-[#3FB1F0]/60"
+                          style={{
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.14)",
+                            backdropFilter: "blur(20px)",
+                            WebkitBackdropFilter: "blur(20px)",
+                          }}
+                        />
+                        {fieldError.password && (
+                          <p className="text-[12px] text-rose-300/90 mt-0.5">
+                            {fieldError.password.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {globalError && (
+                        <div
+                          className="rounded-[12px] px-3.5 py-2.5 text-[13px] text-rose-100"
+                          style={{
+                            background: "rgba(244,63,94,0.10)",
+                            border: "1px solid rgba(244,63,94,0.35)",
+                          }}
+                        >
+                          {globalError}
+                        </div>
+                      )}
+
+                      <div id="clerk-captcha" />
+
+                      <button
+                        type="submit"
+                        disabled={!canCreate}
+                        className="mt-1 inline-flex items-center justify-center gap-2 rounded-[14px] py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:opacity-95"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
+                          boxShadow:
+                            "0 12px 32px -8px hsla(200,95%,55%,0.55)",
+                        }}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            Create account <span aria-hidden>→</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </>
+                )}
 
                 <div className="mt-6 pt-5 border-t border-white/10 text-center">
                   <p className="text-xs text-white/60">
                     Already have an account?{" "}
                     <a
                       href={signInHref}
-                      className="text-primary hover:text-primary/80 font-semibold"
+                      className="font-semibold"
+                      style={{ color: "hsl(200 95% 70%)" }}
                     >
                       Sign in →
                     </a>
