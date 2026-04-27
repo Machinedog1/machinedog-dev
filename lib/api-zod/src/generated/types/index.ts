@@ -32,6 +32,8 @@ export * from "./projectList";
 export * from "./projectStatus";
 export * from "./promptSession";
 export * from "./promptSessionList";
+export * from "./submitLeadBody";
+export * from "./submitLeadResponse";
 export * from "./submitPromptBody";
 export * from "./tokenBundle";
 export * from "./tokenBundleList";

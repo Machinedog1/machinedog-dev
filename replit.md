@@ -24,4 +24,16 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
+## Operator notifications (pricing-page leads)
+
+- `LEADS_NOTIFY_EMAIL` — operator inbox that receives new pricing-page leads. If unset, falls back to `SMTP_FROM_EMAIL` / `SMTP_FROM` / `SMTP_USER`.
+- Email delivery uses SMTP via nodemailer. Configure with:
+  - `SMTP_HOST` (e.g. `smtp.office365.com`)
+  - `SMTP_PORT` (defaults to 587)
+  - `SMTP_USER` — login username
+  - `SMTP_PASSWORD` (alias accepted: `SMTP_PASS`)
+  - `SMTP_FROM` — sender address (alias accepted: `SMTP_FROM_EMAIL`); falls back to `SMTP_USER`
+  - `SMTP_SECURE` (optional: `true`/`false`; defaults to `true` for port 465, `false` otherwise)
+- If SMTP is unavailable or the send fails, the lead is still saved to the `leads` table and the failure reason is recorded in `notify_error`.
+
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.

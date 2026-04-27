@@ -22,6 +22,8 @@ tags:
     description: Consulting packages and bookings
   - name: admin
     description: Admin operations
+  - name: leads
+    description: Public lead capture (e.g. pricing-page contact form)
 
 paths:
   /healthz:
@@ -293,6 +295,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CheckoutResponse"
+
+  # ─── Public lead capture ───────────────────────────────────────────────────
+
+  /leads:
+    post:
+      operationId: submitLead
+      tags: [leads]
+      summary: Submit a lead from a public contact form (no auth)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitLeadBody"
+      responses:
+        "200":
+          description: Lead accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitLeadResponse"
+        "400":
+          description: Invalid input
+        "429":
+          description: Too many requests
 
   # ─── Admin ─────────────────────────────────────────────────────────────────
 
@@ -768,3 +795,38 @@ components:
         reason:
           type: string
       required: [delta]
+
+    SubmitLeadBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        company:
+          type: ["string", "null"]
+          maxLength: 200
+        notes:
+          type: ["string", "null"]
+          maxLength: 5000
+        source:
+          type: ["string", "null"]
+          maxLength: 100
+          description: Where the lead originated (e.g. "pricing-page")
+        website:
+          type: ["string", "null"]
+          description: Honeypot field — must be empty for real submissions
+      required: [name, email]
+
+    SubmitLeadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        id:
+          type: integer
+      required: [success]

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useSubmitLead } from "@workspace/api-client-react";
 import {
   ArrowRight,
   Check,
@@ -61,12 +62,47 @@ export default function PricingPage() {
     email: "",
     company: "",
     notes: "",
+    website: "", // honeypot — must stay empty
   });
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const submitLead = useSubmitLead();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    setErrorMessage(null);
+    submitLead.mutate(
+      {
+        data: {
+          name: contact.name.trim(),
+          email: contact.email.trim(),
+          company: contact.company.trim() || null,
+          notes: contact.notes.trim() || null,
+          source: "pricing-page",
+          website: contact.website,
+        },
+      },
+      {
+        onSuccess: () => {
+          setSubmitted(true);
+        },
+        onError: (err: unknown) => {
+          const status =
+            typeof err === "object" && err !== null && "status" in err
+              ? (err as { status?: number }).status
+              : undefined;
+          if (status === 429) {
+            setErrorMessage(
+              "You've sent a few requests already — please try again in a little while.",
+            );
+          } else {
+            setErrorMessage(
+              "Something went wrong sending your message. Please try again or email hello@machinedog.dev.",
+            );
+          }
+        },
+      },
+    );
   }
 
   return (
@@ -706,9 +742,41 @@ export default function PricingPage() {
                     />
                   </label>
 
+                  {/* Honeypot — hidden from real users; bots will fill it. */}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: "-10000px",
+                      width: "1px",
+                      height: "1px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <label>
+                      Website
+                      <input
+                        type="text"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={contact.website}
+                        onChange={(e) =>
+                          setContact({ ...contact, website: e.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  {errorMessage && (
+                    <p className="text-sm text-red-400" role="alert">
+                      {errorMessage}
+                    </p>
+                  )}
+
                   <Button
                     type="submit"
                     size="lg"
+                    disabled={submitLead.isPending}
                     className="w-full h-12 text-sm tracking-wider font-bold"
                     style={{
                       background:
@@ -716,7 +784,7 @@ export default function PricingPage() {
                       boxShadow: "0 10px 30px -10px hsla(200,90%,60%,0.55)",
                     }}
                   >
-                    SCHEDULE A CALL
+                    {submitLead.isPending ? "SENDING…" : "SCHEDULE A CALL"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
 

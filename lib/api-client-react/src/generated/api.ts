@@ -37,6 +37,8 @@ import type {
   ProjectList,
   PromptSession,
   PromptSessionList,
+  SubmitLeadBody,
+  SubmitLeadResponse,
   SubmitPromptBody,
   TokenBundleList,
   TokenPurchaseList,
@@ -1263,6 +1265,92 @@ export const useCreateConsultingCheckout = <
   TContext
 > => {
   return useMutation(getCreateConsultingCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary Submit a lead from a public contact form (no auth)
+ */
+export const getSubmitLeadUrl = () => {
+  return `/api/leads`;
+};
+
+export const submitLead = async (
+  submitLeadBody: SubmitLeadBody,
+  options?: RequestInit,
+): Promise<SubmitLeadResponse> => {
+  return customFetch<SubmitLeadResponse>(getSubmitLeadUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitLeadBody),
+  });
+};
+
+export const getSubmitLeadMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitLead>>,
+    TError,
+    { data: BodyType<SubmitLeadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitLead>>,
+  TError,
+  { data: BodyType<SubmitLeadBody> },
+  TContext
+> => {
+  const mutationKey = ["submitLead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitLead>>,
+    { data: BodyType<SubmitLeadBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitLead(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitLeadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitLead>>
+>;
+export type SubmitLeadMutationBody = BodyType<SubmitLeadBody>;
+export type SubmitLeadMutationError = ErrorType<void>;
+
+/**
+ * @summary Submit a lead from a public contact form (no auth)
+ */
+export const useSubmitLead = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitLead>>,
+    TError,
+    { data: BodyType<SubmitLeadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitLead>>,
+  TError,
+  { data: BodyType<SubmitLeadBody> },
+  TContext
+> => {
+  return useMutation(getSubmitLeadMutationOptions(options));
 };
 
 /**

@@ -250,6 +250,40 @@ export const CreateConsultingCheckoutResponse = zod.object({
 });
 
 /**
+ * @summary Submit a lead from a public contact form (no auth)
+ */
+export const submitLeadBodyNameMax = 200;
+
+export const submitLeadBodyEmailMax = 320;
+
+export const submitLeadBodyCompanyMax = 200;
+
+export const submitLeadBodyNotesMax = 5000;
+
+export const submitLeadBodySourceMax = 100;
+
+export const SubmitLeadBody = zod.object({
+  name: zod.string().min(1).max(submitLeadBodyNameMax),
+  email: zod.string().email().max(submitLeadBodyEmailMax),
+  company: zod.string().max(submitLeadBodyCompanyMax).nullish(),
+  notes: zod.string().max(submitLeadBodyNotesMax).nullish(),
+  source: zod
+    .string()
+    .max(submitLeadBodySourceMax)
+    .nullish()
+    .describe('Where the lead originated (e.g. \"pricing-page\")'),
+  website: zod
+    .string()
+    .nullish()
+    .describe("Honeypot field — must be empty for real submissions"),
+});
+
+export const SubmitLeadResponse = zod.object({
+  success: zod.boolean(),
+  id: zod.number().optional(),
+});
+
+/**
  * @summary Get admin dashboard stats
  */
 export const GetAdminStatsResponse = zod.object({

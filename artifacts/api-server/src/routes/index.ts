@@ -7,6 +7,7 @@ import projectsRouter from "./projects";
 import consultingRouter from "./consulting";
 import adminRouter from "./admin";
 import intakeRouter from "./intake";
+import leadsRouter from "./leads";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(tokensRouter);
 router.use(projectsRouter);
 router.use(consultingRouter);
 router.use(adminRouter);
+router.use(leadsRouter);
 
 export default router;

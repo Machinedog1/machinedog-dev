@@ -223,6 +223,42 @@ export interface AdjustBalanceBody {
   reason?: string;
 }
 
+export interface SubmitLeadBody {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  name: string;
+  /** @maxLength 320 */
+  email: string;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  company?: string | null;
+  /**
+   * @maxLength 5000
+   * @nullable
+   */
+  notes?: string | null;
+  /**
+   * Where the lead originated (e.g. "pricing-page")
+   * @maxLength 100
+   * @nullable
+   */
+  source?: string | null;
+  /**
+   * Honeypot field — must be empty for real submissions
+   * @nullable
+   */
+  website?: string | null;
+}
+
+export interface SubmitLeadResponse {
+  success: boolean;
+  id?: number;
+}
+
 export type ListMyPromptsParams = {
   limit?: number;
   offset?: number;
