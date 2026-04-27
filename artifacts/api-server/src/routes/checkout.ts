@@ -221,7 +221,7 @@ router.post(
   requireAuth,
   loadOrCreateClient,
   async (req, res): Promise<void> => {
-    if (!req.client) {
+    if (!req.dbClient) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -242,9 +242,9 @@ router.post(
     const origin = publicOrigin(req);
     const amountCents = Math.round(PORTAL_PRICE_USD * 100);
     const explicitPriceId = process.env.STRIPE_PRICE_PORTAL?.trim();
-    const customerArgs = req.client.stripeCustomerId
-      ? { customer: req.client.stripeCustomerId }
-      : { customer_email: req.client.email };
+    const customerArgs = req.dbClient.stripeCustomerId
+      ? { customer: req.dbClient.stripeCustomerId }
+      : { customer_email: req.dbClient.email };
 
     try {
       const session = await stripe.checkout.sessions.create({
@@ -272,12 +272,12 @@ router.post(
         allow_promotion_codes: true,
         metadata: {
           kind: "portal",
-          clientId: String(req.client.id),
+          clientId: String(req.dbClient.id),
         },
         subscription_data: {
           metadata: {
             kind: "portal",
-            clientId: String(req.client.id),
+            clientId: String(req.dbClient.id),
           },
         },
         success_url: `${origin}/thank-you?kind=portal&session_id={CHECKOUT_SESSION_ID}`,

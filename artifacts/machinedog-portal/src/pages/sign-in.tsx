@@ -1,50 +1,43 @@
-import { useSignIn } from "@clerk/react";
 import { useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { useAuth } from "@/lib/auth";
 import huskyPortrait from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777252211433.png";
 
 export default function SignInPage() {
   const intakeHref = `${import.meta.env.BASE_URL}intake`.replace(/\/+/g, "/");
   const workHref = `${import.meta.env.BASE_URL}work`.replace(/\/+/g, "/");
-  const signUpHref = `${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/");
-  const homeHref = `${import.meta.env.BASE_URL}`.replace(/\/+/g, "/");
+  const forgotHref = `${import.meta.env.BASE_URL}forgot-password`.replace(/\/+/g, "/");
 
-  const { signIn, errors, fetchStatus } = useSignIn();
+  const { signIn } = useAuth();
   const [, setLocation] = useLocation();
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
-  const isSubmitting = fetchStatus === "fetching";
   const canSubmit = emailAddress.trim().length > 0 && password.length > 0 && !isSubmitting;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    const { error } = await signIn.password({
-      emailAddress: emailAddress.trim(),
-      password,
-    });
-    if (error) return;
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ decorateUrl }: { decorateUrl: (path: string) => string }) => {
-          setLocation(decorateUrl(homeHref));
-        },
-      });
+    setGlobalError(null);
+    setIsSubmitting(true);
+    const { error } = await signIn(emailAddress.trim(), password);
+    setIsSubmitting(false);
+    if (error) {
+      setGlobalError(error);
+      return;
     }
+    setLocation("/");
   };
-
-  const fieldError = errors?.fields ?? {};
-  const globalError = errors?.global?.[0]?.message;
 
   return (
     <div
       className="dark relative min-h-screen w-full overflow-hidden text-white"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* DESKTOP full-bleed husky portrait — eye-focused crop, heavily faded into the background */}
       <div
         className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
         style={{
@@ -53,8 +46,6 @@ export default function SignInPage() {
           opacity: 0.35,
         }}
       />
-
-      {/* Desktop cyan halo behind the eyes */}
       <div
         className="hidden lg:block absolute inset-0 pointer-events-none mix-blend-screen"
         style={{
@@ -62,8 +53,6 @@ export default function SignInPage() {
             "radial-gradient(ellipse 70% 35% at 52% 38%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
         }}
       />
-
-      {/* Desktop vignette / bottom fade for legibility */}
       <div
         className="hidden lg:block absolute inset-0 pointer-events-none"
         style={{
@@ -79,9 +68,7 @@ export default function SignInPage() {
         }}
       />
 
-      {/* Content layer */}
       <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Top bar */}
         <header className="flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
           <Logo size="sm" />
           <nav className="flex items-center gap-2 sm:gap-3">
@@ -112,8 +99,6 @@ export default function SignInPage() {
           </nav>
         </header>
 
-        {/* MOBILE husky hero — normal-flow block between header and main so layout is bullet-proof.
-            Hidden on lg+ where the desktop full-bleed bg above takes over. */}
         <div className="lg:hidden relative w-full h-[58vh] min-h-[340px] max-h-[500px] overflow-hidden mt-3">
           <img
             src={huskyPortrait}
@@ -126,7 +111,6 @@ export default function SignInPage() {
               opacity: 0.45,
             }}
           />
-          {/* Cyan halo over the eyes */}
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none mix-blend-screen"
@@ -135,7 +119,6 @@ export default function SignInPage() {
                 "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
             }}
           />
-          {/* Bottom fade so content underneath reads cleanly */}
           <div
             aria-hidden
             className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
@@ -146,9 +129,7 @@ export default function SignInPage() {
           />
         </div>
 
-        {/* Main grid: headline left, glass card right on desktop (stacks on mobile, headline first). */}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
-          {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
           <div className="order-1 lg:order-1 w-full max-w-xl">
             <div
               className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
@@ -162,7 +143,6 @@ export default function SignInPage() {
                   "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
               }}
             >
-              {/* Top rim highlight */}
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -171,7 +151,6 @@ export default function SignInPage() {
                     "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
                 }}
               />
-              {/* Soft cyan inner glow */}
               <div
                 aria-hidden
                 className="pointer-events-none absolute -top-24 -left-20 h-64 w-64 rounded-full"
@@ -181,7 +160,6 @@ export default function SignInPage() {
                   filter: "blur(8px)",
                 }}
               />
-
               <div className="relative">
                 <div
                   className="mb-4 text-[11px] sm:text-xs font-mono tracking-[0.28em] uppercase"
@@ -221,7 +199,6 @@ export default function SignInPage() {
             </div>
           </div>
 
-          {/* Apple-style glass sign-in card */}
           <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0">
             <div
               className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
@@ -235,7 +212,6 @@ export default function SignInPage() {
                   "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
               }}
             >
-              {/* Top rim highlight */}
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -244,7 +220,6 @@ export default function SignInPage() {
                     "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
                 }}
               />
-              {/* Soft cyan inner glow */}
               <div
                 aria-hidden
                 className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full"
@@ -254,7 +229,6 @@ export default function SignInPage() {
                   filter: "blur(8px)",
                 }}
               />
-
               <div className="relative">
                 <div className="mb-1 text-[11px] font-mono tracking-[0.24em] uppercase text-white/60">
                   Welcome back
@@ -288,11 +262,6 @@ export default function SignInPage() {
                         WebkitBackdropFilter: "blur(20px)",
                       }}
                     />
-                    {fieldError.identifier && (
-                      <p className="text-[12px] text-rose-300/90 mt-0.5">
-                        {fieldError.identifier.message}
-                      </p>
-                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -303,6 +272,12 @@ export default function SignInPage() {
                       >
                         Password
                       </label>
+                      <a
+                        href={forgotHref}
+                        className="text-[10px] font-semibold tracking-[0.18em] uppercase text-primary/90 hover:text-primary"
+                      >
+                        Forgot?
+                      </a>
                     </div>
                     <input
                       id="password"
@@ -319,11 +294,6 @@ export default function SignInPage() {
                         WebkitBackdropFilter: "blur(20px)",
                       }}
                     />
-                    {fieldError.password && (
-                      <p className="text-[12px] text-rose-300/90 mt-0.5">
-                        {fieldError.password.message}
-                      </p>
-                    )}
                   </div>
 
                   {globalError && (
@@ -361,33 +331,15 @@ export default function SignInPage() {
 
                 <div className="mt-6 pt-5 border-t border-white/10 text-center space-y-2">
                   <p className="text-xs text-white/60">
-                    New here?{" "}
-                    <a
-                      href={signUpHref}
-                      className="text-primary hover:text-primary/80 font-semibold"
-                      style={{ color: "hsl(200 95% 70%)" }}
-                    >
-                      Create an account
-                    </a>
+                    Machinedog.Dev is invite-only. New accounts are created when
+                    we send you an invitation by email.
                   </p>
-                  <p className="text-xs text-white/60">
-                    Don't have an invite?{" "}
-                    <a
-                      href={intakeHref}
-                      className="font-semibold"
-                      style={{ color: "hsl(200 95% 70%)" }}
-                    >
-                      Request one →
-                    </a>
+                  <p className="text-[11px] text-white/40 font-mono uppercase tracking-[0.2em]">
+                    Encrypted · Invite-only · No spam
                   </p>
                 </div>
               </div>
             </div>
-
-            {/* Tiny legal/foot caption beneath card */}
-            <p className="mt-4 text-center text-[10px] tracking-[0.2em] uppercase font-mono text-white/35">
-              Encrypted · Invite-only · No spam
-            </p>
           </div>
         </main>
       </div>

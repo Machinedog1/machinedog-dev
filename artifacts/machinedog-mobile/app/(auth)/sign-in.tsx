@@ -1,4 +1,3 @@
-import { useSignIn } from "@clerk/expo";
 import { type Href, Link, useRouter } from "expo-router";
 import React from "react";
 import {
@@ -16,6 +15,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
+import { useAuth } from "@/lib/auth";
 
 const huskyImg = require("@/assets/images/husky-mark.png");
 const huskyPortrait = require("@/assets/images/husky-portrait-frontal.png");
@@ -23,7 +23,7 @@ const huskyPortrait = require("@/assets/images/husky-portrait-frontal.png");
 export default function SignInScreen() {
   const colors = useColors();
   const r = useResponsive();
-  const { signIn, errors, fetchStatus } = useSignIn();
+  const { signIn } = useAuth();
   const router = useRouter();
 
   const heroHeight = Math.min(
@@ -31,7 +31,6 @@ export default function SignInScreen() {
     r.isTablet ? 620 : 500,
   );
   const sidePad = r.isTablet ? 32 : r.isCompact ? 18 : 22;
-  // Match the website's clamp(1.5rem, 7vw, 4.5rem) — at 393px that's ~27px.
   const headlineFont = r.isTablet
     ? Math.min(Math.max(Math.round(r.width * 0.07), 40), 64)
     : Math.min(Math.max(Math.round(r.width * 0.07), 22), 30);
@@ -39,24 +38,20 @@ export default function SignInScreen() {
 
   const [emailAddress, setEmailAddress] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   const handleSubmit = async () => {
-    const { error } = await signIn.password({
-      emailAddress: emailAddress.trim(),
-      password,
-    });
-    if (error) {
-      console.warn("[sign-in]", JSON.stringify(error));
+    if (!emailAddress.trim() || !password) return;
+    setSubmitting(true);
+    setError(null);
+    const result = await signIn(emailAddress.trim(), password);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error);
       return;
     }
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ decorateUrl }: { decorateUrl: (path: string) => string }) => {
-          const url = decorateUrl("/");
-          router.replace(url as Href);
-        },
-      });
-    }
+    router.replace("/(tabs)" as Href);
   };
 
   return (
@@ -65,7 +60,6 @@ export default function SignInScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScreenShell contentStyle={{ paddingHorizontal: 0, gap: 0 }}>
-        {/* Top brand row — sits above the hero, mirroring the website header */}
         <View style={[styles.topBar, { paddingHorizontal: sidePad }]}>
           <View
             style={[
@@ -87,8 +81,6 @@ export default function SignInScreen() {
           </Text>
         </View>
 
-        {/* Hero — husky portrait with eyes visible, no overlay copy.
-            Mirrors portal sign-in mobile hero exactly via web-only CSS props. */}
         <View
           style={[
             styles.hero,
@@ -114,7 +106,6 @@ export default function SignInScreen() {
               } as object,
             ]}
           />
-          {/* Cyan halo radial over the eyes (mix-blend-screen mirrors portal) */}
           <View
             pointerEvents="none"
             style={[
@@ -126,7 +117,6 @@ export default function SignInScreen() {
               } as object,
             ]}
           />
-          {/* Bottom fade only over lower 2/3 so the husky face stays clear */}
           <View
             pointerEvents="none"
             style={[
@@ -143,7 +133,6 @@ export default function SignInScreen() {
           />
         </View>
 
-        {/* Headline glass card — sits BELOW the hero, like the website */}
         <View
           style={[
             styles.section,
@@ -197,7 +186,6 @@ export default function SignInScreen() {
           </GlassCard>
         </View>
 
-        {/* Form glass card */}
         <View
           style={[
             styles.section,
@@ -246,11 +234,6 @@ export default function SignInScreen() {
                     },
                   ]}
                 />
-                {errors?.fields?.identifier && (
-                  <Text style={[styles.error, { color: colors.destructive }]}>
-                    {errors.fields.identifier.message}
-                  </Text>
-                )}
               </View>
 
               <View>
@@ -274,36 +257,31 @@ export default function SignInScreen() {
                     },
                   ]}
                 />
-                {errors?.fields?.password && (
-                  <Text style={[styles.error, { color: colors.destructive }]}>
-                    {errors.fields.password.message}
-                  </Text>
-                )}
               </View>
 
-              {errors?.global?.length ? (
+              {error && (
                 <Text style={[styles.error, { color: colors.destructive }]}>
-                  {errors.global[0].message}
+                  {error}
                 </Text>
-              ) : null}
+              )}
 
               <PrimaryButton
                 title="SIGN IN"
                 size="lg"
                 fullWidth
                 onPress={handleSubmit}
-                loading={fetchStatus === "fetching"}
+                loading={submitting}
                 disabled={!emailAddress || !password}
               />
             </View>
 
             <View style={styles.linkRow}>
               <Text style={{ color: colors.mutedForeground }}>
-                Don&apos;t have an account?{" "}
+                Need access?{" "}
               </Text>
               <Link href="/(auth)/sign-up" replace>
                 <Text style={{ color: colors.primary, fontWeight: "700" }}>
-                  Sign up
+                  Request invite
                 </Text>
               </Link>
             </View>
@@ -339,10 +317,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  brandAvatar: {
-    width: 36,
-    height: 36,
-  },
+  brandAvatar: { width: 36, height: 36 },
   brandWord: {
     fontFamily: "Inter_700Bold",
     fontWeight: "800",
@@ -350,13 +325,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     color: "#FFFFFF",
   },
-  hero: {
-    width: "100%",
-    overflow: "hidden",
-  },
-  section: {
-    paddingTop: 0,
-  },
+  hero: { width: "100%", overflow: "hidden" },
+  section: { paddingTop: 0 },
   eyebrow: {
     fontFamily: "Inter_700Bold",
     fontWeight: "700",
@@ -371,10 +341,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textTransform: "uppercase",
   },
-  heroBody: {
-    fontFamily: "Inter_400Regular",
-    marginTop: 16,
-  },
+  heroBody: { fontFamily: "Inter_400Regular", marginTop: 16 },
   welcomeEyebrow: {
     fontFamily: "Inter_700Bold",
     fontWeight: "700",
@@ -403,10 +370,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 15,
   },
-  error: {
-    marginTop: 6,
-    fontSize: 13,
-  },
+  error: { marginTop: 6, fontSize: 13 },
   linkRow: {
     flexDirection: "row",
     justifyContent: "center",

@@ -1,5 +1,5 @@
-import { useAuth, useSignUp } from "@clerk/expo";
 import { type Href, Link, useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React from "react";
 import {
   KeyboardAvoidingView,
@@ -16,50 +16,46 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
+import { useAuth } from "@/lib/auth";
 
 export default function SignUpScreen() {
   const colors = useColors();
   const r = useResponsive();
-  const { signUp, errors, fetchStatus } = useSignUp();
-  const { isSignedIn } = useAuth();
   const router = useRouter();
+  const { acceptInvite } = useAuth();
 
-  const [emailAddress, setEmailAddress] = React.useState("");
+  const [inviteToken, setInviteToken] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [code, setCode] = React.useState("");
+  const [confirm, setConfirm] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    const { error } = await signUp.password({
-      emailAddress: emailAddress.trim(),
-      password,
-    });
-    if (error) {
-      console.warn("[sign-up]", JSON.stringify(error));
+  const intakeUrl = process.env.EXPO_PUBLIC_DOMAIN
+    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/intake`
+    : null;
+
+  const canSubmit =
+    inviteToken.trim().length > 0 &&
+    password.length >= 8 &&
+    password === confirm &&
+    !submitting;
+
+  const handleAccept = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError(null);
+    const result = await acceptInvite(inviteToken.trim(), password);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error);
       return;
     }
-    await signUp.verifications.sendEmailCode();
+    router.replace("/(tabs)" as Href);
   };
 
-  const handleVerify = async () => {
-    await signUp.verifications.verifyEmailCode({ code });
-    if (signUp.status === "complete") {
-      await signUp.finalize({
-        navigate: ({ decorateUrl }: { decorateUrl: (path: string) => string }) => {
-          const url = decorateUrl("/");
-          router.replace(url as Href);
-        },
-      });
-    }
+  const openIntake = async () => {
+    if (intakeUrl) await WebBrowser.openBrowserAsync(intakeUrl);
   };
-
-  if (signUp.status === "complete" || isSignedIn) {
-    return null;
-  }
-
-  const needsVerification =
-    signUp.status === "missing_requirements" &&
-    signUp.unverifiedFields?.includes("email_address") &&
-    (!signUp.missingFields || signUp.missingFields.length === 0);
 
   return (
     <KeyboardAvoidingView
@@ -71,168 +67,123 @@ export default function SignUpScreen() {
           <Logo size="md" />
         </View>
 
-        <GlassCard padding={r.isTablet ? 32 : r.isCompact ? 18 : 24} style={styles.card}>
-          {needsVerification ? (
-            <>
-              <Text
+        <GlassCard padding={r.isTablet ? 28 : 22}>
+          <Text
+            style={[
+              styles.title,
+              { color: colors.foreground, fontSize: r.font(22, 26, 34) },
+            ]}
+          >
+            Activate your invite
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+            Machinedog.Dev is invite-only. Paste the token from your invite
+            email and choose a password to activate your account.
+          </Text>
+
+          <View style={{ gap: 14, marginTop: 18 }}>
+            <View>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>
+                Invite token
+              </Text>
+              <TextInput
+                value={inviteToken}
+                onChangeText={setInviteToken}
+                placeholder="Paste the token from your email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholderTextColor={colors.mutedForeground}
                 style={[
-                  styles.title,
-                  { color: colors.foreground, fontSize: r.font(22, 26, 34) },
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    color: colors.foreground,
+                    borderColor: colors.cardBorder,
+                    borderRadius: colors.radius,
+                  },
                 ]}
-              >
-                Verify your email
-              </Text>
-              <Text
-                style={[styles.subtitle, { color: colors.mutedForeground }]}
-              >
-                We just sent a 6-digit code to {emailAddress}.
-              </Text>
+              />
+            </View>
 
-              <View style={{ gap: 14, marginTop: 18 }}>
-                <TextInput
-                  value={code}
-                  onChangeText={setCode}
-                  placeholder="000000"
-                  keyboardType="number-pad"
-                  placeholderTextColor={colors.mutedForeground}
-                  maxLength={6}
-                  style={[
-                    styles.input,
-                    styles.codeInput,
-                    {
-                      backgroundColor: colors.input,
-                      color: colors.foreground,
-                      borderColor: colors.cardBorder,
-                      borderRadius: colors.radius,
-                    },
-                  ]}
-                />
-                {errors?.fields?.code && (
-                  <Text style={[styles.error, { color: colors.destructive }]}>
-                    {errors.fields.code.message}
-                  </Text>
-                )}
-                <PrimaryButton
-                  title="Verify and continue"
-                  size="lg"
-                  fullWidth
-                  onPress={handleVerify}
-                  loading={fetchStatus === "fetching"}
-                  disabled={code.length < 6}
-                />
-                <PrimaryButton
-                  title="Resend code"
-                  variant="ghost"
-                  fullWidth
-                  onPress={() => signUp.verifications.sendEmailCode()}
-                />
-              </View>
-            </>
-          ) : (
-            <>
-              <Text
+            <View>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>
+                New password (min 8 chars)
+              </Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="At least 8 characters"
+                secureTextEntry
+                autoComplete="password-new"
+                placeholderTextColor={colors.mutedForeground}
                 style={[
-                  styles.title,
-                  { color: colors.foreground, fontSize: r.font(22, 26, 34) },
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    color: colors.foreground,
+                    borderColor: colors.cardBorder,
+                    borderRadius: colors.radius,
+                  },
                 ]}
-              >
-                Create your account
+              />
+            </View>
+
+            <View>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>
+                Confirm password
               </Text>
-              <Text
-                style={[styles.subtitle, { color: colors.mutedForeground }]}
-              >
-                Use the email your account team invited. Other addresses cannot
-                access the workspace.
+              <TextInput
+                value={confirm}
+                onChangeText={setConfirm}
+                secureTextEntry
+                placeholderTextColor={colors.mutedForeground}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    color: colors.foreground,
+                    borderColor: colors.cardBorder,
+                    borderRadius: colors.radius,
+                  },
+                ]}
+              />
+            </View>
+
+            {error && (
+              <Text style={[styles.error, { color: colors.destructive }]}>
+                {error}
               </Text>
+            )}
 
-              <View style={{ gap: 14, marginTop: 18 }}>
-                <View>
-                  <Text style={[styles.label, { color: colors.mutedForeground }]}>
-                    Email address
-                  </Text>
-                  <TextInput
-                    value={emailAddress}
-                    onChangeText={setEmailAddress}
-                    placeholder="you@company.com"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    keyboardType="email-address"
-                    placeholderTextColor={colors.mutedForeground}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        color: colors.foreground,
-                        borderColor: colors.cardBorder,
-                        borderRadius: colors.radius,
-                      },
-                    ]}
-                  />
-                  {errors?.fields?.emailAddress && (
-                    <Text style={[styles.error, { color: colors.destructive }]}>
-                      {errors.fields.emailAddress.message}
-                    </Text>
-                  )}
-                </View>
+            <PrimaryButton
+              title="Activate account"
+              size="lg"
+              fullWidth
+              onPress={handleAccept}
+              loading={submitting}
+              disabled={!canSubmit}
+            />
 
-                <View>
-                  <Text style={[styles.label, { color: colors.mutedForeground }]}>
-                    Password
-                  </Text>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="At least 8 characters"
-                    secureTextEntry
-                    autoComplete="password-new"
-                    placeholderTextColor={colors.mutedForeground}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        color: colors.foreground,
-                        borderColor: colors.cardBorder,
-                        borderRadius: colors.radius,
-                      },
-                    ]}
-                  />
-                  {errors?.fields?.password && (
-                    <Text style={[styles.error, { color: colors.destructive }]}>
-                      {errors.fields.password.message}
-                    </Text>
-                  )}
-                </View>
+            {intakeUrl && (
+              <PrimaryButton
+                title="Don't have an invite? Request one"
+                variant="ghost"
+                fullWidth
+                onPress={openIntake}
+              />
+            )}
+          </View>
 
-                {errors?.global?.length ? (
-                  <Text style={[styles.error, { color: colors.destructive }]}>
-                    {errors.global[0].message}
-                  </Text>
-                ) : null}
-
-                <PrimaryButton
-                  title="Create account"
-                  size="lg"
-                  fullWidth
-                  onPress={handleSubmit}
-                  loading={fetchStatus === "fetching"}
-                  disabled={!emailAddress || password.length < 8}
-                />
-              </View>
-
-              <View nativeID="clerk-captcha" />
-
-              <View style={styles.linkRow}>
-                <Text style={{ color: colors.mutedForeground }}>
-                  Already have an account?{" "}
-                </Text>
-                <Link href="/(auth)/sign-in" replace>
-                  <Text style={{ color: colors.primary, fontWeight: "600" }}>
-                    Sign in
-                  </Text>
-                </Link>
-              </View>
-            </>
-          )}
+          <View style={styles.linkRow}>
+            <Text style={{ color: colors.mutedForeground }}>
+              Already activated?{" "}
+            </Text>
+            <Link href="/(auth)/sign-in" replace>
+              <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                Sign in
+              </Text>
+            </Link>
+          </View>
         </GlassCard>
       </ScreenShell>
     </KeyboardAvoidingView>
@@ -240,14 +191,7 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  card: {
-    marginTop: 12,
-  },
+  headerRow: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
   title: {
     fontFamily: "Inter_700Bold",
     fontWeight: "700",
@@ -275,16 +219,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 15,
   },
-  codeInput: {
-    fontSize: 26,
-    letterSpacing: 8,
-    textAlign: "center",
-    fontFamily: "Inter_600SemiBold",
-  },
-  error: {
-    marginTop: 6,
-    fontSize: 13,
-  },
+  error: { marginTop: 6, fontSize: 13 },
   linkRow: {
     flexDirection: "row",
     justifyContent: "center",

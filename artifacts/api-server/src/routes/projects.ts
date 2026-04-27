@@ -96,7 +96,7 @@ router.get(
   loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
-    const client = req.client!;
+    const client = req.dbClient!;
     const owned = await db
       .select()
       .from(projectsTable)
@@ -153,7 +153,7 @@ router.post(
     const [row] = await db
       .insert(projectsTable)
       .values({
-        clientId: req.client!.id,
+        clientId: req.dbClient!.id,
         title: parsed.data.title,
         description: parsed.data.description,
         summary: parsed.data.summary ?? "",
@@ -179,8 +179,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -220,7 +220,7 @@ router.patch(
         }),
         ...(body.data.status !== undefined && { status: body.data.status }),
       })
-      .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.clientId, req.client!.id)))
+      .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.clientId, req.dbClient!.id)))
       .returning();
     if (!row) {
       res.status(404).json({ error: "Not found" });
@@ -249,7 +249,7 @@ router.get(
       res.status(400).json({ error: params.error.message });
       return;
     }
-    const project = await ensureOwner(params.data.id, req.client!.id);
+    const project = await ensureOwner(params.data.id, req.dbClient!.id);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -284,7 +284,7 @@ router.post(
       res.status(400).json({ error: body.error.message });
       return;
     }
-    const project = await ensureOwner(params.data.id, req.client!.id);
+    const project = await ensureOwner(params.data.id, req.dbClient!.id);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -333,7 +333,7 @@ router.post(
           clientId: isClientActive ? existingClient!.id : null,
           role: "collaborator",
           status: isClientActive ? "active" : "pending",
-          invitedByClientId: req.client!.id,
+          invitedByClientId: req.dbClient!.id,
           acceptedAt: isClientActive ? new Date() : undefined,
         })
         .returning();
@@ -350,7 +350,7 @@ router.post(
       await sendProjectInviteEmail({
         to: email,
         projectTitle: project.title,
-        invitedByEmail: req.client!.email,
+        invitedByEmail: req.dbClient!.email,
         alreadyHasAccount: Boolean(existingClient),
       });
     } catch (err) {
@@ -372,7 +372,7 @@ router.delete(
       res.status(400).json({ error: params.error.message });
       return;
     }
-    const project = await ensureOwner(params.data.id, req.client!.id);
+    const project = await ensureOwner(params.data.id, req.dbClient!.id);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -410,8 +410,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -456,8 +456,8 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -472,7 +472,7 @@ router.post(
       .insert(projectCommentsTable)
       .values({
         projectId: project.id,
-        clientId: req.client!.id,
+        clientId: req.dbClient!.id,
         body: trimmed,
       })
       .returning();
@@ -480,7 +480,7 @@ router.post(
       id: row.id,
       projectId: row.projectId,
       clientId: row.clientId,
-      clientEmail: req.client!.email,
+      clientEmail: req.dbClient!.email,
       body: row.body,
       createdAt: row.createdAt,
     });
@@ -500,8 +500,8 @@ router.delete(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -520,7 +520,7 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isAuthor = comment.clientId === req.client!.id;
+    const isAuthor = comment.clientId === req.dbClient!.id;
     const isOwner = project.viewerRole === "owner";
     if (!isAuthor && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
@@ -546,8 +546,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -581,14 +581,14 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const client = req.client!;
+    const client = req.dbClient!;
     if (client.tokenBalance <= 0) {
       res.status(402).json({
         error: "Insufficient tokens. Please purchase a bundle.",
@@ -646,8 +646,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -695,8 +695,8 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -710,7 +710,7 @@ router.post(
       .insert(projectFilesTable)
       .values({
         projectId: project.id,
-        uploadedByClientId: req.client!.id,
+        uploadedByClientId: req.dbClient!.id,
         name: body.data.name,
         contentType: body.data.contentType,
         sizeBytes: body.data.sizeBytes,
@@ -721,7 +721,7 @@ router.post(
       id: row.id,
       projectId: row.projectId,
       uploadedByClientId: row.uploadedByClientId,
-      uploadedByEmail: req.client!.email,
+      uploadedByEmail: req.dbClient!.email,
       name: row.name,
       contentType: row.contentType,
       sizeBytes: row.sizeBytes,
@@ -744,8 +744,8 @@ router.delete(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.client!.id,
-      req.client!.email,
+      req.dbClient!.id,
+      req.dbClient!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -764,7 +764,7 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isUploader = file.uploadedByClientId === req.client!.id;
+    const isUploader = file.uploadedByClientId === req.dbClient!.id;
     const isOwner = project.viewerRole === "owner";
     if (!isUploader && !isOwner) {
       res.status(403).json({ error: "Forbidden" });

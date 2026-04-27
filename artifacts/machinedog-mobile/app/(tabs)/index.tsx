@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/expo";
+import { useAuth } from "@/lib/auth";
 import { Feather } from "@expo/vector-icons";
 import {
   getListMyPromptsQueryKey,

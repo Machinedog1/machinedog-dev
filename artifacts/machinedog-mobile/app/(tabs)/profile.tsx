@@ -1,4 +1,3 @@
-import { useAuth, useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import { useGetMe } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
@@ -11,6 +10,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
+import { useAuth } from "@/lib/auth";
 
 function formatTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -22,8 +22,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const r = useResponsive();
   const router = useRouter();
-  const { user } = useUser();
-  const { signOut } = useAuth();
+  const { client, signOut } = useAuth();
   const meQuery = useGetMe();
   const me = meQuery.data;
   const scheme = useColorScheme();
@@ -47,11 +46,8 @@ export default function ProfileScreen() {
     }
   };
 
-  const email =
-    user?.primaryEmailAddress?.emailAddress ?? me?.email ?? "Signed-in user";
-  const displayName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-    email.split("@")[0];
+  const email = client?.email ?? me?.email ?? "Signed-in user";
+  const displayName = email.split("@")[0];
 
   return (
     <ScreenShell>
@@ -232,15 +228,8 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    paddingHorizontal: 4,
-    marginTop: 4,
-  },
-  identityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
+  headerRow: { paddingHorizontal: 4, marginTop: 4 },
+  identityRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   avatar: {
     width: 56,
     height: 56,
@@ -262,17 +251,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 8,
   },
-  divider: {
-    height: 1,
-    marginVertical: 16,
-  },
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  stat: {
-    flex: 1,
-  },
+  divider: { height: 1, marginVertical: 16 },
+  statsRow: { flexDirection: "row", alignItems: "center" },
+  stat: { flex: 1 },
   statLabel: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
@@ -286,11 +267,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 4,
   },
-  statDivider: {
-    width: 1,
-    height: 32,
-    marginHorizontal: 12,
-  },
+  statDivider: { width: 1, height: 32, marginHorizontal: 12 },
   sectionTitle: {
     fontFamily: "Inter_700Bold",
     fontWeight: "700",

@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sql, and } from "drizzle-orm";
-import { clerkClient } from "@clerk/express";
 import {
   db,
   clientsTable,
@@ -26,6 +25,8 @@ import {
   ListAllBuildOrdersResponse,
 } from "@workspace/api-zod";
 import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
+import { generateSecureToken } from "../lib/passwords";
+import { sendInviteEmail } from "../lib/mailer";
 
 const router: IRouter = Router();
 
@@ -188,34 +189,30 @@ router.post("/admin/clients/invite", async (req, res): Promise<void> => {
     return;
   }
 
-  // Create an invited record. The client will be linked to a Clerk userId on first sign-in.
+  // Create an invited record with a one-time invite token.
+  const inviteToken = generateSecureToken(32);
+  const inviteTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await db.insert(clientsTable).values({
-    userId: `invited:${email}`,
     email,
     status: "invited",
     tokenBalance: 50_000, // welcome credit
+    inviteToken,
+    inviteTokenExpiresAt,
   });
 
-  // Optionally send a Clerk invitation (best-effort; ignore failure)
-  try {
-    await clerkClient.invitations.createInvitation({ emailAddress: email });
-    res.json(
-      InviteClientResponse.parse({
-        success: true,
-        message: `Invite sent to ${email}. They'll get 50,000 starter tokens on first sign-in.`,
-      }),
-    );
-    return;
-  } catch (err) {
-    req.log.warn({ err }, "Clerk invitation failed (record still created)");
-    res.json(
-      InviteClientResponse.parse({
-        success: true,
-        message: `Reserved a spot for ${email}. Email invite could not be auto-sent — share the sign-up link manually.`,
-      }),
-    );
-    return;
-  }
+  await sendInviteEmail({
+    to: email,
+    token: inviteToken,
+    invitedByEmail: req.dbClient?.email,
+    log: req.log,
+  });
+
+  res.json(
+    InviteClientResponse.parse({
+      success: true,
+      message: `Invite sent to ${email}. They'll get 50,000 starter tokens after setting their password.`,
+    }),
+  );
 });
 
 router.get("/admin/clients/:id", async (req, res): Promise<void> => {

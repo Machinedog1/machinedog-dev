@@ -1,4 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { logger } from "./logger";
+import type { Logger } from "pino";
 
 export interface MailerConfig {
   host: string;
@@ -64,4 +66,150 @@ export function getTransporter(cfg: MailerConfig): Transporter {
   });
   cachedKey = key;
   return cachedTransporter;
+}
+
+function getPortalUrl(): string {
+  const explicit = process.env.PUBLIC_APP_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const dev = process.env.REPLIT_DEV_DOMAIN?.trim();
+  if (dev) return `https://${dev.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+  return "https://machinedog.dev";
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+interface SendInviteEmailArgs {
+  to: string;
+  token: string;
+  invitedByEmail?: string;
+  log?: Logger;
+}
+
+export async function sendInviteEmail(args: SendInviteEmailArgs): Promise<void> {
+  const portal = getPortalUrl();
+  const url = `${portal}/accept-invite?token=${encodeURIComponent(args.token)}`;
+  const subject = "You're invited to Machinedog.Dev";
+
+  const text = [
+    args.invitedByEmail
+      ? `${args.invitedByEmail} invited you to join Machinedog.Dev — a private AI engineering atelier.`
+      : `You've been invited to join Machinedog.Dev — a private AI engineering atelier.`,
+    "",
+    `Set your password to activate your account:`,
+    url,
+    "",
+    "This invite link expires in 7 days.",
+    "",
+    "— The Machinedog team",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;background:#070914;color:#e6e9f2;padding:32px">
+      <div style="max-width:560px;margin:0 auto;background:#0e1224;border:1px solid rgba(63,177,240,0.2);border-radius:16px;padding:32px">
+        <h1 style="font-size:20px;margin:0 0 16px;color:#3FB1F0;letter-spacing:0.04em;text-transform:uppercase">Machinedog.Dev</h1>
+        <p style="font-size:16px;line-height:1.5;margin:0 0 16px">
+          ${args.invitedByEmail ? `<strong>${escapeHtml(args.invitedByEmail)}</strong> invited you to ` : "You've been invited to "}
+          join <strong>Machinedog.Dev</strong> — a private AI engineering atelier.
+        </p>
+        <p style="font-size:14px;line-height:1.5;color:#a4adc7;margin:0 0 24px">
+          Set your password to activate your account. This link expires in 7 days.
+        </p>
+        <p style="margin:0 0 24px">
+          <a href="${url}" style="display:inline-block;background:linear-gradient(120deg,#3FB1F0,#7c5cff);color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:9999px">
+            Set your password
+          </a>
+        </p>
+        <p style="font-size:12px;color:#6b7494;margin:0">
+          If the button doesn't work, copy this link into your browser:<br/>
+          <span style="word-break:break-all">${url}</span>
+        </p>
+      </div>
+    </div>`;
+
+  await sendOrLog({ to: args.to, subject, text, html, url, log: args.log, kind: "invite" });
+}
+
+interface SendResetEmailArgs {
+  to: string;
+  token: string;
+  log?: Logger;
+}
+
+export async function sendPasswordResetEmail(args: SendResetEmailArgs): Promise<void> {
+  const portal = getPortalUrl();
+  const url = `${portal}/reset-password?token=${encodeURIComponent(args.token)}`;
+  const subject = "Reset your Machinedog.Dev password";
+
+  const text = [
+    "Someone (hopefully you) requested a password reset for your Machinedog.Dev account.",
+    "",
+    "Reset your password with this link (expires in 1 hour):",
+    url,
+    "",
+    "If you didn't request this, you can safely ignore this email.",
+    "",
+    "— The Machinedog team",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;background:#070914;color:#e6e9f2;padding:32px">
+      <div style="max-width:560px;margin:0 auto;background:#0e1224;border:1px solid rgba(63,177,240,0.2);border-radius:16px;padding:32px">
+        <h1 style="font-size:20px;margin:0 0 16px;color:#3FB1F0;letter-spacing:0.04em;text-transform:uppercase">Machinedog.Dev</h1>
+        <p style="font-size:16px;line-height:1.5;margin:0 0 16px">Reset your password</p>
+        <p style="font-size:14px;line-height:1.5;color:#a4adc7;margin:0 0 24px">
+          Click the button below to choose a new password. This link expires in 1 hour.
+        </p>
+        <p style="margin:0 0 24px">
+          <a href="${url}" style="display:inline-block;background:linear-gradient(120deg,#3FB1F0,#7c5cff);color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:9999px">
+            Reset password
+          </a>
+        </p>
+        <p style="font-size:12px;color:#6b7494;margin:0">
+          If you didn't request this, ignore this email. If the button doesn't work, copy this link:<br/>
+          <span style="word-break:break-all">${url}</span>
+        </p>
+      </div>
+    </div>`;
+
+  await sendOrLog({ to: args.to, subject, text, html, url, log: args.log, kind: "reset" });
+}
+
+async function sendOrLog(args: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  url: string;
+  log?: Logger;
+  kind: "invite" | "reset";
+}): Promise<void> {
+  const log = args.log ?? logger;
+  const cfg = loadMailerConfig();
+  if (!cfg) {
+    log.warn(
+      { to: args.to, url: args.url, kind: args.kind },
+      `SMTP not configured — printing ${args.kind} link to logs (set SMTP_HOST / SMTP_USER / SMTP_PASSWORD / SMTP_FROM to enable email)`,
+    );
+    return;
+  }
+  try {
+    const transporter = getTransporter(cfg);
+    await transporter.sendMail({
+      from: cfg.from,
+      to: args.to,
+      subject: args.subject,
+      text: args.text,
+      html: args.html,
+    });
+    log.info({ to: args.to, kind: args.kind }, "Sent transactional email");
+  } catch (err) {
+    log.error({ err, to: args.to, url: args.url, kind: args.kind }, "Failed to send email — link printed to logs as fallback");
+  }
 }

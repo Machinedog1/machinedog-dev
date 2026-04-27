@@ -1,131 +1,100 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { getAuth, clerkClient } from "@clerk/express";
 import { eq, and } from "drizzle-orm";
-import { db, clientsTable, projectMembersTable, type Client } from "@workspace/db";
-
-declare module "express-serve-static-core" {
-  // eslint-disable-next-line @typescript-eslint/no-empty-interface
-  interface Request {
-    userId?: string;
-    client?: Client;
-  }
-}
+import { db, clientsTable, projectMembersTable } from "@workspace/db";
+import { getSessionById, readSessionIdFromRequest, touchSession } from "./sessions";
+// Side-effect import: registers `req.dbClient` and `req.session` typings on
+// express-serve-static-core's Request interface. Do not remove.
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
-export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const auth = getAuth(req);
-  const userId = auth?.userId ?? auth?.sessionClaims?.userId;
-  if (!userId || typeof userId !== "string") {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  req.userId = userId;
-  next();
-}
-
-async function fetchClerkUserEmail(userId: string): Promise<string | null> {
-  try {
-    const user = await clerkClient.users.getUser(userId);
-    const primary = user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId);
-    return (primary?.emailAddress ?? user.emailAddresses[0]?.emailAddress ?? null);
-  } catch {
-    return null;
-  }
-}
-
-export async function loadOrCreateClient(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (!req.userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const existing = await db.select().from(clientsTable).where(eq(clientsTable.userId, req.userId));
-  if (existing[0]) {
-    req.client = existing[0];
-    if (existing[0].status === "active") {
-      await attachPendingProjectMemberships(existing[0].id, existing[0].email);
-    }
+export async function loadSessionAndClient(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const sessionId = readSessionIdFromRequest(req);
+  if (!sessionId) {
     next();
     return;
   }
-  const email = await fetchClerkUserEmail(req.userId);
-  if (!email) {
-    res.status(401).json({ error: "Could not resolve email for current user" });
+  const session = await getSessionById(sessionId);
+  if (!session) {
+    next();
     return;
   }
-  const lowered = email.toLowerCase();
-
-  // Check for an existing pre-invited client record by email (status: 'invited')
-  const invited = await db
+  const [client] = await db
     .select()
     .from(clientsTable)
-    .where(eq(clientsTable.email, lowered));
-
-  if (invited[0] && invited[0].status === "invited") {
-    const [updated] = await db
-      .update(clientsTable)
-      .set({ userId: req.userId, status: "active", isAdmin: invited[0].isAdmin || ADMIN_EMAILS.includes(lowered) })
-      .where(eq(clientsTable.id, invited[0].id))
-      .returning();
-    req.client = updated;
-    await attachPendingProjectMemberships(updated.id, lowered);
+    .where(eq(clientsTable.id, session.clientId));
+  if (!client) {
     next();
     return;
   }
-
-  // Activate via pending project invite even without an admin "client invite" row.
-  const pendingMember = await db
-    .select()
-    .from(projectMembersTable)
-    .where(
-      and(
-        eq(projectMembersTable.email, lowered),
-        eq(projectMembersTable.status, "pending"),
-      ),
-    )
-    .limit(1);
-
-  if (pendingMember.length > 0) {
-    const [created] = await db
-      .insert(clientsTable)
-      .values({
-        userId: req.userId,
-        email: lowered,
-        isAdmin: ADMIN_EMAILS.includes(lowered),
-        status: "active",
-        tokenBalance: 0,
-      })
-      .returning();
-    req.client = created;
-    await attachPendingProjectMemberships(created.id, lowered);
-    next();
-    return;
-  }
-
-  // First-ever sign-in with no invite: only allow if email is in ADMIN_EMAILS (bootstrap owner)
-  // Otherwise create a 'suspended' record so the UI can render a not-invited screen.
-  const isAdmin = ADMIN_EMAILS.includes(lowered);
-  const [created] = await db
-    .insert(clientsTable)
-    .values({
-      userId: req.userId,
-      email: lowered,
-      isAdmin,
-      status: isAdmin ? "active" : "suspended",
-      tokenBalance: isAdmin ? 1_000_000 : 0,
-    })
-    .returning();
-  req.client = created;
-  if (isAdmin) {
-    await attachPendingProjectMemberships(created.id, lowered);
+  req.session = session;
+  req.dbClient = client;
+  // Touch session asynchronously — don't block the request
+  touchSession(session).catch(() => {});
+  // Pick up any pending project memberships in case the user accepted invites between requests
+  if (client.status === "active") {
+    attachPendingProjectMemberships(client.id, client.email).catch(() => {});
   }
   next();
 }
 
-async function attachPendingProjectMemberships(clientId: number, lowered: string): Promise<void> {
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  if (!req.dbClient) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}
+
+/**
+ * Backward-compatibility no-op. The new global middleware
+ * `loadSessionAndClient` already loads `req.dbClient` from the session, so
+ * existing route guards `requireAuth, loadOrCreateClient, requireActiveClient`
+ * continue to work unchanged.
+ */
+export function loadOrCreateClient(_req: Request, _res: Response, next: NextFunction): void {
+  next();
+}
+
+export function requireActiveClient(req: Request, res: Response, next: NextFunction): void {
+  if (!req.dbClient) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (req.dbClient.status !== "active") {
+    res.status(403).json({ error: "Account not active", status: req.dbClient.status });
+    return;
+  }
+  next();
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.dbClient) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!req.dbClient.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  next();
+}
+
+/**
+ * When a client accepts a project-member invite (or signs in with an email
+ * that has pending project invites), automatically attach them to the project.
+ */
+export async function attachPendingProjectMemberships(
+  clientId: number,
+  email: string,
+): Promise<void> {
+  const lowered = email.toLowerCase();
   await db
     .update(projectMembersTable)
     .set({ clientId, status: "active", acceptedAt: new Date() })
@@ -137,22 +106,6 @@ async function attachPendingProjectMemberships(clientId: number, lowered: string
     );
 }
 
-export function requireActiveClient(req: Request, res: Response, next: NextFunction): void {
-  if (!req.client) {
-    res.status(401).json({ error: "No client record" });
-    return;
-  }
-  if (req.client.status !== "active") {
-    res.status(403).json({ error: "Account not active", status: req.client.status });
-    return;
-  }
-  next();
-}
-
-export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (!req.client?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
-  next();
+export function isAdminEmail(email: string): boolean {
+  return ADMIN_EMAILS.includes(email.toLowerCase());
 }

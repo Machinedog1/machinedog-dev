@@ -8,7 +8,7 @@ import {
   useGetMe,
   getGetMeQueryKey,
 } from "@workspace/api-client-react";
-import { useUser } from "@clerk/react";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import {
@@ -987,7 +987,9 @@ export default function PricingPage() {
 }
 
 function PortalCheckoutButton() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { client, isLoading } = useAuth();
+  const isSignedIn = !!client;
+  const isLoaded = !isLoading;
   const { data: me } = useGetMe({
     query: { queryKey: getGetMeQueryKey(), enabled: !!isSignedIn, retry: false },
   });

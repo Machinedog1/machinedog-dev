@@ -29,7 +29,7 @@ router.get("/tokens/purchases", requireAuth, loadOrCreateClient, requireActiveCl
   const rows = await db
     .select()
     .from(tokenPurchasesTable)
-    .where(eq(tokenPurchasesTable.clientId, req.client!.id))
+    .where(eq(tokenPurchasesTable.clientId, req.dbClient!.id))
     .orderBy(desc(tokenPurchasesTable.createdAt));
   res.json(ListMyTokenPurchasesResponse.parse({ data: rows }));
 });
@@ -68,11 +68,11 @@ router.post("/tokens/checkout", requireAuth, loadOrCreateClient, requireActiveCl
         },
       },
     ],
-    customer_email: req.client!.email,
-    client_reference_id: String(req.client!.id),
+    customer_email: req.dbClient!.email,
+    client_reference_id: String(req.dbClient!.id),
     metadata: {
       kind: "tokens",
-      clientId: String(req.client!.id),
+      clientId: String(req.dbClient!.id),
       bundleKey: bundle.key,
       tokens: String(bundle.tokens),
     },
@@ -82,7 +82,7 @@ router.post("/tokens/checkout", requireAuth, loadOrCreateClient, requireActiveCl
 
   // Pre-record a pending purchase so the user sees it in history immediately
   await db.insert(tokenPurchasesTable).values({
-    clientId: req.client!.id,
+    clientId: req.dbClient!.id,
     bundleKey: bundle.key,
     tokensAdded: bundle.tokens,
     amountCents: Math.round(bundle.priceUsd * 100),

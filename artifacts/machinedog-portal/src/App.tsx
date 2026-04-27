@@ -1,13 +1,14 @@
-import { ClerkProvider, ClerkLoaded, RedirectToSignIn, useUser } from "@clerk/react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { dark } from "@clerk/themes";
 import NotFound from "@/pages/not-found";
 
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import AcceptInvitePage from "@/pages/accept-invite";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import NotInvitedPage from "@/pages/not-invited";
 import PricingPage from "@/pages/pricing";
 import ThankYouPage from "@/pages/thank-you";
@@ -30,23 +31,34 @@ import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspa
 import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
-import { useTheme } from "@/hooks/use-theme";
+import { AuthProvider, useAuth } from "@/lib/auth";
 
 const queryClient = new QueryClient();
 
-function SignedIn({ children }: { children: React.ReactNode }) {
-  const { isSignedIn } = useUser();
-  return isSignedIn ? <>{children}</> : null;
-}
-
-function SignedOut({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded } = useUser();
-  return isLoaded && !isSignedIn ? <>{children}</> : null;
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center text-foreground relative">
+      <div className="bg-mesh" />
+      <div className="bg-grid" />
+      <div className="glass p-8 flex flex-col items-center justify-center rounded-2xl">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-4 text-sm text-muted-foreground font-mono">INITIALIZING_WORKSPACE...</p>
+      </div>
+    </div>
+  );
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { data: me, isLoading, error } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
+  const { client: authClient, isLoading: authLoading } = useAuth();
   const [location, setLocation] = useLocation();
+
+  const { data: me, isLoading } = useGetMe({
+    query: {
+      queryKey: getGetMeQueryKey(),
+      enabled: !!authClient,
+      retry: false,
+    },
+  });
 
   const { data: myProjects } = useListMyProjects({
     query: {
@@ -65,23 +77,17 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [me, myProjects, location, setLocation]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center text-foreground relative">
-        <div className="bg-mesh" />
-        <div className="bg-grid" />
-        <div className="glass p-8 flex flex-col items-center justify-center rounded-2xl">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="mt-4 text-sm text-muted-foreground font-mono">INITIALIZING_WORKSPACE...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !me) {
-    if (location !== "/not-invited") {
-      setLocation("/not-invited");
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authClient) {
+      setLocation("/sign-in");
     }
+  }, [authLoading, authClient, setLocation]);
+
+  if (authLoading || (authClient && isLoading)) return <LoadingScreen />;
+  if (!authClient) return null;
+  if (!me) {
+    if (location !== "/not-invited") setLocation("/not-invited");
     return null;
   }
 
@@ -90,7 +96,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   if (me && !me.isAdmin) {
     setLocation("/");
@@ -100,11 +106,32 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function Router() {
+function PublicOnlyRoutes() {
   return (
     <Switch>
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/accept-invite" component={AcceptInvitePage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/pricing" component={PricingPage} />
+      <Route path="/thank-you" component={ThankYouPage} />
+      <Route path="/intake" component={IntakePage} />
+      <Route path="/work" component={WorkPage} />
+      <Route path="*" component={SignInPage} />
+    </Switch>
+  );
+}
+
+function AuthedRoutes() {
+  return (
+    <Switch>
+      {/* Public routes still accessible while signed in */}
+      <Route path="/sign-in" component={SignInPage} />
+      <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/accept-invite" component={AcceptInvitePage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/thank-you" component={ThankYouPage} />
@@ -151,71 +178,33 @@ function Router() {
   );
 }
 
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+function RoutedApp() {
+  const { client, isLoading } = useAuth();
+  const qc = useQueryClient();
+
+  // When the auth identity changes, blow away cached server data so that
+  // sign-in / sign-out switches user context cleanly.
+  useEffect(() => {
+    qc.invalidateQueries();
+  }, [client?.id, qc]);
+
+  if (isLoading) return <LoadingScreen />;
+  return client ? <AuthedRoutes /> : <PublicOnlyRoutes />;
+}
 
 function App() {
-  const { theme } = useTheme();
-
-  if (!clerkPubKey) {
-    return <div className="p-8 text-destructive">Missing VITE_CLERK_PUBLISHABLE_KEY</div>;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <ClerkProvider
-            publishableKey={clerkPubKey}
-            appearance={{
-              baseTheme: theme === "dark" ? dark : undefined,
-              variables: {
-                colorPrimary: "#3FB1F0",
-                colorBackground: "transparent",
-                colorInput: theme === "dark" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-                colorInputForeground: theme === "dark" ? "#FFFFFF" : "#000000",
-                colorForeground: theme === "dark" ? "#E2EAF2" : "#1A2636",
-                fontFamily: "'Inter', sans-serif",
-                borderRadius: "0.875rem",
-              },
-              elements: {
-                cardBox: "glass-strong border-0 shadow-xl",
-                card: "bg-transparent shadow-none",
-                headerTitle: "font-mono font-bold text-foreground",
-                headerSubtitle: "font-mono text-muted-foreground",
-                socialButtonsBlockButton: "glass-subtle border-0 text-foreground hover:bg-muted/50",
-                formFieldLabel: "font-mono text-xs font-bold text-muted-foreground",
-                formFieldInput: "glass-input border-0 focus:ring-primary",
-                footerActionText: "text-muted-foreground",
-                footerActionLink: "text-primary hover:text-primary/80",
-                identityPreviewText: "text-foreground",
-                identityPreviewEditButtonIcon: "text-muted-foreground hover:text-foreground",
-              },
-            }}
-          >
-            <ClerkLoaded>
-              <SignedIn>
-                <Router />
-              </SignedIn>
-              <SignedOut>
-                <Switch>
-                  <Route path="/sign-up" component={SignUpPage} />
-                  <Route path="/pricing" component={PricingPage} />
-                  <Route path="/thank-you" component={ThankYouPage} />
-                  <Route path="/intake" component={IntakePage} />
-                  <Route path="/work" component={WorkPage} />
-                  <Route path="*" component={SignInPage} />
-                </Switch>
-              </SignedOut>
-            </ClerkLoaded>
-          </ClerkProvider>
+          <AuthProvider>
+            <RoutedApp />
+          </AuthProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
-
-// Keep a reference so unused-import lint stays quiet for the redirect helper.
-void RedirectToSignIn;
 
 export default App;

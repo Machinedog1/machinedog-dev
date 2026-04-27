@@ -1,11 +1,11 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
-import { clerkMiddleware } from "@clerk/express";
-import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import { logger } from "./lib/logger";
+import { loadSessionAndClient } from "./lib/auth";
 
 const app: Express = express();
 
@@ -29,15 +29,18 @@ app.use(
   }),
 );
 
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-
+// Stripe webhook needs the raw body — must mount before json parsers
 app.use("/api/stripe/webhook", stripeWebhookRouter);
 
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-app.use(clerkMiddleware());
+// Populate req.session and req.dbClient on every request when a valid
+// session cookie or bearer token is present. Routes opt-in to authentication
+// via the requireAuth / requireActiveClient / requireAdmin guards.
+app.use(loadSessionAndClient);
 
 app.use("/api", router);
 

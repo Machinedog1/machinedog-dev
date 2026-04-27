@@ -27,14 +27,14 @@ router.get("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, asy
   const rows = await db
     .select()
     .from(promptSessionsTable)
-    .where(eq(promptSessionsTable.clientId, req.client!.id))
+    .where(eq(promptSessionsTable.clientId, req.dbClient!.id))
     .orderBy(desc(promptSessionsTable.createdAt))
     .limit(limit)
     .offset(offset);
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(promptSessionsTable)
-    .where(eq(promptSessionsTable.clientId, req.client!.id));
+    .where(eq(promptSessionsTable.clientId, req.dbClient!.id));
   res.json(ListMyPromptsResponse.parse({ data: rows, total: Number(count) }));
 });
 
@@ -44,7 +44,7 @@ router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, as
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const client = req.client!;
+  const client = req.dbClient!;
   if (client.tokenBalance <= 0) {
     res.status(402).json({ error: "Insufficient tokens. Please purchase a bundle.", tokenBalance: client.tokenBalance });
     return;
@@ -95,7 +95,7 @@ router.get("/prompts/:id", requireAuth, loadOrCreateClient, async (req, res): Pr
   const [row] = await db
     .select()
     .from(promptSessionsTable)
-    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.clientId, req.client!.id)));
+    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.clientId, req.dbClient!.id)));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -127,7 +127,7 @@ router.post(
       .where(
         and(
           eq(promptSessionsTable.id, params.data.id),
-          eq(promptSessionsTable.clientId, req.client!.id),
+          eq(promptSessionsTable.clientId, req.dbClient!.id),
         ),
       );
 
@@ -149,7 +149,7 @@ router.post(
       .where(
         and(
           eq(promptSessionsTable.id, params.data.id),
-          eq(promptSessionsTable.clientId, req.client!.id),
+          eq(promptSessionsTable.clientId, req.dbClient!.id),
         ),
       )
       .returning();

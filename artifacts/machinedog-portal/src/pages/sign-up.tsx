@@ -1,529 +1,84 @@
-import { useSignUp } from "@clerk/react";
-import { useState, type FormEvent } from "react";
-import { useLocation } from "wouter";
-import { Loader2 } from "lucide-react";
+import { Link } from "wouter";
 import { Logo } from "@/components/Logo";
 import huskyPortrait from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777252211433.png";
 
 export default function SignUpPage() {
-  const intakeHref = `${import.meta.env.BASE_URL}intake`.replace(/\/+/g, "/");
-  const workHref = `${import.meta.env.BASE_URL}work`.replace(/\/+/g, "/");
-  const signInHref = `${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/");
-  const homeHref = `${import.meta.env.BASE_URL}`.replace(/\/+/g, "/");
-
-  const { signUp, errors, fetchStatus } = useSignUp();
-  const [, setLocation] = useLocation();
-  const [emailAddress, setEmailAddress] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [resendNotice, setResendNotice] = useState<string | null>(null);
-
-  const isSubmitting = fetchStatus === "fetching";
-
-  const needsVerification =
-    signUp.status === "missing_requirements" &&
-    signUp.unverifiedFields?.includes("email_address") &&
-    (!signUp.missingFields || signUp.missingFields.length === 0);
-
-  const canCreate =
-    emailAddress.trim().length > 0 && password.length >= 8 && !isSubmitting;
-  const canVerify = code.length === 6 && !isSubmitting;
-
-  const handleCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!canCreate) return;
-    setSendError(null);
-    const { error } = await signUp.password({
-      emailAddress: emailAddress.trim(),
-      password,
-    });
-    if (error) return;
-    const sendResult = await signUp.verifications.sendEmailCode();
-    if (sendResult?.error) {
-      setSendError(
-        sendResult.error.message ||
-          "We couldn't send the verification code. Please try again.",
-      );
-    }
-  };
-
-  const handleVerify = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!canVerify) return;
-    const { error } = await signUp.verifications.verifyEmailCode({ code });
-    if (error) return;
-    if (signUp.status !== "complete") return;
-    await signUp.finalize({
-      navigate: ({
-        decorateUrl,
-      }: {
-        decorateUrl: (path: string) => string;
-      }) => {
-        setLocation(decorateUrl(homeHref));
-      },
-    });
-  };
-
-  const handleResend = async () => {
-    if (isSubmitting) return;
-    setSendError(null);
-    setResendNotice(null);
-    const sendResult = await signUp.verifications.sendEmailCode();
-    if (sendResult?.error) {
-      setSendError(
-        sendResult.error.message ||
-          "We couldn't resend the code. Please try again.",
-      );
-    } else {
-      setResendNotice("New code sent. Check your inbox.");
-    }
-  };
-
-  const fieldError = errors?.fields ?? {};
-  const globalError = sendError ?? errors?.global?.[0]?.message ?? null;
-
   return (
     <div
-      className="dark relative min-h-screen w-full overflow-hidden text-white"
+      className="dark relative min-h-screen w-full overflow-hidden text-white flex flex-col"
       style={{ background: "hsl(220 45% 3%)" }}
     >
       <div
-        className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
+        className="absolute inset-0 bg-cover bg-no-repeat"
         style={{
           backgroundImage: `url(${huskyPortrait})`,
-          filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
+          filter: "saturate(0.85) contrast(0.95) brightness(0.45)",
+          opacity: 0.3,
+          backgroundPosition: "50% 32%",
         }}
       />
       <div
-        className="hidden lg:block absolute inset-0 pointer-events-none mix-blend-screen"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 35% at 52% 38%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
-        }}
-      />
-      <div
-        className="hidden lg:block absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 35%, transparent 0%, hsla(220,45%,3%,0.35) 60%, hsla(220,45%,3%,0.85) 100%)",
-        }}
-      />
-      <div
-        className="hidden lg:block absolute inset-x-0 bottom-0 h-1/2 pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{
           background:
             "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 55%, hsla(220,45%,3%,0.95) 100%)",
         }}
       />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
-        <header className="flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
-          <Logo size="sm" />
-          <nav className="flex items-center gap-2 sm:gap-3">
-            <a
-              href={workHref}
-              className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wider uppercase text-white/80 transition hover:text-white"
+      <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
+        <Logo size="sm" />
+      </header>
+
+      <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10">
+        <div
+          className="w-full max-w-lg rounded-[28px] p-6 sm:p-8 overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            backdropFilter: "blur(40px) saturate(180%)",
+            WebkitBackdropFilter: "blur(40px) saturate(180%)",
+            boxShadow: "0 30px 80px -20px rgba(0,0,0,0.55)",
+          }}
+        >
+          <div className="text-[11px] font-mono tracking-[0.24em] uppercase text-primary/90 mb-2">
+            Invite-only
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-3">
+            Machinedog.Dev is invite-only
+          </h1>
+          <p className="text-sm text-white/70 leading-relaxed mb-6">
+            Accounts are created when our team sends you an invitation by email.
+            If you've already received an invite, follow the link in that email
+            to set your password. Otherwise, request access below and we'll be
+            in touch.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href="/intake"
+              className="inline-flex items-center justify-center gap-2 rounded-[14px] px-5 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition hover:opacity-95"
               style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              }}
-            >
-              Projects
-            </a>
-            <a
-              href={intakeHref}
-              className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wider uppercase text-white/80 transition hover:text-white"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.14)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                background:
+                  "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
+                boxShadow: "0 12px 32px -8px hsla(200,95%,55%,0.55)",
               }}
             >
               Request invite <span aria-hidden>→</span>
-            </a>
-          </nav>
-        </header>
-
-        <div className="lg:hidden relative w-full h-[58vh] min-h-[340px] max-h-[500px] overflow-hidden mt-3">
-          <img
-            src={huskyPortrait}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 h-full w-full object-cover"
-            style={{
-              objectPosition: "50% 30%",
-              filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
-            }}
-          />
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none mix-blend-screen"
-            style={{
-              background:
-                "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
-            }}
-          />
-          <div
-            aria-hidden
-            className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.55) 55%, hsla(220,45%,3%,1) 100%)",
-            }}
-          />
+            </Link>
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center justify-center gap-2 rounded-[14px] px-5 py-3 text-sm font-semibold tracking-wide text-white/90 transition hover:text-white"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
+              I already have an account
+            </Link>
+          </div>
         </div>
-
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
-          <div className="order-1 lg:order-1 w-full max-w-xl">
-            <div
-              className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
-                border: "1px solid rgba(255,255,255,0.14)",
-                backdropFilter: "blur(40px) saturate(180%)",
-                WebkitBackdropFilter: "blur(40px) saturate(180%)",
-                boxShadow:
-                  "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
-              }}
-            >
-
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 h-px"
-                style={{
-                  background:
-                    "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
-                }}
-              />
-
-              <div
-                aria-hidden
-                className="pointer-events-none absolute -top-24 -left-20 h-64 w-64 rounded-full"
-                style={{
-                  background:
-                    "radial-gradient(circle, hsla(200,95%,60%,0.30) 0%, transparent 70%)",
-                  filter: "blur(8px)",
-                }}
-              />
-
-              <div className="relative">
-                <div
-                  className="mb-4 text-[11px] sm:text-xs font-mono tracking-[0.28em] uppercase"
-                  style={{ color: "hsl(200 95% 70%)" }}
-                >
-                  Invite-only AI atelier
-                </div>
-                <h1
-                  className="text-white uppercase font-extrabold leading-[0.95] tracking-tight break-words"
-                  style={{
-                    fontSize: "clamp(1.5rem, 7vw, 4.5rem)",
-                    textShadow: "0 4px 40px rgba(0,0,0,0.45)",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  Claim your
-                  <br />
-                  <span
-                    style={{
-                      WebkitTextFillColor: "transparent",
-                      WebkitBackgroundClip: "text",
-                      backgroundImage:
-                        "linear-gradient(135deg, hsl(200 95% 65%) 0%, hsl(254 95% 78%) 100%)",
-                    }}
-                  >
-                    invite
-                  </span>
-                  <br />
-                  account
-                </h1>
-                <p className="mt-5 max-w-md text-base sm:text-lg leading-relaxed text-white/75">
-                  Finish setting up your Machinedog.Dev account using the email
-                  address your invite was sent to. Access unlocks once we
-                  recognize you on the guest list.
-                </p>
-              </div>
-            </div>
-          </div>
-
-
-          <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0">
-            <div
-              className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
-                border: "1px solid rgba(255,255,255,0.14)",
-                backdropFilter: "blur(40px) saturate(180%)",
-                WebkitBackdropFilter: "blur(40px) saturate(180%)",
-                boxShadow:
-                  "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
-              }}
-            >
-
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 h-px"
-                style={{
-                  background:
-                    "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
-                }}
-              />
-
-              <div
-                aria-hidden
-                className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full"
-                style={{
-                  background:
-                    "radial-gradient(circle, hsla(200,95%,60%,0.35) 0%, transparent 70%)",
-                  filter: "blur(8px)",
-                }}
-              />
-
-              <div className="relative">
-                {needsVerification ? (
-                  <>
-                    <div className="mb-1 text-[11px] font-mono tracking-[0.24em] uppercase text-white/60">
-                      One more step
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
-                      Verify your email
-                    </h2>
-                    <p className="text-sm text-white/65 mb-6 break-words">
-                      We just sent a 6-digit code to{" "}
-                      <span className="text-white/90 font-medium">
-                        {emailAddress}
-                      </span>
-                      .
-                    </p>
-
-                    <form
-                      onSubmit={handleVerify}
-                      className="flex flex-col gap-4"
-                    >
-                      <div className="flex flex-col gap-1.5">
-                        <label
-                          htmlFor="code"
-                          className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/60"
-                        >
-                          Verification code
-                        </label>
-                        <input
-                          id="code"
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          maxLength={6}
-                          placeholder="000000"
-                          value={code}
-                          onChange={(e) =>
-                            setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                          }
-                          className="w-full rounded-[14px] px-4 py-3 text-center text-[22px] font-semibold tracking-[0.5em] text-white placeholder:text-white/30 outline-none transition focus:ring-2 focus:ring-[#3FB1F0]/60"
-                          style={{
-                            background: "rgba(255,255,255,0.05)",
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            backdropFilter: "blur(20px)",
-                            WebkitBackdropFilter: "blur(20px)",
-                          }}
-                        />
-                        {fieldError.code && (
-                          <p className="text-[12px] text-rose-300/90 mt-0.5">
-                            {fieldError.code.message}
-                          </p>
-                        )}
-                      </div>
-
-                      {globalError && (
-                        <div
-                          className="rounded-[12px] px-3.5 py-2.5 text-[13px] text-rose-100"
-                          style={{
-                            background: "rgba(244,63,94,0.10)",
-                            border: "1px solid rgba(244,63,94,0.35)",
-                          }}
-                        >
-                          {globalError}
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={!canVerify}
-                        className="mt-1 inline-flex items-center justify-center gap-2 rounded-[14px] py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:opacity-95"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
-                          boxShadow:
-                            "0 12px 32px -8px hsla(200,95%,55%,0.55)",
-                        }}
-                      >
-                        {isSubmitting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            Verify and continue{" "}
-                            <span aria-hidden>→</span>
-                          </>
-                        )}
-                      </button>
-
-                      <div className="flex items-center justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={handleResend}
-                          disabled={isSubmitting}
-                          className="text-[12px] text-white/60 hover:text-white/90 transition disabled:opacity-50"
-                        >
-                          Resend code
-                        </button>
-                        {resendNotice && (
-                          <span
-                            className="text-[12px]"
-                            style={{ color: "hsl(200 95% 70%)" }}
-                            role="status"
-                          >
-                            {resendNotice}
-                          </span>
-                        )}
-                      </div>
-                    </form>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-1 text-[11px] font-mono tracking-[0.24em] uppercase text-white/60">
-                      New to the kennel
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-6">
-                      Create your account
-                    </h2>
-
-                    <form
-                      onSubmit={handleCreate}
-                      className="flex flex-col gap-4"
-                    >
-                      <div className="flex flex-col gap-1.5">
-                        <label
-                          htmlFor="email"
-                          className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/60"
-                        >
-                          Email address
-                        </label>
-                        <input
-                          id="email"
-                          type="email"
-                          autoComplete="email"
-                          autoCapitalize="none"
-                          spellCheck={false}
-                          placeholder="you@company.com"
-                          value={emailAddress}
-                          onChange={(e) => setEmailAddress(e.target.value)}
-                          className="w-full rounded-[14px] px-4 py-3 text-[15px] text-white placeholder:text-white/40 outline-none transition focus:ring-2 focus:ring-[#3FB1F0]/60"
-                          style={{
-                            background: "rgba(255,255,255,0.05)",
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            backdropFilter: "blur(20px)",
-                            WebkitBackdropFilter: "blur(20px)",
-                          }}
-                        />
-                        {fieldError.emailAddress && (
-                          <p className="text-[12px] text-rose-300/90 mt-0.5">
-                            {fieldError.emailAddress.message}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label
-                          htmlFor="password"
-                          className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/60"
-                        >
-                          Password
-                        </label>
-                        <input
-                          id="password"
-                          type="password"
-                          autoComplete="new-password"
-                          placeholder="At least 8 characters"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full rounded-[14px] px-4 py-3 text-[15px] text-white placeholder:text-white/40 outline-none transition focus:ring-2 focus:ring-[#3FB1F0]/60"
-                          style={{
-                            background: "rgba(255,255,255,0.05)",
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            backdropFilter: "blur(20px)",
-                            WebkitBackdropFilter: "blur(20px)",
-                          }}
-                        />
-                        {fieldError.password && (
-                          <p className="text-[12px] text-rose-300/90 mt-0.5">
-                            {fieldError.password.message}
-                          </p>
-                        )}
-                      </div>
-
-                      {globalError && (
-                        <div
-                          className="rounded-[12px] px-3.5 py-2.5 text-[13px] text-rose-100"
-                          style={{
-                            background: "rgba(244,63,94,0.10)",
-                            border: "1px solid rgba(244,63,94,0.35)",
-                          }}
-                        >
-                          {globalError}
-                        </div>
-                      )}
-
-                      <div id="clerk-captcha" />
-
-                      <button
-                        type="submit"
-                        disabled={!canCreate}
-                        className="mt-1 inline-flex items-center justify-center gap-2 rounded-[14px] py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:opacity-95"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
-                          boxShadow:
-                            "0 12px 32px -8px hsla(200,95%,55%,0.55)",
-                        }}
-                      >
-                        {isSubmitting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            Create account <span aria-hidden>→</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  </>
-                )}
-
-                <div className="mt-6 pt-5 border-t border-white/10 text-center">
-                  <p className="text-xs text-white/60">
-                    Already have an account?{" "}
-                    <a
-                      href={signInHref}
-                      className="font-semibold"
-                      style={{ color: "hsl(200 95% 70%)" }}
-                    >
-                      Sign in →
-                    </a>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-
-            <p className="mt-4 text-center text-[10px] tracking-[0.2em] uppercase font-mono text-white/35">
-              Encrypted · Invite-only · No spam
-            </p>
-          </div>
-        </main>
-      </div>
+      </main>
     </div>
   );
 }

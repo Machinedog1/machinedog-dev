@@ -4,8 +4,13 @@ import { z } from "zod/v4";
 
 export const clientsTable = pgTable("clients", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().unique(),
-  email: text("email").notNull(),
+  userId: text("user_id").unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
+  inviteToken: text("invite_token").unique(),
+  inviteTokenExpiresAt: timestamp("invite_token_expires_at", { withTimezone: true }),
+  passwordResetToken: text("password_reset_token").unique(),
+  passwordResetExpiresAt: timestamp("password_reset_expires_at", { withTimezone: true }),
   tokenBalance: integer("token_balance").notNull().default(0),
   totalTokensUsed: integer("total_tokens_used").notNull().default(0),
   isAdmin: boolean("is_admin").notNull().default(false),

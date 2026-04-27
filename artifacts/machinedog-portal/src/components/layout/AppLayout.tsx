@@ -1,21 +1,21 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
-import { UserButton } from "@clerk/react";
-import { 
+import { useAuth } from "@/lib/auth";
+import {
   Terminal,
-  History, 
-  Coins, 
-  FolderGit2, 
-  Briefcase, 
-  Settings, 
+  History,
+  Coins,
+  FolderGit2,
+  Briefcase,
+  Settings,
   ShieldAlert,
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  LogOut,
 } from "lucide-react";
-import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { Logo } from "@/components/Logo";
@@ -26,14 +26,19 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { data: me } = useGetMe();
-  const [location] = useLocation();
+  const { signOut } = useAuth();
+  const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
-  // Close sidebar on mobile when location changes
   useEffect(() => {
     setSidebarOpen(false);
   }, [location]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    setLocation("/sign-in");
+  };
 
   const navItems = [
     { href: "/", label: "Console", icon: Terminal },
@@ -50,33 +55,43 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/admin/orders", label: "Orders", icon: ShieldAlert },
   ];
 
+  const initial = me?.email ? me.email.charAt(0).toUpperCase() : "?";
+
   return (
     <div className="flex h-screen bg-transparent overflow-hidden text-foreground selection:bg-primary/30 selection:text-primary-foreground font-sans relative">
       <div className="bg-mesh" />
       <div className="bg-grid" />
-      
+
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 border-b border-border/20 glass z-50 flex items-center justify-between px-4">
         <Logo size="sm" />
         <div className="flex items-center gap-2">
           <button onClick={toggleTheme} className="p-2 text-muted-foreground hover:text-foreground">
-            {theme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+            {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </button>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 -mr-2 text-muted-foreground hover:text-foreground">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 -mr-2 text-muted-foreground hover:text-foreground"
+          >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed md:static inset-y-0 left-0 z-40 w-64 border-r border-border/20 glass flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <aside
+        className={cn(
+          "fixed md:static inset-y-0 left-0 z-40 w-64 border-r border-border/20 glass flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
         <div className="h-14 flex items-center justify-between px-6 border-b border-border/20 hidden md:flex">
           <Logo size="sm" />
-          <button onClick={toggleTheme} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors">
-            {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
+          >
+            {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </button>
         </div>
 
@@ -116,14 +131,20 @@ export function AppLayout({ children }: AppLayoutProps) {
           )}
 
           <nav className="flex flex-col gap-1">
-            <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">Workspace</div>
+            <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">
+              Workspace
+            </div>
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                location === item.href || (item.href !== "/" && location.startsWith(item.href))
-                  ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-              )}>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                  location === item.href || (item.href !== "/" && location.startsWith(item.href))
+                    ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
+                )}
+              >
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </Link>
@@ -132,14 +153,20 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {me?.isAdmin && (
             <nav className="flex flex-col gap-1">
-              <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">Admin</div>
+              <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">
+                Admin
+              </div>
               {adminItems.map((item) => (
-                <Link key={item.href} href={item.href} className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                  location === item.href || (item.href !== "/admin" && location.startsWith(item.href))
-                    ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-                )}>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                    location === item.href || (item.href !== "/admin" && location.startsWith(item.href))
+                      ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
+                  )}
+                >
                   <item.icon className="h-4 w-4" />
                   {item.label}
                 </Link>
@@ -149,39 +176,53 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         <div className="p-4 border-t border-border/20 mt-auto glass-subtle">
-          <Link href="/settings" className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 mb-4",
-            location.startsWith("/settings")
-              ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
-              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-          )}>
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 mb-3",
+              location.startsWith("/settings")
+                ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
+            )}
+          >
             <Settings className="h-4 w-4" />
             Settings
           </Link>
-          <div className="flex items-center gap-3 px-3">
-            <UserButton afterSignOutUrl="/sign-in" appearance={{
-              elements: {
-                userButtonAvatarBox: "h-8 w-8 ring-1 ring-border/50 ring-offset-1 ring-offset-background"
-              }
-            }} />
-            <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-medium truncate">{me?.email}</span>
-              <span className="text-xs text-muted-foreground truncate font-mono opacity-70">{me?.id ? `ID:${me.id}` : ''}</span>
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div
+              className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white shrink-0 ring-1 ring-border/50"
+              style={{
+                background:
+                  "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
+              }}
+            >
+              {initial}
             </div>
+            <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+              <span className="text-sm font-medium truncate">{me?.email}</span>
+              <span className="text-xs text-muted-foreground truncate font-mono opacity-70">
+                {me?.id ? `ID:${me.id}` : ""}
+              </span>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative pt-14 md:pt-0">
-        <div className="flex-1 overflow-y-auto">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </main>
 
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-background/40 backdrop-blur-sm z-30 md:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />

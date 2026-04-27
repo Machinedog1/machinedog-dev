@@ -1,5 +1,3 @@
-import { ClerkLoaded, ClerkProvider } from "@clerk/expo";
-import { tokenCache } from "@clerk/expo/token-cache";
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -17,14 +15,12 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthProvider } from "@/lib/auth";
 
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) {
   setBaseUrl(`https://${domain}`);
 }
-
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
-const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 SplashScreen.preventAutoHideAsync();
 
@@ -62,30 +58,18 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
-  if (!publishableKey) {
-    console.warn(
-      "[machinedog-mobile] EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set — auth flows will be unavailable.",
-    );
-  }
-
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <ClerkProvider
-          publishableKey={publishableKey}
-          tokenCache={tokenCache}
-          proxyUrl={proxyUrl}
-        >
-          <ClerkLoaded>
-            <QueryClientProvider client={queryClient}>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </QueryClientProvider>
-          </ClerkLoaded>
-        </ClerkProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <KeyboardProvider>
+                <RootLayoutNav />
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </AuthProvider>
+        </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
