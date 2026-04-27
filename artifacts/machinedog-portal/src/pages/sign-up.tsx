@@ -191,7 +191,7 @@ export default function SignUpPage() {
                   "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
               }}
             >
-              {/* Top rim highlight */}
+
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -200,7 +200,7 @@ export default function SignUpPage() {
                     "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
                 }}
               />
-              {/* Soft cyan inner glow */}
+
               <div
                 aria-hidden
                 className="pointer-events-none absolute -top-24 -left-20 h-64 w-64 rounded-full"
@@ -250,7 +250,7 @@ export default function SignUpPage() {
             </div>
           </div>
 
-          {/* Apple-style glass sign-up card */}
+
           <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0">
             <div
               className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
@@ -264,7 +264,7 @@ export default function SignUpPage() {
                   "0 30px 80px -20px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.18) inset, 0 -1px 0 0 rgba(255,255,255,0.04) inset",
               }}
             >
-              {/* Top rim highlight */}
+
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -273,7 +273,7 @@ export default function SignUpPage() {
                     "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
                 }}
               />
-              {/* Soft cyan inner glow */}
+
               <div
                 aria-hidden
                 className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full"
@@ -517,7 +517,7 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* Tiny legal/foot caption beneath card */}
+
             <p className="mt-4 text-center text-[10px] tracking-[0.2em] uppercase font-mono text-white/35">
               Encrypted · Invite-only · No spam
             </p>
