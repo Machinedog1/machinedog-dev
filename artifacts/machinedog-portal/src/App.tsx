@@ -13,6 +13,7 @@ import PricingPage from "@/pages/pricing";
 import ThankYouPage from "@/pages/thank-you";
 import IntakePage from "@/pages/intake";
 import PromptConsole from "@/pages/index";
+import { getGetMeQueryKey } from "@workspace/api-client-react";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
 import ProjectsPage from "@/pages/projects";
@@ -42,7 +43,7 @@ function SignedOut({ children }: { children: React.ReactNode }) {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { data: me, isLoading, error } = useGetMe({ query: { retry: false } });
+  const { data: me, isLoading, error } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
   const [location, setLocation] = useLocation();
 
   if (isLoading) {
@@ -69,7 +70,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { data: me } = useGetMe({ query: { retry: false } });
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
   const [location, setLocation] = useLocation();
 
   if (me && !me.isAdmin) {

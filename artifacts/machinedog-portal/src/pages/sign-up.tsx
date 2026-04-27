@@ -88,7 +88,6 @@ export default function SignUpPage() {
       className="dark relative min-h-screen w-full overflow-hidden text-white"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* DESKTOP full-bleed husky portrait — eye-focused crop, hidden on mobile */}
       <div
         className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
         style={{
@@ -96,8 +95,6 @@ export default function SignUpPage() {
           filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
         }}
       />
-
-      {/* Desktop cyan halo behind the eyes */}
       <div
         className="hidden lg:block absolute inset-0 pointer-events-none mix-blend-screen"
         style={{
@@ -105,8 +102,6 @@ export default function SignUpPage() {
             "radial-gradient(ellipse 70% 35% at 52% 38%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
         }}
       />
-
-      {/* Desktop vignette / bottom fade for legibility */}
       <div
         className="hidden lg:block absolute inset-0 pointer-events-none"
         style={{
@@ -122,9 +117,7 @@ export default function SignUpPage() {
         }}
       />
 
-      {/* Content layer */}
       <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Top bar */}
         <header className="flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
           <Logo size="sm" />
           <nav className="flex items-center gap-2 sm:gap-3">
@@ -155,8 +148,6 @@ export default function SignUpPage() {
           </nav>
         </header>
 
-        {/* MOBILE husky hero — normal-flow block between header and main so layout is bullet-proof.
-            Hidden on lg+ where the desktop full-bleed bg above takes over. */}
         <div className="lg:hidden relative w-full h-[58vh] min-h-[340px] max-h-[500px] overflow-hidden mt-3">
           <img
             src={huskyPortrait}
@@ -168,7 +159,6 @@ export default function SignUpPage() {
               filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
             }}
           />
-          {/* Cyan halo over the eyes */}
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none mix-blend-screen"
@@ -177,7 +167,6 @@ export default function SignUpPage() {
                 "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
             }}
           />
-          {/* Bottom fade so content underneath reads cleanly */}
           <div
             aria-hidden
             className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
@@ -188,9 +177,7 @@ export default function SignUpPage() {
           />
         </div>
 
-        {/* Main grid: headline left, glass card right (stacks on mobile, headline first). */}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
-          {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
           <div className="order-1 lg:order-1 w-full max-w-xl">
             <div
               className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
