@@ -18,6 +18,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
 
 const huskyImg = require("@/assets/images/husky-mark.png");
+const huskyPortrait = require("@/assets/images/husky-portrait.png");
 
 export default function SignInScreen() {
   const colors = useColors();
@@ -52,33 +53,39 @@ export default function SignInScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScreenShell contentStyle={{ paddingHorizontal: 0, gap: 0 }}>
-        {/* Hero header */}
+        {/* Hero header — dramatic husky portrait backdrop */}
         <View style={styles.hero}>
-          <LinearGradient
-            colors={[
-              "rgba(4,7,17,1)",
-              "rgba(8,18,40,0.9)",
-              "rgba(4,7,17,0.7)",
-              colors.background,
+          <Image
+            source={huskyPortrait}
+            resizeMode="cover"
+            style={[
+              StyleSheet.absoluteFill,
+              // objectPosition is honored by react-native-web only;
+              // shifts focal point lower so the cyan eye + collar are visible.
+              { objectPosition: "50% 65%" } as object,
             ]}
-            locations={[0, 0.35, 0.75, 1]}
-            style={StyleSheet.absoluteFill}
           />
+          {/* Cyber blue radial tint */}
           <LinearGradient
             colors={[
-              "rgba(63,184,240,0.22)",
+              "rgba(63,184,240,0.28)",
               "transparent",
-              "rgba(168,140,255,0.14)",
+              "rgba(168,140,255,0.18)",
             ]}
             start={{ x: 0.5, y: 0.15 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          {/* Husky watermark — clean transparent mark */}
-          <Image
-            source={huskyImg}
-            style={styles.heroWatermark}
-            resizeMode="contain"
+          {/* Bottom fade for headline legibility */}
+          <LinearGradient
+            colors={[
+              "transparent",
+              "rgba(4,7,17,0.55)",
+              "rgba(4,7,17,0.95)",
+              colors.background,
+            ]}
+            locations={[0, 0.55, 0.85, 1]}
+            style={StyleSheet.absoluteFill}
           />
 
           <View style={styles.heroBrandRow}>
@@ -227,21 +234,13 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    height: 420,
+    height: 480,
     width: "100%",
     overflow: "hidden",
     justifyContent: "space-between",
     paddingTop: 12,
     paddingHorizontal: 18,
     paddingBottom: 28,
-  },
-  heroWatermark: {
-    position: "absolute",
-    alignSelf: "center",
-    top: "22%",
-    width: "70%",
-    height: "60%",
-    opacity: 0.18,
   },
   heroBrandRow: {
     flexDirection: "row",
