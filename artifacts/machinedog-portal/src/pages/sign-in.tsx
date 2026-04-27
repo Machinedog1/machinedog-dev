@@ -15,15 +15,16 @@ export default function SignInPage() {
       style={{ background: "hsl(220 45% 3%)" }}
     >
       {/* MOBILE husky hero — fixed-aspect top portrait so the face is always visible.
-          Hidden on lg+ where we use the full-bleed layout below. */}
-      <div className="lg:hidden absolute inset-x-0 top-0 h-[68vh] overflow-hidden">
+          Hidden on lg+ where we use the full-bleed layout below.
+          Bounded height keeps the face crop consistent across very short / very tall mobile viewports. */}
+      <div className="lg:hidden absolute inset-x-0 top-0 h-[60vh] min-h-[360px] max-h-[520px] overflow-hidden">
         <img
           src={huskyPortrait}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
           style={{
-            objectPosition: "50% 22%",
+            objectPosition: "50% 28%",
             filter: "saturate(1.18) contrast(1.06) brightness(0.82)",
           }}
         />
@@ -115,8 +116,8 @@ export default function SignInPage() {
         </header>
 
         {/* Main grid: headline left, glass card right (stacks on mobile, headline first).
-            On mobile, content begins below the husky hero (~52vh of top space reserved for the portrait). */}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-[52vh] sm:pt-[44vh] lg:pt-0">
+            On mobile, content begins below the husky hero (matches the bounded hero height). */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-[calc(min(60vh,520px)-12px)] sm:pt-[calc(min(60vh,520px)-12px)] lg:pt-0">
           {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
           <div className="order-1 lg:order-1 w-full max-w-xl">
             <div
@@ -159,9 +160,9 @@ export default function SignInPage() {
                   Invite-only AI atelier
                 </div>
                 <h1
-                  className="text-white uppercase font-extrabold leading-[0.92] tracking-tight"
+                  className="text-white uppercase font-extrabold leading-[0.92] tracking-tight break-words"
                   style={{
-                    fontSize: "clamp(2.25rem, 6vw, 4.5rem)",
+                    fontSize: "clamp(1.75rem, 7.5vw, 4.5rem)",
                     textShadow: "0 4px 40px rgba(0,0,0,0.45)",
                   }}
                 >
