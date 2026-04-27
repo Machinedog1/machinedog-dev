@@ -12,3 +12,9 @@ id = "mUMGT-nhfpNAyKu9X1e_z"
 uri = "file://attached_assets/generated_images/husky_cyber_portrait.png"
 type = "image"
 title = "cyber husky portrait"
+
+[[generated]]
+id = "GSckX0Ekv_CxQpoCfS62t"
+uri = "file://attached_assets/generated_images/husky_mark.png"
+type = "image"
+title = "husky logo mark"

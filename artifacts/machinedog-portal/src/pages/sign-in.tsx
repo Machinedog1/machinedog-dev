@@ -2,6 +2,7 @@ import { SignIn } from "@clerk/react";
 import { useTheme } from "@/hooks/use-theme";
 import { dark } from "@clerk/themes";
 import huskyImg from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777251779783.png";
+import huskyMark from "@assets/generated_images/husky_mark.png";
 
 export default function SignInPage() {
   const { theme } = useTheme();
@@ -29,44 +30,27 @@ export default function SignInPage() {
               "radial-gradient(ellipse at 50% 60%, hsla(200,90%,55%,0.45) 0%, transparent 55%)",
           }}
         />
-        {/* Strong vignette so source text fades */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 65%, hsla(220,45%,3%,0.30) 25%, hsla(220,45%,3%,0.85) 75%, hsla(220,45%,3%,0.98) 100%)",
-          }}
-        />
-        {/* Top fade for header legibility */}
-        <div
-          className="absolute inset-x-0 top-0 h-40"
-          style={{
-            background:
-              "linear-gradient(180deg, hsla(220,45%,3%,0.95) 0%, hsla(220,45%,3%,0.6) 60%, transparent 100%)",
-          }}
-        />
         {/* Bottom fade for headline legibility */}
         <div
-          className="absolute inset-x-0 bottom-0 h-2/3"
+          className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
           style={{
             background:
-              "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.75) 55%, hsla(220,45%,3%,1) 100%)",
+              "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.6) 55%, hsla(220,45%,3%,0.95) 100%)",
           }}
         />
 
         <div className="relative z-10 flex items-center gap-3">
           <div
-            className="h-11 w-11 rounded-full overflow-hidden border-2 border-[hsl(var(--primary))]"
+            className="h-11 w-11 rounded-full overflow-hidden border-2 border-[hsl(var(--primary))] bg-[hsl(220,40%,4%)] flex items-center justify-center"
             style={{
               boxShadow:
                 "0 0 0 1px hsla(200,90%,60%,0.45), 0 0 24px hsla(200,90%,60%,0.55)",
             }}
           >
             <img
-              src={huskyImg}
-              alt=""
-              className="h-full w-full object-cover"
-              style={{ objectPosition: "50% 30%" }}
+              src={huskyMark}
+              alt="Machinedog husky logo"
+              className="h-full w-full object-contain p-0.5"
             />
           </div>
           <span

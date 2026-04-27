@@ -17,7 +17,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
 
-const huskyImg = require("@/assets/images/husky.png");
+const huskyImg = require("@/assets/images/husky-mark.png");
 
 export default function SignInScreen() {
   const colors = useColors();
@@ -54,33 +54,31 @@ export default function SignInScreen() {
       <ScreenShell contentStyle={{ paddingHorizontal: 0, gap: 0 }}>
         {/* Hero header */}
         <View style={styles.hero}>
-          {/* Zoomed husky portrait — clipped to crop out source UI text */}
-          <View style={styles.heroImageClip}>
-            <Image
-              source={huskyImg}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-          </View>
           <LinearGradient
             colors={[
-              "rgba(4,7,17,0.95)",
-              "rgba(4,7,17,0.35)",
-              "rgba(4,7,17,0.55)",
+              "rgba(4,7,17,1)",
+              "rgba(8,18,40,0.9)",
+              "rgba(4,7,17,0.7)",
               colors.background,
             ]}
-            locations={[0, 0.18, 0.65, 1]}
+            locations={[0, 0.35, 0.75, 1]}
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
             colors={[
-              "rgba(63,184,240,0.18)",
+              "rgba(63,184,240,0.22)",
               "transparent",
-              "rgba(63,184,240,0.10)",
+              "rgba(168,140,255,0.14)",
             ]}
-            start={{ x: 0.5, y: 0.2 }}
+            start={{ x: 0.5, y: 0.15 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
+          />
+          {/* Husky watermark — clean transparent mark */}
+          <Image
+            source={huskyImg}
+            style={styles.heroWatermark}
+            resizeMode="contain"
           />
 
           <View style={styles.heroBrandRow}>
@@ -96,7 +94,7 @@ export default function SignInScreen() {
               <Image
                 source={huskyImg}
                 style={styles.brandAvatar}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             </View>
             <Text style={styles.brandWord}>MACHINEDOG.DEV</Text>
@@ -237,16 +235,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 28,
   },
-  heroImageClip: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: "hidden",
-  },
-  heroImage: {
+  heroWatermark: {
     position: "absolute",
-    width: "260%",
-    height: "260%",
-    left: "-80%",
-    top: "-90%",
+    alignSelf: "center",
+    top: "22%",
+    width: "70%",
+    height: "60%",
+    opacity: 0.18,
   },
   heroBrandRow: {
     flexDirection: "row",
@@ -262,13 +257,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "hsl(220, 40%, 4%)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   brandAvatar: {
-    width: "180%",
-    height: "180%",
-    marginLeft: "-40%",
-    marginTop: "-55%",
+    width: 36,
+    height: 36,
   },
   brandWord: {
     fontFamily: "Inter_700Bold",

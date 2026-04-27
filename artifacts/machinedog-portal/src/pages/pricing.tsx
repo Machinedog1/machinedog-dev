@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 import huskyImg from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777251779783.png";
+import huskyMark from "@assets/generated_images/husky_mark.png";
 
 function scrollToId(id: string) {
   const el = document.getElementById(id);
@@ -96,14 +97,13 @@ export default function PricingPage() {
       <nav className="relative z-10 max-w-7xl mx-auto flex items-center justify-between px-6 lg:px-10 py-5">
         <Link href="/" className="flex items-center gap-3">
           <div
-            className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary bg-[hsl(220,40%,4%)]"
+            className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary bg-[hsl(220,40%,4%)] flex items-center justify-center"
             style={{ boxShadow: "0 0 20px hsla(200,90%,60%,0.55)" }}
           >
             <img
-              src={huskyImg}
-              alt=""
-              className="w-full h-full object-cover"
-              style={{ objectPosition: "50% 30%" }}
+              src={huskyMark}
+              alt="Machinedog husky logo"
+              className="w-full h-full object-contain p-0.5"
             />
           </div>
           <span className="font-extrabold tracking-[0.2em] text-sm sm:text-base">

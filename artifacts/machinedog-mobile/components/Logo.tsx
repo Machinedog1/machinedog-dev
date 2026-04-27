@@ -8,7 +8,7 @@ interface LogoProps {
   showWordmark?: boolean;
 }
 
-const huskyImg = require("@/assets/images/husky.png");
+const huskyImg = require("@/assets/images/husky-mark.png");
 
 export function Logo({ size = "md", showWordmark = true }: LogoProps) {
   const colors = useColors();
@@ -26,6 +26,7 @@ export function Logo({ size = "md", showWordmark = true }: LogoProps) {
             borderRadius: (dim + 4) / 2,
             borderColor: colors.primary,
             shadowColor: colors.primary,
+            backgroundColor: "hsl(220, 40%, 4%)",
           },
         ]}
       >
@@ -35,16 +36,16 @@ export function Logo({ size = "md", showWordmark = true }: LogoProps) {
             height: dim,
             borderRadius: dim / 2,
             overflow: "hidden",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           <Image
             source={huskyImg}
-            resizeMode="cover"
+            resizeMode="contain"
             style={{
-              width: dim * 1.8,
-              height: dim * 1.8,
-              marginLeft: -dim * 0.4,
-              marginTop: -dim * 0.55,
+              width: dim - 4,
+              height: dim - 4,
             }}
           />
         </View>
