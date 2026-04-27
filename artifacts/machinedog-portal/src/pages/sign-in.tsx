@@ -1,7 +1,7 @@
 import { SignIn } from "@clerk/react";
 import { useTheme } from "@/hooks/use-theme";
 import { dark } from "@clerk/themes";
-import huskyImg from "@assets/generated_images/husky_cyber_portrait.png";
+import huskyImg from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777251779783.png";
 
 export default function SignInPage() {
   const { theme } = useTheme();
