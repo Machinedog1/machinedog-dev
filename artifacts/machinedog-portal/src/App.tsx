@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import NotInvitedPage from "@/pages/not-invited";
+import PricingPage from "@/pages/pricing";
 import PromptConsole from "@/pages/index";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
@@ -81,6 +82,7 @@ function Router() {
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/not-invited" component={NotInvitedPage} />
+      <Route path="/pricing" component={PricingPage} />
 
       <Route path="/">
         <AuthGuard><PromptConsole /></AuthGuard>
@@ -164,6 +166,7 @@ function App() {
               <SignedOut>
                 <Switch>
                   <Route path="/sign-up" component={SignUpPage} />
+                  <Route path="/pricing" component={PricingPage} />
                   <Route path="*" component={SignInPage} />
                 </Switch>
               </SignedOut>
