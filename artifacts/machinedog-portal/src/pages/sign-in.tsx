@@ -146,10 +146,10 @@ export default function SignInPage() {
           />
         </div>
 
-        {/* Main grid: glass card left, headline right on desktop (stacks on mobile, headline first). */}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(420px,0.95fr)_1.05fr] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
+        {/* Main grid: headline left, glass card right on desktop (stacks on mobile, headline first). */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
           {/* Headline — wrapped in an Apple-style glass card so it stays legible over the husky portrait */}
-          <div className="order-1 lg:order-2 w-full max-w-xl lg:ml-auto">
+          <div className="order-1 lg:order-1 w-full max-w-xl">
             <div
               className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
               style={{
@@ -222,7 +222,7 @@ export default function SignInPage() {
           </div>
 
           {/* Apple-style glass sign-in card */}
-          <div className="order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0 lg:mr-auto min-w-0">
+          <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0">
             <div
               className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
               style={{
