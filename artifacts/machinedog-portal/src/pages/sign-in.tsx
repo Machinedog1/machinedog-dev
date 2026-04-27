@@ -1,7 +1,6 @@
 import { SignIn } from "@clerk/react";
 import { useTheme } from "@/hooks/use-theme";
 import { dark } from "@clerk/themes";
-import huskyImg from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777251779783.png";
 import huskyMark from "@assets/generated_images/husky_mark.png";
 
 export default function SignInPage() {
@@ -9,36 +8,46 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row text-foreground relative overflow-hidden">
-      {/* Hero side */}
-      <div className="relative flex flex-col justify-between p-8 lg:p-12 lg:w-1/2 min-h-[520px] lg:min-h-screen overflow-hidden bg-[hsl(220,40%,4%)]">
-        {/* Husky portrait backdrop */}
+      {/* Hero side — matches mobile sign-in aesthetic */}
+      <div
+        className="relative flex flex-col justify-between p-8 lg:p-12 lg:w-1/2 min-h-[520px] lg:min-h-screen overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(180deg, hsl(220 45% 8%) 0%, hsl(220 40% 4%) 100%)",
+        }}
+      >
+        {/* Ambient cyan glow */}
         <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url(${huskyImg})`,
-            backgroundSize: "cover",
-            backgroundPosition: "50% 30%",
-            backgroundRepeat: "no-repeat",
-            filter: "saturate(1.15) contrast(1.05) brightness(0.85)",
-          }}
-        />
-        {/* Cyber blue tint */}
-        <div
-          className="absolute inset-0 mix-blend-overlay"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse at 50% 60%, hsla(200,90%,55%,0.45) 0%, transparent 55%)",
+              "radial-gradient(900px 700px at 50% 35%, hsla(200,90%,60%,0.12), transparent 60%), radial-gradient(700px 500px at 80% 90%, hsla(254,95%,75%,0.10), transparent 60%)",
           }}
         />
-        {/* Bottom fade for headline legibility */}
+        {/* Subtle grid */}
         <div
-          className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
+          className="absolute inset-0 opacity-[0.05] pointer-events-none"
           style={{
-            background:
-              "linear-gradient(180deg, transparent 0%, hsla(220,45%,3%,0.6) 55%, hsla(220,45%,3%,0.95) 100%)",
+            backgroundImage:
+              "linear-gradient(hsla(0,0%,100%,0.25) 1px, transparent 1px), linear-gradient(90deg, hsla(0,0%,100%,0.25) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
           }}
         />
 
+        {/* Big faded husky watermark behind headline */}
+        <div
+          aria-hidden
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        >
+          <img
+            src={huskyMark}
+            alt=""
+            className="w-[78%] max-w-[520px] object-contain"
+            style={{ opacity: 0.18 }}
+          />
+        </div>
+
+        {/* Top: small logo + wordmark */}
         <div className="relative z-10 flex items-center gap-3">
           <div
             className="h-11 w-11 rounded-full overflow-hidden border-2 border-[hsl(var(--primary))] bg-[hsl(220,40%,4%)] flex items-center justify-center"
@@ -61,14 +70,30 @@ export default function SignInPage() {
           </span>
         </div>
 
+        {/* Bottom: eyebrow + headline */}
         <div className="relative z-10 max-w-md mt-auto">
-          <div className="text-eyebrow mb-4 text-[hsl(var(--primary-bright))]">
+          <div
+            className="mb-4 text-xs font-mono tracking-[0.22em] uppercase"
+            style={{ color: "hsl(200 90% 65%)" }}
+          >
             Invite-only AI atelier
           </div>
-          <h1 className="text-headline text-white text-5xl md:text-6xl">
+          <h1
+            className="text-headline text-white uppercase font-extrabold leading-[0.95] tracking-tight"
+            style={{ fontSize: "clamp(2.5rem, 5.5vw, 4rem)" }}
+          >
             We forge
             <br />
-            <span className="text-gradient-cyber">digital</span>
+            <span
+              style={{
+                WebkitTextFillColor: "transparent",
+                WebkitBackgroundClip: "text",
+                backgroundImage:
+                  "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+              }}
+            >
+              digital
+            </span>
             <br />
             intelligence
           </h1>
