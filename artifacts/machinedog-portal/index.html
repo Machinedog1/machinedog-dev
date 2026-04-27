@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Machinedog.Dev — Custom AI Systems</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -16,6 +19,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.addEventListener('pageshow', function (e) {
+        if (e.persisted) { window.location.reload(); }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
