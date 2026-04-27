@@ -45,6 +45,17 @@ const PROJECTS: Project[] = [
     gradient:
       "linear-gradient(135deg, hsl(254 90% 70%) 0%, hsl(232 85% 60%) 60%, hsl(200 95% 55%) 100%)",
   },
+  {
+    domain: "enrg.fit",
+    monogram: "E",
+    tagline: "Train with the energy you actually have today",
+    description:
+      "An adaptive fitness coach that reads your sleep, HRV, and recovery signals to tune each session. Less burnout, more durable progress, no guilt-driven plans.",
+    href: "https://enrg.fit",
+    tags: ["Health", "Wearables", "Adaptive AI"],
+    gradient:
+      "linear-gradient(135deg, hsl(330 90% 62%) 0%, hsl(0 90% 58%) 55%, hsl(28 95% 55%) 100%)",
+  },
 ];
 
 export default function WorkPage() {
