@@ -130,6 +130,33 @@ paths:
         "404":
           description: Not found
 
+  /prompts/{id}/publish:
+    post:
+      operationId: publishPrompt
+      tags: [prompts]
+      summary: Mark a prompt session as published (or unpublished)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishPromptBody"
+      responses:
+        "200":
+          description: Updated prompt session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptSession"
+        "404":
+          description: Not found
+
   # ─── Tokens ────────────────────────────────────────────────────────────────
 
   /tokens/bundles:
@@ -577,10 +604,23 @@ components:
           type: integer
         model:
           type: string
+        isPublished:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
-      required: [id, clientId, prompt, output, tokensUsed, model, createdAt]
+      required: [id, clientId, prompt, output, tokensUsed, model, isPublished, createdAt]
+
+    PublishPromptBody:
+      type: object
+      properties:
+        published:
+          type: boolean
+          default: true
 
     PromptSessionList:
       type: object

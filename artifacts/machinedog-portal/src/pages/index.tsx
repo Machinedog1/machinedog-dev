@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useSubmitPrompt, useGetMe } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useSubmitPrompt, useGetMe, usePublishPrompt } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Terminal, Send, Loader2, Zap, AlertTriangle } from "lucide-react";
+import { Terminal, Loader2, Zap, AlertTriangle, Globe2, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMeQueryKey, getListMyPromptsQueryKey } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,9 +20,39 @@ export default function PromptConsole() {
   const queryClient = useQueryClient();
   const { data: me } = useGetMe();
   const submitPrompt = useSubmitPrompt();
-  
+  const publishPrompt = usePublishPrompt();
+
   const [output, setOutput] = useState<string | null>(null);
   const [tokensUsed, setTokensUsed] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [isPublished, setIsPublished] = useState(false);
+
+  const handlePublish = () => {
+    if (!sessionId || publishPrompt.isPending) return;
+    const next = !isPublished;
+    publishPrompt.mutate(
+      { id: sessionId, data: { published: next } },
+      {
+        onSuccess: (data) => {
+          setIsPublished(data.isPublished);
+          queryClient.invalidateQueries({ queryKey: getListMyPromptsQueryKey() });
+          toast({
+            title: data.isPublished ? "Prompt published" : "Prompt unpublished",
+            description: data.isPublished
+              ? "This prompt is now marked as published."
+              : "This prompt is no longer published.",
+          });
+        },
+        onError: (err: any) => {
+          toast({
+            variant: "destructive",
+            title: "Publish failed",
+            description: err?.error || "Could not update publish state.",
+          });
+        },
+      }
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +60,8 @@ export default function PromptConsole() {
 
     setOutput(null);
     setTokensUsed(null);
+    setSessionId(null);
+    setIsPublished(false);
 
     submitPrompt.mutate(
       { data: { prompt } },
@@ -37,6 +69,8 @@ export default function PromptConsole() {
         onSuccess: (data) => {
           setOutput(data.output);
           setTokensUsed(data.tokensUsed);
+          setSessionId(data.id);
+          setIsPublished(data.isPublished);
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListMyPromptsQueryKey() });
           toast({
@@ -132,12 +166,38 @@ export default function PromptConsole() {
               exit={{ opacity: 0 }}
               className="flex-1 overflow-hidden flex flex-col glass rounded-xl"
             >
-              <div className="h-10 border-b border-border/20 glass-subtle flex items-center justify-between px-4 shrink-0">
-                <span className="font-mono text-xs font-bold text-muted-foreground">OUTPUT</span>
-                {tokensUsed && (
-                  <span className="font-mono text-xs text-primary font-semibold glass-subtle px-2 py-1 rounded">
-                    -{tokensUsed} TKNS
-                  </span>
+              <div className="h-12 border-b border-border/20 glass-subtle flex items-center justify-between px-4 gap-2 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono text-xs font-bold text-muted-foreground">PREVIEW</span>
+                  {tokensUsed && (
+                    <span className="font-mono text-[10px] text-primary font-semibold glass-subtle px-2 py-0.5 rounded">
+                      -{tokensUsed} TKNS
+                    </span>
+                  )}
+                </div>
+                {sessionId && !submitPrompt.isPending && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handlePublish}
+                    disabled={publishPrompt.isPending}
+                    variant={isPublished ? "secondary" : "default"}
+                    className={
+                      isPublished
+                        ? "font-mono text-xs glass-subtle border border-primary/30 text-primary hover:bg-primary/10"
+                        : "font-mono text-xs bg-gradient-to-r from-[#3FB1F0] to-[#7C7BF7] hover:opacity-95 text-white font-bold shadow-lg shadow-primary/20 border-0"
+                    }
+                    data-testid="button-publish-prompt"
+                  >
+                    {publishPrompt.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    ) : isPublished ? (
+                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                    ) : (
+                      <Globe2 className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    {isPublished ? "PUBLISHED" : "PUBLISH"}
+                  </Button>
                 )}
               </div>
               <div className="flex-1 overflow-y-auto p-4 md:p-6 prose prose-invert max-w-none font-sans prose-pre:glass-strong prose-pre:border-0 prose-pre:shadow-inner">

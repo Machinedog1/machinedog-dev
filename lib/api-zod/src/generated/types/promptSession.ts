@@ -13,5 +13,7 @@ export interface PromptSession {
   output: string;
   tokensUsed: number;
   model: string;
+  isPublished: boolean;
+  publishedAt?: Date | null;
   createdAt: Date;
 }

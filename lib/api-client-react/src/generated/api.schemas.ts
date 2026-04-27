@@ -48,7 +48,13 @@ export interface PromptSession {
   output: string;
   tokensUsed: number;
   model: string;
+  isPublished: boolean;
+  publishedAt?: string | null;
   createdAt: string;
+}
+
+export interface PublishPromptBody {
+  published?: boolean;
 }
 
 export interface PromptSessionList {

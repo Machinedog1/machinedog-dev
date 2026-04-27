@@ -40,6 +40,7 @@ import type {
   PromptSession,
   PromptSessionList,
   PublicCheckoutBody,
+  PublishPromptBody,
   SubmitLeadBody,
   SubmitLeadResponse,
   SubmitPromptBody,
@@ -459,6 +460,93 @@ export function useGetPrompt<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Mark a prompt session as published (or unpublished)
+ */
+export const getPublishPromptUrl = (id: number) => {
+  return `/api/prompts/${id}/publish`;
+};
+
+export const publishPrompt = async (
+  id: number,
+  publishPromptBody?: PublishPromptBody,
+  options?: RequestInit,
+): Promise<PromptSession> => {
+  return customFetch<PromptSession>(getPublishPromptUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(publishPromptBody),
+  });
+};
+
+export const getPublishPromptMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishPrompt>>,
+    TError,
+    { id: number; data: BodyType<PublishPromptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof publishPrompt>>,
+  TError,
+  { id: number; data: BodyType<PublishPromptBody> },
+  TContext
+> => {
+  const mutationKey = ["publishPrompt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof publishPrompt>>,
+    { id: number; data: BodyType<PublishPromptBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return publishPrompt(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PublishPromptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof publishPrompt>>
+>;
+export type PublishPromptMutationBody = BodyType<PublishPromptBody>;
+export type PublishPromptMutationError = ErrorType<void>;
+
+/**
+ * @summary Mark a prompt session as published (or unpublished)
+ */
+export const usePublishPrompt = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishPrompt>>,
+    TError,
+    { id: number; data: BodyType<PublishPromptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof publishPrompt>>,
+  TError,
+  { id: number; data: BodyType<PublishPromptBody> },
+  TContext
+> => {
+  return useMutation(getPublishPromptMutationOptions(options));
+};
 
 /**
  * @summary List available token bundles for purchase

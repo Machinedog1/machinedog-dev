@@ -49,6 +49,8 @@ export const ListMyPromptsResponse = zod.object({
       output: zod.string(),
       tokensUsed: zod.number(),
       model: zod.string(),
+      isPublished: zod.boolean(),
+      publishedAt: zod.coerce.date().nullish(),
       createdAt: zod.coerce.date(),
     }),
   ),
@@ -70,6 +72,8 @@ export const SubmitPromptResponse = zod.object({
   output: zod.string(),
   tokensUsed: zod.number(),
   model: zod.string(),
+  isPublished: zod.boolean(),
+  publishedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 
@@ -87,6 +91,33 @@ export const GetPromptResponse = zod.object({
   output: zod.string(),
   tokensUsed: zod.number(),
   model: zod.string(),
+  isPublished: zod.boolean(),
+  publishedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Mark a prompt session as published (or unpublished)
+ */
+export const PublishPromptParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const publishPromptBodyPublishedDefault = true;
+
+export const PublishPromptBody = zod.object({
+  published: zod.boolean().default(publishPromptBodyPublishedDefault),
+});
+
+export const PublishPromptResponse = zod.object({
+  id: zod.number(),
+  clientId: zod.number(),
+  prompt: zod.string(),
+  output: zod.string(),
+  tokensUsed: zod.number(),
+  model: zod.string(),
+  isPublished: zod.boolean(),
+  publishedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 
