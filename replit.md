@@ -45,3 +45,11 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - If SMTP is unavailable or the send fails, the lead is still saved to the `leads` table and the failure reason is recorded in `notify_error`.
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Mobile responsive system (`@workspace/machinedog-mobile`)
+
+- `hooks/useResponsive.ts` is the source of truth. Breakpoints: compact <360, regular 360–719, medium 720–1023 (covers iPad Mini portrait at 744), expanded ≥1024.
+- `useResponsive()` returns `{width, height, isCompact, isRegular, isTablet, containerMaxWidth, gutter, gap, columns, scale(), font(compact, regular, tablet?), pick({compact, regular, tablet, default})}`.
+- `components/ScreenShell.tsx` centers content with `containerMaxWidth` (720 medium / 880 expanded), composes safe-area top + bottom inset, and applies responsive `gutter`/`gap`. `Backdrop` uses `useWindowDimensions` so it reacts to viewport / orientation changes.
+- Bundle and consulting package cards switch to a 2-column grid on tablet (`flexBasis: "48%"` + `maxWidth: "48%"`, `columnGap`/`rowGap: 12`). Pass `noMargin` to `BundleCard` (or omit `packageCard` style) to avoid double vertical spacing inside the grid.
+- Sign-in hero clamps to 58% of viewport height on phones (340–500) and 50% on tablets (340–620). Headline scales 28 / 38 / 56 px via `r.font()`.

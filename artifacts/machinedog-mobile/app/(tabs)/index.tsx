@@ -21,6 +21,7 @@ import { Logo } from "@/components/Logo";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 function formatTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -30,6 +31,7 @@ function formatTokens(n: number) {
 
 export default function ConsoleScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const { isSignedIn } = useAuth();
   const queryClient = useQueryClient();
   const meQuery = useGetMe({
@@ -113,11 +115,16 @@ export default function ConsoleScreen() {
           </View>
         </View>
 
-        <GlassCard padding={20}>
+        <GlassCard padding={r.isTablet ? 28 : r.isCompact ? 16 : 20}>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>
             Prompt console
           </Text>
-          <Text style={[styles.heading, { color: colors.foreground }]}>
+          <Text
+            style={[
+              styles.heading,
+              { color: colors.foreground, fontSize: r.font(20, 22, 30) },
+            ]}
+          >
             What should Claude do today?
           </Text>
           <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
@@ -139,6 +146,8 @@ export default function ConsoleScreen() {
                 color: colors.foreground,
                 borderColor: colors.cardBorder,
                 borderRadius: colors.radius,
+                minHeight: r.isTablet ? 180 : r.isCompact ? 96 : 120,
+                fontSize: r.font(14, 15, 16),
               },
             ]}
           />
@@ -206,7 +215,7 @@ export default function ConsoleScreen() {
           </GlassCard>
         )}
 
-        <GlassCard padding={18}>
+        <GlassCard padding={r.isTablet ? 24 : 18}>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>
             Workspace usage
           </Text>
@@ -215,7 +224,12 @@ export default function ConsoleScreen() {
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
                 Available
               </Text>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
+              <Text
+                style={[
+                  styles.statValue,
+                  { color: colors.foreground, fontSize: r.font(20, 22, 28) },
+                ]}
+              >
                 {formatTokens(balance)}
               </Text>
             </View>
@@ -226,7 +240,12 @@ export default function ConsoleScreen() {
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
                 Used to date
               </Text>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
+              <Text
+                style={[
+                  styles.statValue,
+                  { color: colors.foreground, fontSize: r.font(20, 22, 28) },
+                ]}
+              >
                 {formatTokens(usedTotal)}
               </Text>
             </View>

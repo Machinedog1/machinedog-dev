@@ -15,9 +15,11 @@ import { Logo } from "@/components/Logo";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 export default function SignUpScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const { signUp, errors, fetchStatus } = useSignUp();
   const { isSignedIn } = useAuth();
   const router = useRouter();
@@ -69,10 +71,15 @@ export default function SignUpScreen() {
           <Logo size="md" />
         </View>
 
-        <GlassCard padding={24} style={styles.card}>
+        <GlassCard padding={r.isTablet ? 32 : r.isCompact ? 18 : 24} style={styles.card}>
           {needsVerification ? (
             <>
-              <Text style={[styles.title, { color: colors.foreground }]}>
+              <Text
+                style={[
+                  styles.title,
+                  { color: colors.foreground, fontSize: r.font(22, 26, 34) },
+                ]}
+              >
                 Verify your email
               </Text>
               <Text
@@ -123,7 +130,12 @@ export default function SignUpScreen() {
             </>
           ) : (
             <>
-              <Text style={[styles.title, { color: colors.foreground }]}>
+              <Text
+                style={[
+                  styles.title,
+                  { color: colors.foreground, fontSize: r.font(22, 26, 34) },
+                ]}
+              >
                 Create your account
               </Text>
               <Text

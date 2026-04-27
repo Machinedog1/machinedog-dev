@@ -16,14 +16,24 @@ import { GlassCard } from "@/components/GlassCard";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 const huskyImg = require("@/assets/images/husky-mark.png");
 const huskyPortrait = require("@/assets/images/husky-portrait.png");
 
 export default function SignInScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const { signIn, errors, fetchStatus } = useSignIn();
   const router = useRouter();
+
+  const heroHeight = Math.min(
+    Math.max(Math.round(r.height * (r.isTablet ? 0.5 : 0.58)), 340),
+    r.isTablet ? 620 : 500,
+  );
+  const heroPaddingX = r.isTablet ? 32 : r.isCompact ? 14 : 18;
+  const headlineFont = r.isTablet ? 56 : r.isCompact ? 28 : 38;
+  const headlineLine = r.isTablet ? 58 : r.isCompact ? 30 : 40;
 
   const [emailAddress, setEmailAddress] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -54,7 +64,16 @@ export default function SignInScreen() {
     >
       <ScreenShell contentStyle={{ paddingHorizontal: 0, gap: 0 }}>
         {/* Hero header — dramatic husky portrait backdrop */}
-        <View style={styles.hero}>
+        <View
+          style={[
+            styles.hero,
+            {
+              height: heroHeight,
+              paddingHorizontal: heroPaddingX,
+              paddingBottom: r.isTablet ? 36 : 28,
+            },
+          ]}
+        >
           <Image
             source={huskyPortrait}
             resizeMode="cover"
@@ -116,7 +135,15 @@ export default function SignInScreen() {
             >
               INVITE-ONLY AI ATELIER
             </Text>
-            <Text style={styles.headline}>
+            <Text
+              style={[
+                styles.headline,
+                {
+                  fontSize: headlineFont,
+                  lineHeight: headlineLine,
+                },
+              ]}
+            >
               WE FORGE{"\n"}
               <Text style={{ color: colors.primaryBright ?? colors.primary }}>
                 DIGITAL
@@ -127,7 +154,17 @@ export default function SignInScreen() {
         </View>
 
         {/* Form */}
-        <View style={styles.formWrap}>
+        <View
+          style={[
+            styles.formWrap,
+            {
+              paddingHorizontal: heroPaddingX,
+              maxWidth: r.containerMaxWidth,
+              alignSelf: "center",
+              width: "100%",
+            },
+          ]}
+        >
           <GlassCard padding={22} style={styles.card}>
             <Text style={[styles.title, { color: colors.foreground }]}>
               Welcome back
@@ -234,13 +271,10 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    height: 480,
     width: "100%",
     overflow: "hidden",
     justifyContent: "space-between",
     paddingTop: 12,
-    paddingHorizontal: 18,
-    paddingBottom: 28,
   },
   heroBrandRow: {
     flexDirection: "row",

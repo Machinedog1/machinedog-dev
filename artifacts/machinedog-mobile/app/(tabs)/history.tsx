@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { Logo } from "@/components/Logo";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 function formatTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -30,6 +31,7 @@ function formatDate(iso: string) {
 
 export default function HistoryScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const promptsQuery = useListMyPrompts({ limit: 50 });
 
   const items = promptsQuery.data?.data ?? [];
@@ -40,11 +42,16 @@ export default function HistoryScreen() {
         <Logo size="md" />
       </View>
 
-      <GlassCard padding={20}>
+      <GlassCard padding={r.isTablet ? 26 : 20}>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>
           Prompt history
         </Text>
-        <Text style={[styles.heading, { color: colors.foreground }]}>
+        <Text
+          style={[
+            styles.heading,
+            { color: colors.foreground, fontSize: r.font(20, 22, 30) },
+          ]}
+        >
           Your recent conversations
         </Text>
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>

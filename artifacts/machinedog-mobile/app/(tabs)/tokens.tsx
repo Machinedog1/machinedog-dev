@@ -21,6 +21,7 @@ import { Logo } from "@/components/Logo";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 function formatTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M`;
@@ -45,17 +46,22 @@ function BundleCard({
   bundle,
   onSelect,
   pendingKey,
+  noMargin,
 }: {
   bundle: TokenBundle;
   onSelect: (b: TokenBundle) => void;
   pendingKey: string | null;
+  noMargin?: boolean;
 }) {
   const colors = useColors();
   const isPending = pendingKey === bundle.key;
   const perDollar = bundle.tokens / bundle.priceUsd;
 
   return (
-    <GlassCard padding={18} style={styles.bundleCard}>
+    <GlassCard
+      padding={18}
+      style={noMargin ? undefined : styles.bundleCard}
+    >
       <View style={styles.bundleHeader}>
         <View>
           <Text style={[styles.bundleName, { color: colors.foreground }]}>
@@ -136,6 +142,7 @@ function BundleCard({
 
 export default function TokensScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const meQuery = useGetMe();
   const bundlesQuery = useListTokenBundles();
   const purchasesQuery = useListMyTokenPurchases();
@@ -184,11 +191,16 @@ export default function TokensScreen() {
         <Logo size="md" />
       </View>
 
-      <GlassCard padding={22}>
+      <GlassCard padding={r.isTablet ? 28 : 22}>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>
           Token wallet
         </Text>
-        <Text style={[styles.balanceValue, { color: colors.foreground }]}>
+        <Text
+          style={[
+            styles.balanceValue,
+            { color: colors.foreground, fontSize: r.font(36, 44, 64) },
+          ]}
+        >
           {formatTokens(balance)}
         </Text>
         <Text
@@ -237,14 +249,36 @@ export default function TokensScreen() {
         </GlassCard>
       )}
 
-      {bundles.map((bundle) => (
-        <BundleCard
-          key={bundle.key}
-          bundle={bundle}
-          onSelect={handleSelect}
-          pendingKey={pendingKey}
-        />
-      ))}
+      <View
+        style={
+          r.isTablet
+            ? {
+                flexDirection: "row",
+                flexWrap: "wrap",
+                columnGap: 12,
+                rowGap: 12,
+              }
+            : undefined
+        }
+      >
+        {bundles.map((bundle) => (
+          <View
+            key={bundle.key}
+            style={
+              r.isTablet
+                ? { flexBasis: "48%", maxWidth: "48%" }
+                : undefined
+            }
+          >
+            <BundleCard
+              bundle={bundle}
+              onSelect={handleSelect}
+              pendingKey={pendingKey}
+              noMargin={r.isTablet}
+            />
+          </View>
+        ))}
+      </View>
 
       <View style={{ marginTop: 18 }}>
         <Text

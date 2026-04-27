@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import Svg, { Defs, Pattern, Rect, Circle } from "react-native-svg";
 
 import { useColors } from "@/hooks/useColors";
@@ -8,11 +8,12 @@ import { useColors } from "@/hooks/useColors";
 /**
  * Layered ambient backdrop inspired by the Replit IDE: a deep base color,
  * a subtle dot-grid overlay, and a soft amber radial gradient that hints
- * at the brand color without overwhelming.
+ * at the brand color without overwhelming. Reactive to orientation /
+ * split-screen / window size changes via useWindowDimensions.
  */
 export function Backdrop() {
   const colors = useColors();
-  const { width, height } = Dimensions.get("window");
+  const { width, height } = useWindowDimensions();
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>

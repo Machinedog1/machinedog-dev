@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop } from "@/components/Backdrop";
+import { useResponsive } from "@/hooks/useResponsive";
 
 interface ScreenShellProps {
   children: React.ReactNode;
@@ -23,16 +24,28 @@ export function ScreenShell({
   scroll = true,
   contentStyle,
   scrollViewProps,
-  bottomInset = 120,
+  bottomInset,
 }: ScreenShellProps) {
   const insets = useSafeAreaInsets();
-  const paddingTop = insets.top + 12;
+  const r = useResponsive();
+  const paddingTop = insets.top + (r.isCompact ? 8 : 12);
+  const baseBottom =
+    bottomInset ?? (r.isTablet ? 140 : r.isCompact ? 96 : 120);
+  const resolvedBottomInset = baseBottom + insets.bottom;
 
   const inner = (
     <View
       style={[
         styles.content,
-        { paddingTop, paddingBottom: bottomInset },
+        {
+          paddingTop,
+          paddingBottom: resolvedBottomInset,
+          paddingHorizontal: r.gutter,
+          gap: r.gap,
+          maxWidth: r.containerMaxWidth,
+          alignSelf: "center",
+          width: "100%",
+        },
         contentStyle,
       ]}
     >
@@ -67,7 +80,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   content: {
-    paddingHorizontal: 18,
-    gap: 18,
+    flex: 0,
   },
 });

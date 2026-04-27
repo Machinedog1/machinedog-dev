@@ -20,6 +20,7 @@ import { Logo } from "@/components/Logo";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 function formatPrice(usd: number) {
   return `$${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -27,6 +28,7 @@ function formatPrice(usd: number) {
 
 export default function ConsultingScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const packagesQuery = useListConsultingPackages();
   const bookingsQuery = useListMyConsultingBookings();
   const checkout = useCreateConsultingCheckout();
@@ -71,11 +73,16 @@ export default function ConsultingScreen() {
         <Logo size="md" />
       </View>
 
-      <GlassCard padding={22}>
+      <GlassCard padding={r.isTablet ? 28 : 22}>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>
           Consulting hours
         </Text>
-        <Text style={[styles.heading, { color: colors.foreground }]}>
+        <Text
+          style={[
+            styles.heading,
+            { color: colors.foreground, fontSize: r.font(22, 24, 32) },
+          ]}
+        >
           Book a strategist
         </Text>
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
@@ -98,8 +105,31 @@ export default function ConsultingScreen() {
         </GlassCard>
       )}
 
+      <View
+        style={
+          r.isTablet
+            ? {
+                flexDirection: "row",
+                flexWrap: "wrap",
+                columnGap: 12,
+                rowGap: 12,
+              }
+            : undefined
+        }
+      >
       {packages.map((pkg) => (
-        <GlassCard key={pkg.key} padding={20} style={styles.packageCard}>
+        <View
+          key={pkg.key}
+          style={
+            r.isTablet
+              ? { flexBasis: "48%", maxWidth: "48%" }
+              : undefined
+          }
+        >
+        <GlassCard
+          padding={20}
+          style={r.isTablet ? undefined : styles.packageCard}
+        >
           <View style={styles.packageHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.packageName, { color: colors.foreground }]}>
@@ -174,7 +204,9 @@ export default function ConsultingScreen() {
             </Text>
           )}
         </GlassCard>
+        </View>
       ))}
+      </View>
 
       <View style={{ marginTop: 18 }}>
         <Text

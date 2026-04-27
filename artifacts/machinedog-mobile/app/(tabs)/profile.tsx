@@ -10,6 +10,7 @@ import { Logo } from "@/components/Logo";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useColors } from "@/hooks/useColors";
+import { useResponsive } from "@/hooks/useResponsive";
 
 function formatTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -19,6 +20,7 @@ function formatTokens(n: number) {
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const r = useResponsive();
   const router = useRouter();
   const { user } = useUser();
   const { signOut } = useAuth();
@@ -57,7 +59,7 @@ export default function ProfileScreen() {
         <Logo size="md" />
       </View>
 
-      <GlassCard padding={22}>
+      <GlassCard padding={r.isTablet ? 28 : 22}>
         <View style={styles.identityRow}>
           <View
             style={[
@@ -79,7 +81,12 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.name, { color: colors.foreground }]}>
+            <Text
+              style={[
+                styles.name,
+                { color: colors.foreground, fontSize: r.font(18, 20, 26) },
+              ]}
+            >
               {displayName}
             </Text>
             <Text
@@ -127,7 +134,12 @@ export default function ProfileScreen() {
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
               Available
             </Text>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>
+            <Text
+              style={[
+                styles.statValue,
+                { color: colors.foreground, fontSize: r.font(20, 22, 30) },
+              ]}
+            >
               {formatTokens(me?.tokenBalance ?? 0)}
             </Text>
           </View>
@@ -138,7 +150,12 @@ export default function ProfileScreen() {
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
               Used
             </Text>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>
+            <Text
+              style={[
+                styles.statValue,
+                { color: colors.foreground, fontSize: r.font(20, 22, 30) },
+              ]}
+            >
               {formatTokens(me?.totalTokensUsed ?? 0)}
             </Text>
           </View>
