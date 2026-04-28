@@ -52,5 +52,8 @@ ADMIN_EMAILS = "tom@machinedog.com"
 BOOTSTRAP_ADMIN_EMAIL = "tom@machinedog.com"
 OPERATOR_EMAIL = "tom@machinedog.com"
 
+[userenv.production]
+PUBLIC_APP_URL = "https://machinedog.dev"
+
 [nix]
 channel = "stable-25_05"
