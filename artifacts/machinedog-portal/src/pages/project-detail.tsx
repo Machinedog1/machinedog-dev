@@ -190,7 +190,7 @@ export default function ProjectDetailPage() {
   };
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-8 max-w-5xl mx-auto w-full gap-6">
+    <div className="min-h-full flex flex-col p-4 md:p-8 max-w-5xl mx-auto w-full gap-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Link href="/projects">
           <Button variant="ghost" size="sm" className="font-mono text-muted-foreground">
