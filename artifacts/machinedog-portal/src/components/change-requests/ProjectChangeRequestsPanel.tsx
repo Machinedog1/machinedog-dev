@@ -120,10 +120,11 @@ export function ProjectChangeRequestsPanel({ projectId }: { projectId: number })
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = draftRequest.trim();
-    if (trimmed.length < 4) {
+    const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+    if (wordCount < 6) {
       toast({
         title: "Tell us a bit more",
-        description: "Describe the change in at least a few words.",
+        description: "Describe the change in more than five words so Claude has enough to work with.",
         variant: "destructive",
       });
       return;

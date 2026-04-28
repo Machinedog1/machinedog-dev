@@ -266,6 +266,16 @@ router.post(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid request body" } });
       return;
     }
+    const wordCount = body.data.rawRequest.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount < 6) {
+      res.status(400).json({
+        error: {
+          code: "bad_request",
+          message: "Describe the change in more than five words so Claude has enough to work with.",
+        },
+      });
+      return;
+    }
     const client = req.dbClient!;
     const access = await loadViewableProject(params.data.id, client.id, client.email);
     if (!access) {
