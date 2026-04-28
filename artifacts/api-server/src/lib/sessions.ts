@@ -11,6 +11,29 @@ function isProd(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
+/**
+ * Cookie options that work both in production (HTTPS) and inside the Replit
+ * workspace iframe during development. The portal is rendered inside an iframe
+ * served from a different site than the workspace UI, so browsers treat the
+ * cookie as third-party. SameSite=Lax cookies are blocked in that context;
+ * SameSite=None (with Secure) is required so the session cookie is stored and
+ * sent on follow-up requests. Both the dev workspace and the deployed app
+ * are served over HTTPS, so Secure is safe to set unconditionally here.
+ */
+function cookieOptions(): {
+  httpOnly: true;
+  secure: true;
+  sameSite: "none";
+  path: "/";
+} {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+  };
+}
+
 export async function createSession(
   clientId: number,
   meta?: { userAgent?: string; ipAddress?: string },
@@ -70,21 +93,13 @@ export async function purgeExpiredSessions(): Promise<void> {
 
 export function setSessionCookie(res: Response, sessionId: string, expiresAt: Date): void {
   res.cookie(SESSION_COOKIE_NAME, sessionId, {
-    httpOnly: true,
-    secure: isProd(),
-    sameSite: "lax",
-    path: "/",
+    ...cookieOptions(),
     expires: expiresAt,
   });
 }
 
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie(SESSION_COOKIE_NAME, {
-    httpOnly: true,
-    secure: isProd(),
-    sameSite: "lax",
-    path: "/",
-  });
+  res.clearCookie(SESSION_COOKIE_NAME, cookieOptions());
 }
 
 export function readSessionIdFromRequest(req: Request): string | null {
