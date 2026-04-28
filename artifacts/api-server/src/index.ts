@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { bootstrapAdmin } from "./lib/bootstrap-admin";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,9 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Fire-and-forget bootstrap so it doesn't block request handling.
+  bootstrapAdmin().catch((boot) => {
+    logger.error({ err: boot }, "bootstrapAdmin threw");
+  });
 });
