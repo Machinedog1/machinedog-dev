@@ -220,6 +220,21 @@ router.patch(
           coverImageUrl: body.data.coverImageUrl?.trim() ? body.data.coverImageUrl.trim() : null,
         }),
         ...(body.data.status !== undefined && { status: body.data.status }),
+        ...(body.data.productionUrl !== undefined && {
+          productionUrl: body.data.productionUrl?.trim() ? body.data.productionUrl.trim() : null,
+        }),
+        ...(body.data.operatorEmail !== undefined && {
+          operatorEmail: body.data.operatorEmail?.trim() ? body.data.operatorEmail.trim() : null,
+        }),
+        ...(body.data.githubOwner !== undefined && {
+          githubOwner: body.data.githubOwner?.trim() ? body.data.githubOwner.trim() : null,
+        }),
+        ...(body.data.githubRepo !== undefined && {
+          githubRepo: body.data.githubRepo?.trim() ? body.data.githubRepo.trim() : null,
+        }),
+        ...(body.data.githubDefaultBranch !== undefined && body.data.githubDefaultBranch?.trim() && {
+          githubDefaultBranch: body.data.githubDefaultBranch.trim(),
+        }),
       })
       .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.clientId, req.dbClient!.id)))
       .returning();

@@ -81,6 +81,7 @@ export default function ProjectDetailPage() {
     summary: "",
     description: "",
     liveUrl: "",
+    productionUrl: "",
     coverImageUrl: "",
     status: "draft" as "draft" | "active" | "completed" | "archived",
   });
@@ -93,6 +94,7 @@ export default function ProjectDetailPage() {
         summary: project.summary ?? "",
         description: project.description ?? "",
         liveUrl: project.liveUrl ?? "",
+        productionUrl: project.productionUrl ?? "",
         coverImageUrl: project.coverImageUrl ?? "",
         status: project.status,
       });
@@ -130,6 +132,7 @@ export default function ProjectDetailPage() {
           summary: form.summary,
           description: form.description,
           liveUrl: form.liveUrl.trim() ? form.liveUrl.trim() : null,
+          productionUrl: form.productionUrl.trim() ? form.productionUrl.trim() : null,
           coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : null,
           status: form.status,
         },
@@ -279,6 +282,14 @@ export default function ProjectDetailPage() {
                   value={form.liveUrl}
                   onChange={(e) => setForm((f) => ({ ...f, liveUrl: e.target.value }))}
                   placeholder="https://beesuite.farm"
+                  type="url"
+                />
+              </Field>
+              <Field label="PRODUCTION URL (LIVE PREVIEW)">
+                <Input
+                  value={form.productionUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, productionUrl: e.target.value }))}
+                  placeholder="https://app.beesuite.farm  — embedded in the Live Site panel"
                   type="url"
                 />
               </Field>
