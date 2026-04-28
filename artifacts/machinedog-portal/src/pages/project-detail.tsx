@@ -30,10 +30,12 @@ import {
   ExternalLink,
   FileUp,
   Files,
+  Globe,
   Loader2,
   Mail,
   MessageSquare,
   Pencil,
+  RefreshCw,
   Save,
   Send,
   Terminal,
@@ -335,6 +337,8 @@ export default function ProjectDetailPage() {
           )}
         </div>
       </div>
+
+      <LiveSitePanel productionUrl={project.productionUrl ?? null} title={project.title} />
 
       <ProjectChangeRequestsPanel projectId={project.id} />
       <ProjectPromptPanel projectId={project.id} />
@@ -858,6 +862,93 @@ function ProjectFilesPanel({
           })
         )}
       </div>
+    </div>
+  );
+}
+
+function isSafeHttpUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function LiveSitePanel({
+  productionUrl,
+  title,
+}: {
+  productionUrl: string | null;
+  title: string;
+}) {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const safeUrl = isSafeHttpUrl(productionUrl) ? productionUrl : null;
+
+  return (
+    <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-mono font-bold uppercase tracking-wider">
+            Live Site
+          </h2>
+        </div>
+        {safeUrl && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              className="font-mono text-xs"
+            >
+              <RefreshCw className="h-3 w-3 mr-2" /> REFRESH
+            </Button>
+            <a
+              href={safeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-mono text-primary hover:underline inline-flex items-center gap-1"
+            >
+              OPEN IN NEW TAB <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
+      </div>
+
+      {!safeUrl ? (
+        <div className="rounded-lg border border-dashed border-white/10 bg-white/3 p-6 text-center">
+          <p className="text-sm font-mono text-muted-foreground">
+            No live site URL is set for this project yet.
+          </p>
+          <p className="text-xs font-mono text-muted-foreground mt-2">
+            An admin can set the Production URL in the project edit form to embed
+            the live site here.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-mono text-muted-foreground break-all">
+            {safeUrl}
+          </p>
+          <div className="rounded-lg overflow-hidden border border-white/10 bg-black">
+            <iframe
+              key={`${safeUrl}-${refreshKey}`}
+              src={safeUrl}
+              title={`Live preview of ${title}`}
+              className="w-full h-[640px] bg-white"
+              sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              referrerPolicy="no-referrer"
+              loading="lazy"
+            />
+          </div>
+          <p className="text-[10px] font-mono text-muted-foreground">
+            Note: some sites refuse to be embedded in iframes (X-Frame-Options or CSP).
+            If the preview is blank, use OPEN IN NEW TAB.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
