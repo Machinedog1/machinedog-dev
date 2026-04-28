@@ -985,7 +985,7 @@ components:
         id:
           type: integer
         userId:
-          type: string
+          type: ["string", "null"]
         email:
           type: string
         tokenBalance:
@@ -1008,7 +1008,7 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, userId, email, tokenBalance, totalTokensUsed, isAdmin, status, portalSubscriptionStatus, createdAt]
+      required: [id, email, tokenBalance, totalTokensUsed, isAdmin, status, portalSubscriptionStatus, createdAt]
 
     ClientList:
       type: object

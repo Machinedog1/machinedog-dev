@@ -19,7 +19,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const GetMeResponse = zod.object({
   id: zod.number(),
-  userId: zod.string(),
+  userId: zod.string().nullish(),
   email: zod.string(),
   tokenBalance: zod.number(),
   totalTokensUsed: zod.number(),
@@ -1102,7 +1102,7 @@ export const ListClientsResponse = zod.object({
   data: zod.array(
     zod.object({
       id: zod.number(),
-      userId: zod.string(),
+      userId: zod.string().nullish(),
       email: zod.string(),
       tokenBalance: zod.number(),
       totalTokensUsed: zod.number(),
@@ -1145,7 +1145,7 @@ export const GetClientByIdParams = zod.object({
 
 export const GetClientByIdResponse = zod.object({
   id: zod.number(),
-  userId: zod.string(),
+  userId: zod.string().nullish(),
   email: zod.string(),
   tokenBalance: zod.number(),
   totalTokensUsed: zod.number(),
@@ -1178,7 +1178,7 @@ export const AdjustClientBalanceBody = zod.object({
 
 export const AdjustClientBalanceResponse = zod.object({
   id: zod.number(),
-  userId: zod.string(),
+  userId: zod.string().nullish(),
   email: zod.string(),
   tokenBalance: zod.number(),
   totalTokensUsed: zod.number(),

@@ -37,7 +37,8 @@ export const ClientPortalSubscriptionStatus = {
 
 export interface Client {
   id: number;
-  userId: string;
+  /** @nullable */
+  userId?: string | null;
   email: string;
   tokenBalance: number;
   totalTokensUsed: number;
