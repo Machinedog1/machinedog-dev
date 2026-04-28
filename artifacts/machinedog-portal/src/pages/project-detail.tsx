@@ -338,7 +338,10 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <LiveSitePanel productionUrl={project.productionUrl ?? null} title={project.title} />
+      <LiveSitePanel
+        productionUrl={project.productionUrl ?? project.liveUrl ?? null}
+        title={project.title}
+      />
 
       <ProjectChangeRequestsPanel projectId={project.id} />
       <ProjectPromptPanel projectId={project.id} />
