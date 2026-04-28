@@ -48,6 +48,9 @@ externalPort = 4200
 
 [userenv.shared]
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_ZXhjaXRlZC1jcmF5ZmlzaC05Ny5jbGVyay5hY2NvdW50cy5kZXYk"
+ADMIN_EMAILS = "tom@machinedog.com"
+BOOTSTRAP_ADMIN_EMAIL = "tom@machinedog.com"
+OPERATOR_EMAIL = "tom@machinedog.com"
 
 [nix]
 channel = "stable-25_05"
