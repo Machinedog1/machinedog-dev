@@ -43,6 +43,7 @@ import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/aut
 import { sendProjectInviteEmail } from "../lib/project-invites";
 import { logger } from "../lib/logger";
 import { runClaudePrompt } from "../lib/anthropic";
+import { computeChargedTokens } from "../lib/billing";
 
 const router: IRouter = Router();
 
@@ -606,7 +607,7 @@ router.post(
       return;
     }
 
-    const tokensUsed = Math.min(result.totalTokens, client.tokenBalance);
+    const tokensUsed = computeChargedTokens(result.totalTokens, client.tokenBalance);
     await db
       .update(clientsTable)
       .set({

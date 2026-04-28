@@ -14,6 +14,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
 import { runClaudePrompt } from "../lib/anthropic";
+import { computeChargedTokens } from "../lib/billing";
 
 const router: IRouter = Router();
 
@@ -59,8 +60,9 @@ router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, as
     return;
   }
 
-  // Deduct tokens atomically; never allow negative
-  const tokensUsed = Math.min(result.totalTokens, client.tokenBalance);
+  // Apply the client-facing token markup, then clamp to the remaining balance
+  // so we never overdraw. See lib/billing.ts for the multiplier.
+  const tokensUsed = computeChargedTokens(result.totalTokens, client.tokenBalance);
   const [updatedClient] = await db
     .update(clientsTable)
     .set({
@@ -81,7 +83,15 @@ router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, as
     })
     .returning();
 
-  req.log.info({ sessionId: session.id, tokensUsed, balance: updatedClient.tokenBalance }, "Prompt completed");
+  req.log.info(
+    {
+      sessionId: session.id,
+      rawTokens: result.totalTokens,
+      tokensUsed,
+      balance: updatedClient.tokenBalance,
+    },
+    "Prompt completed",
+  );
 
   res.json(SubmitPromptResponse.parse(session));
 });
