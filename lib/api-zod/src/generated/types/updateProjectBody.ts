@@ -16,4 +16,15 @@ export interface UpdateProjectBody {
   /** @nullable */
   coverImageUrl?: string | null;
   status?: UpdateProjectBodyStatus;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  githubDefaultBranch?: string;
+  /** @nullable */
+  previewUrlTemplate?: string | null;
+  /** @nullable */
+  productionUrl?: string | null;
+  /** @nullable */
+  operatorEmail?: string | null;
 }

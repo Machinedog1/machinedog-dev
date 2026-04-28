@@ -508,6 +508,164 @@ paths:
         "204":
           description: File removed
 
+  # ─── Change requests ───────────────────────────────────────────────────────
+
+  /projects/{id}/change-requests:
+    get:
+      operationId: listProjectChangeRequests
+      tags: [change-requests]
+      summary: List change requests for a project (owner or member)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Change requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequestList"
+    post:
+      operationId: createChangeRequest
+      tags: [change-requests]
+      summary: Submit a new plain-English change request against a project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChangeRequestBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
+  /change-requests/{id}:
+    get:
+      operationId: getChangeRequest
+      tags: [change-requests]
+      summary: Get a change request with its event timeline
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Change request detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequestDetail"
+
+  /change-requests/{id}/distill:
+    post:
+      operationId: distillChangeRequest
+      tags: [change-requests]
+      summary: Use Claude to turn the raw request into a structured spec
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Distilled spec attached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
+  /change-requests/{id}/generate-patch:
+    post:
+      operationId: generateChangePatch
+      tags: [change-requests]
+      summary: Use Claude to generate the actual file changes from the distilled spec
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patch generated and stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
+  /change-requests/{id}/request-publish:
+    post:
+      operationId: requestChangePublish
+      tags: [change-requests]
+      summary: Client approves the preview and asks the operator to publish
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked awaiting deploy and operator notified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
+  /change-requests/{id}/mark-deployed:
+    post:
+      operationId: markChangeDeployed
+      tags: [change-requests]
+      summary: Operator confirms the change is live in production
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked deployed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
+  /change-requests/{id}/rollback:
+    post:
+      operationId: rollbackChangeRequest
+      tags: [change-requests]
+      summary: Roll back a deployed change request to its snapshot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rollback initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
   # ─── Consulting packages ───────────────────────────────────────────────────
 
   /consulting/packages:
@@ -1006,6 +1164,18 @@ components:
           enum: [draft, active, completed, archived]
         consultingBookingId:
           type: ["integer", "null"]
+        githubOwner:
+          type: ["string", "null"]
+        githubRepo:
+          type: ["string", "null"]
+        githubDefaultBranch:
+          type: string
+        previewUrlTemplate:
+          type: ["string", "null"]
+        productionUrl:
+          type: ["string", "null"]
+        operatorEmail:
+          type: ["string", "null"]
         viewerRole:
           type: string
           enum: [owner, collaborator]
@@ -1015,7 +1185,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, clientId, title, description, summary, status, viewerRole, createdAt, updatedAt]
+      required: [id, clientId, title, description, summary, status, githubDefaultBranch, viewerRole, createdAt, updatedAt]
 
     ProjectList:
       type: object
@@ -1058,6 +1228,18 @@ components:
         status:
           type: string
           enum: [draft, active, completed, archived]
+        githubOwner:
+          type: ["string", "null"]
+        githubRepo:
+          type: ["string", "null"]
+        githubDefaultBranch:
+          type: string
+        previewUrlTemplate:
+          type: ["string", "null"]
+        productionUrl:
+          type: ["string", "null"]
+        operatorEmail:
+          type: ["string", "null"]
 
     ProjectMember:
       type: object
@@ -1482,3 +1664,171 @@ components:
         id:
           type: integer
       required: [success]
+
+    # ─── Change requests ────────────────────────────────────────────────────
+
+    ChangeRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        requesterClientId:
+          type: integer
+        requesterEmail:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum:
+            - draft
+            - distilling
+            - distilled
+            - generating_patch
+            - patched
+            - snapshot_taken
+            - pr_open
+            - awaiting_publish
+            - merged
+            - awaiting_deploy
+            - deployed
+            - rolled_back
+            - failed
+        title:
+          type: string
+        rawRequest:
+          type: string
+        distilledSpec:
+          description: Structured spec emitted by Claude. Shape depends on the model output.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        patchSummary:
+          type: ["string", "null"]
+        patchFiles:
+          description: List of file changes Claude proposed.
+          oneOf:
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
+            - type: "null"
+        githubBranch:
+          type: ["string", "null"]
+        githubPrNumber:
+          type: ["integer", "null"]
+        githubPrUrl:
+          type: ["string", "null"]
+        snapshotTag:
+          type: ["string", "null"]
+        snapshotSha:
+          type: ["string", "null"]
+        previewUrl:
+          type: ["string", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        requestedPublishAt:
+          type: ["string", "null"]
+          format: date-time
+        mergedAt:
+          type: ["string", "null"]
+          format: date-time
+        deployedAt:
+          type: ["string", "null"]
+          format: date-time
+        rolledBackAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - requesterClientId
+        - status
+        - title
+        - rawRequest
+        - createdAt
+        - updatedAt
+
+    ChangeRequestList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeRequest"
+      required: [data]
+
+    ChangeRequestEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        changeRequestId:
+          type: integer
+        kind:
+          type: string
+        message:
+          type: string
+        actorClientId:
+          type: ["integer", "null"]
+        actorEmail:
+          type: ["string", "null"]
+        metadata:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, changeRequestId, kind, message, createdAt]
+
+    ChangeRequestDetail:
+      type: object
+      properties:
+        changeRequest:
+          $ref: "#/components/schemas/ChangeRequest"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeRequestEvent"
+        project:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            githubOwner:
+              type: ["string", "null"]
+            githubRepo:
+              type: ["string", "null"]
+            githubDefaultBranch:
+              type: string
+            previewUrlTemplate:
+              type: ["string", "null"]
+            productionUrl:
+              type: ["string", "null"]
+            githubConfigured:
+              type: boolean
+          required: [id, title, githubDefaultBranch, githubConfigured]
+      required: [changeRequest, events, project]
+
+    CreateChangeRequestBody:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        rawRequest:
+          type: string
+          minLength: 4
+          maxLength: 8000
+      required: [rawRequest]

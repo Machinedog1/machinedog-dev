@@ -192,6 +192,12 @@ export const ListMyProjectsResponse = zod.object({
       coverImageUrl: zod.string().nullish(),
       status: zod.enum(["draft", "active", "completed", "archived"]),
       consultingBookingId: zod.number().nullish(),
+      githubOwner: zod.string().nullish(),
+      githubRepo: zod.string().nullish(),
+      githubDefaultBranch: zod.string(),
+      previewUrlTemplate: zod.string().nullish(),
+      productionUrl: zod.string().nullish(),
+      operatorEmail: zod.string().nullish(),
       viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -228,6 +234,12 @@ export const GetProjectResponse = zod.object({
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
   consultingBookingId: zod.number().nullish(),
+  githubOwner: zod.string().nullish(),
+  githubRepo: zod.string().nullish(),
+  githubDefaultBranch: zod.string(),
+  previewUrlTemplate: zod.string().nullish(),
+  productionUrl: zod.string().nullish(),
+  operatorEmail: zod.string().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -247,6 +259,12 @@ export const UpdateProjectBody = zod.object({
   liveUrl: zod.string().nullish(),
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]).optional(),
+  githubOwner: zod.string().nullish(),
+  githubRepo: zod.string().nullish(),
+  githubDefaultBranch: zod.string().optional(),
+  previewUrlTemplate: zod.string().nullish(),
+  productionUrl: zod.string().nullish(),
+  operatorEmail: zod.string().nullish(),
 });
 
 export const UpdateProjectResponse = zod.object({
@@ -259,6 +277,12 @@ export const UpdateProjectResponse = zod.object({
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
   consultingBookingId: zod.number().nullish(),
+  githubOwner: zod.string().nullish(),
+  githubRepo: zod.string().nullish(),
+  githubDefaultBranch: zod.string(),
+  previewUrlTemplate: zod.string().nullish(),
+  productionUrl: zod.string().nullish(),
+  operatorEmail: zod.string().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -452,6 +476,441 @@ export const AddProjectFileBody = zod.object({
 export const DeleteProjectFileParams = zod.object({
   id: zod.coerce.number(),
   fileId: zod.coerce.number(),
+});
+
+/**
+ * @summary List change requests for a project (owner or member)
+ */
+export const ListProjectChangeRequestsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectChangeRequestsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      projectId: zod.number(),
+      requesterClientId: zod.number(),
+      requesterEmail: zod.string().nullish(),
+      status: zod.enum([
+        "draft",
+        "distilling",
+        "distilled",
+        "generating_patch",
+        "patched",
+        "snapshot_taken",
+        "pr_open",
+        "awaiting_publish",
+        "merged",
+        "awaiting_deploy",
+        "deployed",
+        "rolled_back",
+        "failed",
+      ]),
+      title: zod.string(),
+      rawRequest: zod.string(),
+      distilledSpec: zod
+        .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+        .optional()
+        .describe(
+          "Structured spec emitted by Claude. Shape depends on the model output.",
+        ),
+      patchSummary: zod.string().nullish(),
+      patchFiles: zod
+        .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+        .optional()
+        .describe("List of file changes Claude proposed."),
+      githubBranch: zod.string().nullish(),
+      githubPrNumber: zod.number().nullish(),
+      githubPrUrl: zod.string().nullish(),
+      snapshotTag: zod.string().nullish(),
+      snapshotSha: zod.string().nullish(),
+      previewUrl: zod.string().nullish(),
+      errorMessage: zod.string().nullish(),
+      requestedPublishAt: zod.coerce.date().nullish(),
+      mergedAt: zod.coerce.date().nullish(),
+      deployedAt: zod.coerce.date().nullish(),
+      rolledBackAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Submit a new plain-English change request against a project
+ */
+export const CreateChangeRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const createChangeRequestBodyTitleMax = 200;
+
+export const createChangeRequestBodyRawRequestMin = 4;
+export const createChangeRequestBodyRawRequestMax = 8000;
+
+export const CreateChangeRequestBody = zod.object({
+  title: zod.string().max(createChangeRequestBodyTitleMax).optional(),
+  rawRequest: zod
+    .string()
+    .min(createChangeRequestBodyRawRequestMin)
+    .max(createChangeRequestBodyRawRequestMax),
+});
+
+/**
+ * @summary Get a change request with its event timeline
+ */
+export const GetChangeRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetChangeRequestResponse = zod.object({
+  changeRequest: zod.object({
+    id: zod.number(),
+    projectId: zod.number(),
+    requesterClientId: zod.number(),
+    requesterEmail: zod.string().nullish(),
+    status: zod.enum([
+      "draft",
+      "distilling",
+      "distilled",
+      "generating_patch",
+      "patched",
+      "snapshot_taken",
+      "pr_open",
+      "awaiting_publish",
+      "merged",
+      "awaiting_deploy",
+      "deployed",
+      "rolled_back",
+      "failed",
+    ]),
+    title: zod.string(),
+    rawRequest: zod.string(),
+    distilledSpec: zod
+      .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+      .optional()
+      .describe(
+        "Structured spec emitted by Claude. Shape depends on the model output.",
+      ),
+    patchSummary: zod.string().nullish(),
+    patchFiles: zod
+      .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+      .optional()
+      .describe("List of file changes Claude proposed."),
+    githubBranch: zod.string().nullish(),
+    githubPrNumber: zod.number().nullish(),
+    githubPrUrl: zod.string().nullish(),
+    snapshotTag: zod.string().nullish(),
+    snapshotSha: zod.string().nullish(),
+    previewUrl: zod.string().nullish(),
+    errorMessage: zod.string().nullish(),
+    requestedPublishAt: zod.coerce.date().nullish(),
+    mergedAt: zod.coerce.date().nullish(),
+    deployedAt: zod.coerce.date().nullish(),
+    rolledBackAt: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  events: zod.array(
+    zod.object({
+      id: zod.number(),
+      changeRequestId: zod.number(),
+      kind: zod.string(),
+      message: zod.string(),
+      actorClientId: zod.number().nullish(),
+      actorEmail: zod.string().nullish(),
+      metadata: zod
+        .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+        .optional(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  project: zod.object({
+    id: zod.number(),
+    title: zod.string(),
+    githubOwner: zod.string().nullish(),
+    githubRepo: zod.string().nullish(),
+    githubDefaultBranch: zod.string(),
+    previewUrlTemplate: zod.string().nullish(),
+    productionUrl: zod.string().nullish(),
+    githubConfigured: zod.boolean(),
+  }),
+});
+
+/**
+ * @summary Use Claude to turn the raw request into a structured spec
+ */
+export const DistillChangeRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DistillChangeRequestResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  requesterClientId: zod.number(),
+  requesterEmail: zod.string().nullish(),
+  status: zod.enum([
+    "draft",
+    "distilling",
+    "distilled",
+    "generating_patch",
+    "patched",
+    "snapshot_taken",
+    "pr_open",
+    "awaiting_publish",
+    "merged",
+    "awaiting_deploy",
+    "deployed",
+    "rolled_back",
+    "failed",
+  ]),
+  title: zod.string(),
+  rawRequest: zod.string(),
+  distilledSpec: zod
+    .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+    .optional()
+    .describe(
+      "Structured spec emitted by Claude. Shape depends on the model output.",
+    ),
+  patchSummary: zod.string().nullish(),
+  patchFiles: zod
+    .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+    .optional()
+    .describe("List of file changes Claude proposed."),
+  githubBranch: zod.string().nullish(),
+  githubPrNumber: zod.number().nullish(),
+  githubPrUrl: zod.string().nullish(),
+  snapshotTag: zod.string().nullish(),
+  snapshotSha: zod.string().nullish(),
+  previewUrl: zod.string().nullish(),
+  errorMessage: zod.string().nullish(),
+  requestedPublishAt: zod.coerce.date().nullish(),
+  mergedAt: zod.coerce.date().nullish(),
+  deployedAt: zod.coerce.date().nullish(),
+  rolledBackAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Use Claude to generate the actual file changes from the distilled spec
+ */
+export const GenerateChangePatchParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GenerateChangePatchResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  requesterClientId: zod.number(),
+  requesterEmail: zod.string().nullish(),
+  status: zod.enum([
+    "draft",
+    "distilling",
+    "distilled",
+    "generating_patch",
+    "patched",
+    "snapshot_taken",
+    "pr_open",
+    "awaiting_publish",
+    "merged",
+    "awaiting_deploy",
+    "deployed",
+    "rolled_back",
+    "failed",
+  ]),
+  title: zod.string(),
+  rawRequest: zod.string(),
+  distilledSpec: zod
+    .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+    .optional()
+    .describe(
+      "Structured spec emitted by Claude. Shape depends on the model output.",
+    ),
+  patchSummary: zod.string().nullish(),
+  patchFiles: zod
+    .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+    .optional()
+    .describe("List of file changes Claude proposed."),
+  githubBranch: zod.string().nullish(),
+  githubPrNumber: zod.number().nullish(),
+  githubPrUrl: zod.string().nullish(),
+  snapshotTag: zod.string().nullish(),
+  snapshotSha: zod.string().nullish(),
+  previewUrl: zod.string().nullish(),
+  errorMessage: zod.string().nullish(),
+  requestedPublishAt: zod.coerce.date().nullish(),
+  mergedAt: zod.coerce.date().nullish(),
+  deployedAt: zod.coerce.date().nullish(),
+  rolledBackAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Client approves the preview and asks the operator to publish
+ */
+export const RequestChangePublishParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RequestChangePublishResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  requesterClientId: zod.number(),
+  requesterEmail: zod.string().nullish(),
+  status: zod.enum([
+    "draft",
+    "distilling",
+    "distilled",
+    "generating_patch",
+    "patched",
+    "snapshot_taken",
+    "pr_open",
+    "awaiting_publish",
+    "merged",
+    "awaiting_deploy",
+    "deployed",
+    "rolled_back",
+    "failed",
+  ]),
+  title: zod.string(),
+  rawRequest: zod.string(),
+  distilledSpec: zod
+    .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+    .optional()
+    .describe(
+      "Structured spec emitted by Claude. Shape depends on the model output.",
+    ),
+  patchSummary: zod.string().nullish(),
+  patchFiles: zod
+    .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+    .optional()
+    .describe("List of file changes Claude proposed."),
+  githubBranch: zod.string().nullish(),
+  githubPrNumber: zod.number().nullish(),
+  githubPrUrl: zod.string().nullish(),
+  snapshotTag: zod.string().nullish(),
+  snapshotSha: zod.string().nullish(),
+  previewUrl: zod.string().nullish(),
+  errorMessage: zod.string().nullish(),
+  requestedPublishAt: zod.coerce.date().nullish(),
+  mergedAt: zod.coerce.date().nullish(),
+  deployedAt: zod.coerce.date().nullish(),
+  rolledBackAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Operator confirms the change is live in production
+ */
+export const MarkChangeDeployedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkChangeDeployedResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  requesterClientId: zod.number(),
+  requesterEmail: zod.string().nullish(),
+  status: zod.enum([
+    "draft",
+    "distilling",
+    "distilled",
+    "generating_patch",
+    "patched",
+    "snapshot_taken",
+    "pr_open",
+    "awaiting_publish",
+    "merged",
+    "awaiting_deploy",
+    "deployed",
+    "rolled_back",
+    "failed",
+  ]),
+  title: zod.string(),
+  rawRequest: zod.string(),
+  distilledSpec: zod
+    .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+    .optional()
+    .describe(
+      "Structured spec emitted by Claude. Shape depends on the model output.",
+    ),
+  patchSummary: zod.string().nullish(),
+  patchFiles: zod
+    .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+    .optional()
+    .describe("List of file changes Claude proposed."),
+  githubBranch: zod.string().nullish(),
+  githubPrNumber: zod.number().nullish(),
+  githubPrUrl: zod.string().nullish(),
+  snapshotTag: zod.string().nullish(),
+  snapshotSha: zod.string().nullish(),
+  previewUrl: zod.string().nullish(),
+  errorMessage: zod.string().nullish(),
+  requestedPublishAt: zod.coerce.date().nullish(),
+  mergedAt: zod.coerce.date().nullish(),
+  deployedAt: zod.coerce.date().nullish(),
+  rolledBackAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Roll back a deployed change request to its snapshot
+ */
+export const RollbackChangeRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RollbackChangeRequestResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  requesterClientId: zod.number(),
+  requesterEmail: zod.string().nullish(),
+  status: zod.enum([
+    "draft",
+    "distilling",
+    "distilled",
+    "generating_patch",
+    "patched",
+    "snapshot_taken",
+    "pr_open",
+    "awaiting_publish",
+    "merged",
+    "awaiting_deploy",
+    "deployed",
+    "rolled_back",
+    "failed",
+  ]),
+  title: zod.string(),
+  rawRequest: zod.string(),
+  distilledSpec: zod
+    .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+    .optional()
+    .describe(
+      "Structured spec emitted by Claude. Shape depends on the model output.",
+    ),
+  patchSummary: zod.string().nullish(),
+  patchFiles: zod
+    .union([zod.array(zod.record(zod.string(), zod.unknown())), zod.null()])
+    .optional()
+    .describe("List of file changes Claude proposed."),
+  githubBranch: zod.string().nullish(),
+  githubPrNumber: zod.number().nullish(),
+  githubPrUrl: zod.string().nullish(),
+  snapshotTag: zod.string().nullish(),
+  snapshotSha: zod.string().nullish(),
+  previewUrl: zod.string().nullish(),
+  errorMessage: zod.string().nullish(),
+  requestedPublishAt: zod.coerce.date().nullish(),
+  mergedAt: zod.coerce.date().nullish(),
+  deployedAt: zod.coerce.date().nullish(),
+  rolledBackAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
 });
 
 /**
@@ -753,6 +1212,12 @@ export const ListAllProjectsResponse = zod.object({
       coverImageUrl: zod.string().nullish(),
       status: zod.enum(["draft", "active", "completed", "archived"]),
       consultingBookingId: zod.number().nullish(),
+      githubOwner: zod.string().nullish(),
+      githubRepo: zod.string().nullish(),
+      githubDefaultBranch: zod.string(),
+      previewUrlTemplate: zod.string().nullish(),
+      productionUrl: zod.string().nullish(),
+      operatorEmail: zod.string().nullish(),
       viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),

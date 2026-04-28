@@ -13,6 +13,20 @@ export const projectsTable = pgTable("projects", {
   coverImageUrl: text("cover_image_url"),
   status: text("status", { enum: ["draft", "active", "completed", "archived"] }).notNull().default("draft"),
   consultingBookingId: integer("consulting_booking_id"),
+  // GitHub repo Machinedog opens change-request PRs against. When unset, the
+  // change-request flow runs in "draft only" mode (no PR / no preview).
+  githubOwner: text("github_owner"),
+  githubRepo: text("github_repo"),
+  githubDefaultBranch: text("github_default_branch").notNull().default("main"),
+  // Template URL for per-branch preview deploys. Use `{branch}` placeholder.
+  // Example: "https://preview-{branch}.beesuite.farm".
+  previewUrlTemplate: text("preview_url_template"),
+  // Production URL the operator (Tom) re-publishes on Replit when a change
+  // request is approved.
+  productionUrl: text("production_url"),
+  // Operator email notified when a client clicks Publish. Falls back to the
+  // ADMIN_EMAILS list when unset.
+  operatorEmail: text("operator_email"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

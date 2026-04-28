@@ -21,6 +21,17 @@ export interface Project {
   status: ProjectStatus;
   /** @nullable */
   consultingBookingId?: number | null;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  githubDefaultBranch: string;
+  /** @nullable */
+  previewUrlTemplate?: string | null;
+  /** @nullable */
+  productionUrl?: string | null;
+  /** @nullable */
+  operatorEmail?: string | null;
   viewerRole: ProjectViewerRole;
   createdAt: Date;
   updatedAt: Date;

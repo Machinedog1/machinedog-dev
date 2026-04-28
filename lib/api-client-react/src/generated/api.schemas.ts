@@ -149,6 +149,17 @@ export interface Project {
   status: ProjectStatus;
   /** @nullable */
   consultingBookingId?: number | null;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  githubDefaultBranch: string;
+  /** @nullable */
+  previewUrlTemplate?: string | null;
+  /** @nullable */
+  productionUrl?: string | null;
+  /** @nullable */
+  operatorEmail?: string | null;
   viewerRole: ProjectViewerRole;
   createdAt: string;
   updatedAt: string;
@@ -186,6 +197,17 @@ export interface UpdateProjectBody {
   /** @nullable */
   coverImageUrl?: string | null;
   status?: UpdateProjectBodyStatus;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  githubDefaultBranch?: string;
+  /** @nullable */
+  previewUrlTemplate?: string | null;
+  /** @nullable */
+  productionUrl?: string | null;
+  /** @nullable */
+  operatorEmail?: string | null;
 }
 
 export type ProjectMemberRole =
@@ -475,6 +497,126 @@ export interface SubmitLeadBody {
 export interface SubmitLeadResponse {
   success: boolean;
   id?: number;
+}
+
+export type ChangeRequestStatus =
+  (typeof ChangeRequestStatus)[keyof typeof ChangeRequestStatus];
+
+export const ChangeRequestStatus = {
+  draft: "draft",
+  distilling: "distilling",
+  distilled: "distilled",
+  generating_patch: "generating_patch",
+  patched: "patched",
+  snapshot_taken: "snapshot_taken",
+  pr_open: "pr_open",
+  awaiting_publish: "awaiting_publish",
+  merged: "merged",
+  awaiting_deploy: "awaiting_deploy",
+  deployed: "deployed",
+  rolled_back: "rolled_back",
+  failed: "failed",
+} as const;
+
+/**
+ * Structured spec emitted by Claude. Shape depends on the model output.
+ */
+export type ChangeRequestDistilledSpec = { [key: string]: unknown } | null;
+
+/**
+ * List of file changes Claude proposed.
+ */
+export type ChangeRequestPatchFiles = { [key: string]: unknown }[] | null;
+
+export interface ChangeRequest {
+  id: number;
+  projectId: number;
+  requesterClientId: number;
+  /** @nullable */
+  requesterEmail?: string | null;
+  status: ChangeRequestStatus;
+  title: string;
+  rawRequest: string;
+  /** Structured spec emitted by Claude. Shape depends on the model output. */
+  distilledSpec?: ChangeRequestDistilledSpec;
+  /** @nullable */
+  patchSummary?: string | null;
+  /** List of file changes Claude proposed. */
+  patchFiles?: ChangeRequestPatchFiles;
+  /** @nullable */
+  githubBranch?: string | null;
+  /** @nullable */
+  githubPrNumber?: number | null;
+  /** @nullable */
+  githubPrUrl?: string | null;
+  /** @nullable */
+  snapshotTag?: string | null;
+  /** @nullable */
+  snapshotSha?: string | null;
+  /** @nullable */
+  previewUrl?: string | null;
+  /** @nullable */
+  errorMessage?: string | null;
+  /** @nullable */
+  requestedPublishAt?: string | null;
+  /** @nullable */
+  mergedAt?: string | null;
+  /** @nullable */
+  deployedAt?: string | null;
+  /** @nullable */
+  rolledBackAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChangeRequestList {
+  data: ChangeRequest[];
+}
+
+export type ChangeRequestEventMetadata = { [key: string]: unknown } | null;
+
+export interface ChangeRequestEvent {
+  id: number;
+  changeRequestId: number;
+  kind: string;
+  message: string;
+  /** @nullable */
+  actorClientId?: number | null;
+  /** @nullable */
+  actorEmail?: string | null;
+  metadata?: ChangeRequestEventMetadata;
+  createdAt: string;
+}
+
+export type ChangeRequestDetailProject = {
+  id: number;
+  title: string;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  githubDefaultBranch: string;
+  /** @nullable */
+  previewUrlTemplate?: string | null;
+  /** @nullable */
+  productionUrl?: string | null;
+  githubConfigured: boolean;
+};
+
+export interface ChangeRequestDetail {
+  changeRequest: ChangeRequest;
+  events: ChangeRequestEvent[];
+  project: ChangeRequestDetailProject;
+}
+
+export interface CreateChangeRequestBody {
+  /** @maxLength 200 */
+  title?: string;
+  /**
+   * @minLength 4
+   * @maxLength 8000
+   */
+  rawRequest: string;
 }
 
 export type ListMyPromptsParams = {

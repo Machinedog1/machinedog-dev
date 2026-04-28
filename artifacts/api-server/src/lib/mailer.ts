@@ -181,6 +181,77 @@ export async function sendPasswordResetEmail(args: SendResetEmailArgs): Promise<
   await sendOrLog({ to: args.to, subject, text, html, url, log: args.log, kind: "reset" });
 }
 
+interface SendChangeRequestPublishEmailArgs {
+  to: string;
+  projectTitle: string;
+  changeRequestTitle: string;
+  changeRequestUrl: string;
+  prUrl: string | null;
+  productionUrl: string | null;
+  requesterEmail: string | null;
+  log?: Logger;
+}
+
+export async function sendChangeRequestPublishEmail(
+  args: SendChangeRequestPublishEmailArgs,
+): Promise<void> {
+  const subject = `[Machinedog] Publish requested: ${args.projectTitle} — ${args.changeRequestTitle}`;
+
+  const lines = [
+    args.requesterEmail
+      ? `${args.requesterEmail} approved a change in "${args.projectTitle}" and clicked Publish.`
+      : `A client approved a change in "${args.projectTitle}" and clicked Publish.`,
+    "",
+    `Change request: ${args.changeRequestTitle}`,
+    `Open in Machinedog: ${args.changeRequestUrl}`,
+  ];
+  if (args.prUrl) lines.push(`Merged PR: ${args.prUrl}`);
+  if (args.productionUrl) lines.push(`Production URL: ${args.productionUrl}`);
+  lines.push(
+    "",
+    "Action required: open the project in Replit and click Publish to deploy main.",
+    "When the new version is live, mark the change as Deployed inside Machinedog.",
+    "",
+    "— Machinedog",
+  );
+  const text = lines.join("\n");
+
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;background:#070914;color:#e6e9f2;padding:32px">
+      <div style="max-width:560px;margin:0 auto;background:#0e1224;border:1px solid rgba(63,177,240,0.2);border-radius:16px;padding:32px">
+        <h1 style="font-size:20px;margin:0 0 16px;color:#3FB1F0;letter-spacing:0.04em;text-transform:uppercase">Machinedog.Dev</h1>
+        <p style="font-size:16px;line-height:1.5;margin:0 0 12px">
+          ${args.requesterEmail ? `<strong>${escapeHtml(args.requesterEmail)}</strong>` : "A client"}
+          approved a change in <strong>${escapeHtml(args.projectTitle)}</strong> and clicked Publish.
+        </p>
+        <p style="font-size:14px;line-height:1.5;color:#a4adc7;margin:0 0 16px">
+          <strong>Change request:</strong> ${escapeHtml(args.changeRequestTitle)}
+        </p>
+        <p style="margin:0 0 16px">
+          <a href="${args.changeRequestUrl}" style="display:inline-block;background:linear-gradient(120deg,#3FB1F0,#7c5cff);color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:9999px">
+            Open change request
+          </a>
+        </p>
+        ${args.prUrl ? `<p style="font-size:13px;color:#a4adc7;margin:0 0 8px"><strong>Merged PR:</strong> <a href="${args.prUrl}" style="color:#3FB1F0">${escapeHtml(args.prUrl)}</a></p>` : ""}
+        ${args.productionUrl ? `<p style="font-size:13px;color:#a4adc7;margin:0 0 16px"><strong>Production:</strong> <a href="${args.productionUrl}" style="color:#3FB1F0">${escapeHtml(args.productionUrl)}</a></p>` : ""}
+        <p style="font-size:13px;line-height:1.5;color:#e6e9f2;margin:16px 0 0;padding:12px 16px;background:rgba(124,92,255,0.12);border:1px solid rgba(124,92,255,0.3);border-radius:8px">
+          Action required: open the project in Replit and click <strong>Publish</strong> to deploy main, then mark the change as <strong>Deployed</strong> in Machinedog.
+        </p>
+      </div>
+    </div>
+  `;
+
+  await sendOrLog({
+    to: args.to,
+    subject,
+    text,
+    html,
+    url: args.changeRequestUrl,
+    log: args.log,
+    kind: "publish-request",
+  });
+}
+
 async function sendOrLog(args: {
   to: string;
   subject: string;
@@ -188,7 +259,7 @@ async function sendOrLog(args: {
   html: string;
   url: string;
   log?: Logger;
-  kind: "invite" | "reset";
+  kind: "invite" | "reset" | "publish-request";
 }): Promise<void> {
   const log = args.log ?? logger;
   const cfg = loadMailerConfig();

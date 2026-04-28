@@ -10,3 +10,4 @@ export * from "./consulting-bookings";
 export * from "./intake-submissions";
 export * from "./leads";
 export * from "./build-orders";
+export * from "./change-requests";
