@@ -1,12 +1,17 @@
 import { useState } from "react";
-import { useListClients, useInviteClient, useAdjustClientBalance } from "@workspace/api-client-react";
+import {
+  useListClients,
+  useInviteClient,
+  useAdjustClientBalance,
+  useDeleteClient,
+  useResendClientInvite,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Plus, ShieldAlert, Coins } from "lucide-react";
-import { format } from "date-fns";
+import { Users, Plus, ShieldAlert, Coins, Mail, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListClientsQueryKey } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,15 +19,54 @@ export default function AdminClients() {
   const { data, isLoading } = useListClients();
   const inviteClient = useInviteClient();
   const adjustBalance = useAdjustClientBalance();
+  const deleteClient = useDeleteClient();
+  const resendInvite = useResendClientInvite();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [email, setEmail] = useState("");
-  
+
   const [adjustOpen, setAdjustOpen] = useState<number | null>(null);
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; email: string } | null>(null);
+
+  const handleResend = (clientId: number, clientEmail: string) => {
+    resendInvite.mutate(
+      { id: clientId },
+      {
+        onSuccess: (res) => {
+          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey() });
+          toast({ title: "Invite Resent", description: res?.message || `New invite link sent to ${clientEmail}.` });
+        },
+        onError: (err: any) => {
+          toast({ variant: "destructive", title: "Error", description: err?.error || "Failed to resend invite" });
+        },
+      },
+    );
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteClient.mutate(
+      { id: deleteTarget.id },
+      {
+        onSuccess: (res) => {
+          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey() });
+          setDeleteTarget(null);
+          toast({
+            title: res?.mode === "soft" ? "Client Suspended" : "Client Deleted",
+            description: res?.message,
+          });
+        },
+        onError: (err: any) => {
+          toast({ variant: "destructive", title: "Error", description: err?.error || "Failed to delete client" });
+        },
+      },
+    );
+  };
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +187,28 @@ export default function AdminClients() {
                 <div className="font-mono text-muted-foreground">
                   {client.totalTokensUsed.toLocaleString()}
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end items-center gap-2">
+                  {client.status === 'invited' && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleResend(client.id, client.email)}
+                      disabled={resendInvite.isPending}
+                      title="Resend invite email with a new link"
+                      className="font-mono text-xs h-8 glass-subtle text-foreground hover:bg-muted/50 border-0 shadow-none"
+                    >
+                      <Mail className="h-3 w-3 mr-1" /> RESEND
+                    </Button>
+                  )}
+                  {!client.isAdmin && (
+                    <Button
+                      size="sm"
+                      onClick={() => setDeleteTarget({ id: client.id, email: client.email })}
+                      title="Delete client"
+                      className="font-mono text-xs h-8 glass-subtle text-destructive hover:bg-destructive/10 border-0 shadow-none"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" /> DELETE
+                    </Button>
+                  )}
                   <Dialog open={adjustOpen === client.id} onOpenChange={(v) => setAdjustOpen(v ? client.id : null)}>
                     <DialogTrigger asChild>
                       <Button size="sm" className="font-mono text-xs h-8 glass-subtle text-foreground hover:bg-muted/50 border-0 shadow-none">
@@ -191,6 +256,43 @@ export default function AdminClients() {
           )}
         </div>
       </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="font-mono flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> DELETE_CLIENT
+            </DialogTitle>
+            <DialogDescription className="font-mono text-xs pt-2">
+              Target: <span className="text-foreground">{deleteTarget?.email}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground space-y-2 pt-2">
+            <p>
+              If this client has no projects, prompts, or purchases, the row is removed entirely.
+            </p>
+            <p>
+              If they do have history, the account is suspended (can&apos;t log in) and history is preserved for audit.
+            </p>
+          </div>
+          <DialogFooter className="pt-4 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              className="font-mono"
+            >
+              CANCEL
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleteClient.isPending}
+              className="font-mono bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteClient.isPending ? "PROCESSING..." : "CONFIRM DELETE"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

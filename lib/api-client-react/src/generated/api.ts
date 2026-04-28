@@ -34,6 +34,7 @@ import type {
   CreateProjectCommentBody,
   CreateProjectFileBody,
   CreateTokenCheckoutBody,
+  DeleteClientResponse,
   ErrorResponse,
   HealthStatus,
   InviteClientBody,
@@ -3773,6 +3774,174 @@ export function useGetClientById<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Delete a client (admin only). Hard-deletes invited rows with no history; soft-suspends clients with related records.
+ */
+export const getDeleteClientUrl = (id: number) => {
+  return `/api/admin/clients/${id}`;
+};
+
+export const deleteClient = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteClientResponse> => {
+  return customFetch<DeleteClientResponse>(getDeleteClientUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteClientMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteClient>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteClient>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteClient"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteClient>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteClient(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteClientMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteClient>>
+>;
+
+export type DeleteClientMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a client (admin only). Hard-deletes invited rows with no history; soft-suspends clients with related records.
+ */
+export const useDeleteClient = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteClient>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteClient>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteClientMutationOptions(options));
+};
+
+/**
+ * @summary Regenerate the invite token for a client and resend the invite email
+ */
+export const getResendClientInviteUrl = (id: number) => {
+  return `/api/admin/clients/${id}/resend-invite`;
+};
+
+export const resendClientInvite = async (
+  id: number,
+  options?: RequestInit,
+): Promise<InviteResponse> => {
+  return customFetch<InviteResponse>(getResendClientInviteUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResendClientInviteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendClientInvite>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resendClientInvite>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["resendClientInvite"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resendClientInvite>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return resendClientInvite(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResendClientInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resendClientInvite>>
+>;
+
+export type ResendClientInviteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Regenerate the invite token for a client and resend the invite email
+ */
+export const useResendClientInvite = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resendClientInvite>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resendClientInvite>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getResendClientInviteMutationOptions(options));
+};
 
 /**
  * @summary Manually adjust a client token balance

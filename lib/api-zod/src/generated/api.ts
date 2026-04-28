@@ -1165,6 +1165,35 @@ export const GetClientByIdResponse = zod.object({
 });
 
 /**
+ * @summary Delete a client (admin only). Hard-deletes invited rows with no history; soft-suspends clients with related records.
+ */
+export const DeleteClientParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteClientResponse = zod.object({
+  success: zod.boolean(),
+  mode: zod
+    .enum(["hard", "soft"])
+    .describe(
+      "hard = row removed; soft = client suspended due to existing history",
+    ),
+  message: zod.string(),
+});
+
+/**
+ * @summary Regenerate the invite token for a client and resend the invite email
+ */
+export const ResendClientInviteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ResendClientInviteResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+});
+
+/**
  * @summary Manually adjust a client token balance
  */
 export const AdjustClientBalanceParams = zod.object({

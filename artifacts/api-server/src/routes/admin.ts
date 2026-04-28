@@ -20,6 +20,10 @@ import {
   AdjustClientBalanceParams,
   AdjustClientBalanceBody,
   AdjustClientBalanceResponse,
+  DeleteClientParams,
+  DeleteClientResponse,
+  ResendClientInviteParams,
+  ResendClientInviteResponse,
   ListAllProjectsResponse,
   ListAllBuildOrdersQueryParams,
   ListAllBuildOrdersResponse,
@@ -227,6 +231,144 @@ router.get("/admin/clients/:id", async (req, res): Promise<void> => {
     return;
   }
   res.json(GetClientByIdResponse.parse(row));
+});
+
+router.delete("/admin/clients/:id", async (req, res): Promise<void> => {
+  const params = DeleteClientParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const id = params.data.id;
+  const [target] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
+  if (!target) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (target.isAdmin) {
+    res.status(400).json({ error: "Cannot delete an admin account." });
+    return;
+  }
+  if (req.dbClient && req.dbClient.id === id) {
+    res.status(400).json({ error: "Cannot delete your own account." });
+    return;
+  }
+
+  // Probe for related history that would block a hard delete.
+  const [{ projectCount }] = await db
+    .select({ projectCount: sql<number>`count(*)::int` })
+    .from(projectsTable)
+    .where(eq(projectsTable.clientId, id));
+  const [{ promptCount }] = await db
+    .select({ promptCount: sql<number>`count(*)::int` })
+    .from(promptSessionsTable)
+    .where(eq(promptSessionsTable.clientId, id));
+  const [{ purchaseCount }] = await db
+    .select({ purchaseCount: sql<number>`count(*)::int` })
+    .from(tokenPurchasesTable)
+    .where(eq(tokenPurchasesTable.clientId, id));
+  const [{ bookingCount }] = await db
+    .select({ bookingCount: sql<number>`count(*)::int` })
+    .from(consultingBookingsTable)
+    .where(eq(consultingBookingsTable.clientId, id));
+  const [{ orderCount }] = await db
+    .select({ orderCount: sql<number>`count(*)::int` })
+    .from(buildOrdersTable)
+    .where(eq(buildOrdersTable.clientId, id));
+
+  const hasHistory =
+    projectCount + promptCount + purchaseCount + bookingCount + orderCount > 0;
+
+  if (hasHistory) {
+    // Soft-delete: suspend access, clear invite token. History remains for audit.
+    await db
+      .update(clientsTable)
+      .set({ status: "suspended", inviteToken: null, inviteTokenExpiresAt: null })
+      .where(eq(clientsTable.id, id));
+    req.log.info({ clientId: id, email: target.email }, "Client soft-deleted (suspended)");
+    res.json(
+      DeleteClientResponse.parse({
+        success: true,
+        mode: "soft",
+        message: `${target.email} has been suspended. History preserved for audit.`,
+      }),
+    );
+    return;
+  }
+
+  // Hard-delete: clean up sessions and project_members first (no FK cascade
+  // on those, but project_members is set-null), then delete the row.
+  try {
+    await db.execute(sql`delete from sessions where client_id = ${id}`);
+    await db.execute(sql`delete from project_members where client_id = ${id}`);
+    await db.delete(clientsTable).where(eq(clientsTable.id, id));
+    req.log.info({ clientId: id, email: target.email }, "Client hard-deleted");
+    res.json(
+      DeleteClientResponse.parse({
+        success: true,
+        mode: "hard",
+        message: `${target.email} removed.`,
+      }),
+    );
+  } catch (err) {
+    req.log.error({ err, clientId: id }, "Hard delete failed; falling back to soft");
+    await db
+      .update(clientsTable)
+      .set({ status: "suspended", inviteToken: null, inviteTokenExpiresAt: null })
+      .where(eq(clientsTable.id, id));
+    res.json(
+      DeleteClientResponse.parse({
+        success: true,
+        mode: "soft",
+        message: `${target.email} suspended (could not hard-delete due to existing references).`,
+      }),
+    );
+  }
+});
+
+router.post("/admin/clients/:id/resend-invite", async (req, res): Promise<void> => {
+  const params = ResendClientInviteParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const id = params.data.id;
+  const [target] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
+  if (!target) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (target.isAdmin) {
+    res.status(400).json({ error: "Cannot resend an invite to an admin account." });
+    return;
+  }
+
+  const inviteToken = generateSecureToken(32);
+  const inviteTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await db
+    .update(clientsTable)
+    .set({
+      status: "invited",
+      passwordHash: null,
+      inviteToken,
+      inviteTokenExpiresAt,
+    })
+    .where(eq(clientsTable.id, id));
+
+  await sendInviteEmail({
+    to: target.email,
+    token: inviteToken,
+    invitedByEmail: req.dbClient?.email,
+    log: req.log,
+  });
+
+  req.log.info({ clientId: id, email: target.email }, "Invite resent");
+  res.json(
+    ResendClientInviteResponse.parse({
+      success: true,
+      message: `New invite sent to ${target.email}. Previous invite link is no longer valid.`,
+    }),
+  );
 });
 
 router.patch("/admin/clients/:id/balance", async (req, res): Promise<void> => {

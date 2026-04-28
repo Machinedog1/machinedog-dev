@@ -5,7 +5,7 @@
  *
  * Change in one place — both /prompts and /projects/:id/prompts read from here.
  */
-export const TOKEN_MARKUP_MULTIPLIER = 6;
+export const TOKEN_MARKUP_MULTIPLIER = 20;
 
 /**
  * Apply the markup and clamp to the available balance so we never overdraw.

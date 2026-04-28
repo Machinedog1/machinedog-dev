@@ -449,6 +449,24 @@ export interface InviteResponse {
   message: string;
 }
 
+/**
+ * hard = row removed; soft = client suspended due to existing history
+ */
+export type DeleteClientResponseMode =
+  (typeof DeleteClientResponseMode)[keyof typeof DeleteClientResponseMode];
+
+export const DeleteClientResponseMode = {
+  hard: "hard",
+  soft: "soft",
+} as const;
+
+export interface DeleteClientResponse {
+  success: boolean;
+  /** hard = row removed; soft = client suspended due to existing history */
+  mode: DeleteClientResponseMode;
+  message: string;
+}
+
 export interface AdjustBalanceBody {
   /** Positive to add tokens, negative to deduct */
   delta: number;

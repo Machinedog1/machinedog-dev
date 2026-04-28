@@ -896,6 +896,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Client"
+    delete:
+      operationId: deleteClient
+      tags: [admin]
+      summary: Delete a client (admin only). Hard-deletes invited rows with no history; soft-suspends clients with related records.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteClientResponse"
+
+  /admin/clients/{id}/resend-invite:
+    post:
+      operationId: resendClientInvite
+      tags: [admin]
+      summary: Regenerate the invite token for a client and resend the invite email
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invite resent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteResponse"
 
   /admin/clients/{id}/balance:
     patch:
@@ -1611,6 +1647,19 @@ components:
         message:
           type: string
       required: [success, message]
+
+    DeleteClientResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        mode:
+          type: string
+          enum: [hard, soft]
+          description: hard = row removed; soft = client suspended due to existing history
+        message:
+          type: string
+      required: [success, mode, message]
 
     AdjustBalanceBody:
       type: object

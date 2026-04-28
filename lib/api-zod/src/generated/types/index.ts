@@ -38,6 +38,8 @@ export * from "./createProjectBody";
 export * from "./createProjectCommentBody";
 export * from "./createProjectFileBody";
 export * from "./createTokenCheckoutBody";
+export * from "./deleteClientResponse";
+export * from "./deleteClientResponseMode";
 export * from "./errorResponse";
 export * from "./healthStatus";
 export * from "./inviteClientBody";
