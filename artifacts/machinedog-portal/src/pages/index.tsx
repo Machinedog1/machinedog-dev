@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSubmitPrompt, useGetMe, usePublishPrompt } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Terminal, Loader2, Zap, AlertTriangle, Globe2, Check, Coins, TrendingUp, Plus } from "lucide-react";
+import { Terminal, Loader2, Zap, AlertTriangle, Globe2, Check, Coins, TrendingUp, Plus, Eye, Send, History as HistoryIcon, Lock } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMeQueryKey, getListMyPromptsQueryKey } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,15 +27,29 @@ export default function PromptConsole() {
   const [tokensUsed, setTokensUsed] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [isPublished, setIsPublished] = useState(false);
+  const [publishedAt, setPublishedAt] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<"preview" | "publish">("preview");
+
+  // Tracks the currently-displayed run so async publish callbacks can detect
+  // when the user has moved on to a new submission and ignore stale results.
+  const sessionIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   const handlePublish = () => {
     if (!sessionId || publishPrompt.isPending) return;
     const next = !isPublished;
+    const targetSessionId = sessionId;
     publishPrompt.mutate(
       { id: sessionId, data: { published: next } },
       {
         onSuccess: (data) => {
+          // Guard against stale results: if the user submitted a new prompt
+          // (which moves sessionIdRef forward) before this resolved, ignore.
+          if (sessionIdRef.current !== targetSessionId) return;
           setIsPublished(data.isPublished);
+          setPublishedAt(data.publishedAt ? new Date(data.publishedAt) : null);
           queryClient.invalidateQueries({ queryKey: getListMyPromptsQueryKey() });
           toast({
             title: data.isPublished ? "Prompt published" : "Prompt unpublished",
@@ -66,6 +81,8 @@ export default function PromptConsole() {
     setTokensUsed(null);
     setSessionId(null);
     setIsPublished(false);
+    setPublishedAt(null);
+    setActiveTab("preview");
 
     submitPrompt.mutate(
       { data: { prompt } },
@@ -75,6 +92,7 @@ export default function PromptConsole() {
           setTokensUsed(data.tokensUsed);
           setSessionId(data.id);
           setIsPublished(data.isPublished);
+          setPublishedAt(data.publishedAt ? new Date(data.publishedAt) : null);
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListMyPromptsQueryKey() });
           toast({
@@ -257,76 +275,183 @@ export default function PromptConsole() {
               exit={{ opacity: 0 }}
               className="flex-1 overflow-hidden flex flex-col glass rounded-xl"
             >
-              <div className="h-12 border-b border-border/20 glass-subtle flex items-center justify-between px-4 gap-2 shrink-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-mono text-xs font-bold text-muted-foreground">PREVIEW</span>
+              <Tabs
+                value={activeTab}
+                onValueChange={(v) => setActiveTab(v as "preview" | "publish")}
+                className="flex flex-col flex-1 min-h-0"
+              >
+                <div className="border-b border-border/20 glass-subtle flex items-center justify-between gap-2 shrink-0 pr-3">
+                  <TabsList className="rounded-none bg-transparent h-12 p-1 justify-start">
+                    <TabsTrigger
+                      value="preview"
+                      data-testid="tab-preview"
+                      className="font-mono text-xs uppercase tracking-wider data-[state=active]:bg-background"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      Preview
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="publish"
+                      disabled={!sessionId || submitPrompt.isPending}
+                      data-testid="tab-publish"
+                      className="font-mono text-xs uppercase tracking-wider data-[state=active]:bg-background"
+                    >
+                      <Send className="h-3.5 w-3.5 mr-1.5" />
+                      Publish
+                      {isPublished && (
+                        <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
                   {tokensUsed && (
                     <span className="font-mono text-[10px] text-primary font-semibold glass-subtle px-2 py-0.5 rounded">
                       -{tokensUsed} TKNS
                     </span>
                   )}
                 </div>
-                {sessionId && !submitPrompt.isPending && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handlePublish}
-                    disabled={publishPrompt.isPending}
-                    variant={isPublished ? "secondary" : "default"}
-                    className={
-                      isPublished
-                        ? "font-mono text-xs glass-subtle border border-primary/30 text-primary hover:bg-primary/10"
-                        : "font-mono text-xs bg-gradient-to-r from-[#3FB1F0] to-[#7C7BF7] hover:opacity-95 text-white font-bold shadow-lg shadow-primary/20 border-0"
-                    }
-                    data-testid="button-publish-prompt"
-                  >
-                    {publishPrompt.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    ) : isPublished ? (
-                      <Check className="h-3.5 w-3.5 mr-1.5" />
-                    ) : (
-                      <Globe2 className="h-3.5 w-3.5 mr-1.5" />
-                    )}
-                    {isPublished ? "PUBLISHED" : "PUBLISH"}
-                  </Button>
-                )}
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 md:p-6 prose prose-invert max-w-none font-sans prose-pre:glass-strong prose-pre:border-0 prose-pre:shadow-inner">
-                {submitPrompt.isPending ? (
-                  <div className="flex items-center gap-3 text-muted-foreground font-mono text-sm animate-pulse">
-                    <Terminal className="h-4 w-4" />
-                    PROCESSING_REQUEST...
-                  </div>
-                ) : (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      code({ node, inline, className, children, ...props }: any) {
-                        const match = /language-(\w+)/.exec(className || "");
-                        return !inline && match ? (
-                          <div className="glass-strong rounded-md overflow-hidden my-4 border border-border/10 shadow-inner">
-                            <SyntaxHighlighter
-                              style={vscDarkPlus as any}
-                              language={match[1]}
-                              PreTag="div"
-                              customStyle={{ margin: 0, background: 'transparent' }}
-                              {...props}
-                            >
-                              {String(children).replace(/\n$/, "")}
-                            </SyntaxHighlighter>
-                          </div>
+
+                <TabsContent
+                  value="preview"
+                  forceMount
+                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden overflow-y-auto p-4 md:p-6 prose prose-invert max-w-none font-sans prose-pre:glass-strong prose-pre:border-0 prose-pre:shadow-inner"
+                >
+                  {submitPrompt.isPending ? (
+                    <div className="flex items-center gap-3 text-muted-foreground font-mono text-sm animate-pulse">
+                      <Terminal className="h-4 w-4" />
+                      PROCESSING_REQUEST...
+                    </div>
+                  ) : (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        code({ node, inline, className, children, ...props }: any) {
+                          const match = /language-(\w+)/.exec(className || "");
+                          return !inline && match ? (
+                            <div className="glass-strong rounded-md overflow-hidden my-4 border border-border/10 shadow-inner">
+                              <SyntaxHighlighter
+                                style={vscDarkPlus as any}
+                                language={match[1]}
+                                PreTag="div"
+                                customStyle={{ margin: 0, background: 'transparent' }}
+                                {...props}
+                              >
+                                {String(children).replace(/\n$/, "")}
+                              </SyntaxHighlighter>
+                            </div>
+                          ) : (
+                            <code className="glass-subtle px-1.5 py-0.5 rounded text-primary font-mono text-sm" {...props}>
+                              {children}
+                            </code>
+                          );
+                        },
+                      }}
+                    >
+                      {output || ""}
+                    </ReactMarkdown>
+                  )}
+                </TabsContent>
+
+                <TabsContent
+                  value="publish"
+                  forceMount
+                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden overflow-y-auto p-4 md:p-6"
+                >
+                  <div className="max-w-2xl mx-auto flex flex-col gap-5">
+                    {/* Status card */}
+                    <div className={
+                      "glass-subtle rounded-xl p-5 border " +
+                      (isPublished ? "border-primary/30" : "border-border/30")
+                    }>
+                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                        {isPublished ? (
+                          <Globe2 className="h-3.5 w-3.5 text-primary" />
                         ) : (
-                          <code className="glass-subtle px-1.5 py-0.5 rounded text-primary font-mono text-sm" {...props}>
-                            {children}
-                          </code>
-                        );
-                      },
-                    }}
-                  >
-                    {output || ""}
-                  </ReactMarkdown>
-                )}
-              </div>
+                          <Lock className="h-3.5 w-3.5" />
+                        )}
+                        Status
+                      </div>
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className={
+                          "text-2xl font-bold font-mono tracking-tight " +
+                          (isPublished ? "text-primary" : "text-foreground")
+                        } data-testid="text-publish-status">
+                          {isPublished ? "PUBLISHED" : "DRAFT"}
+                        </span>
+                        {isPublished && publishedAt && (
+                          <span className="text-xs font-mono text-muted-foreground">
+                            since {publishedAt.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+                        {isPublished
+                          ? "This run is marked as published — it appears in your published history and can be referenced from other projects."
+                          : "Publishing flags this run as a finished output. It stays in your private history either way; publishing just elevates it for reuse and reference."}
+                      </p>
+                    </div>
+
+                    {/* Action button */}
+                    <Button
+                      type="button"
+                      onClick={handlePublish}
+                      disabled={!sessionId || publishPrompt.isPending || submitPrompt.isPending}
+                      className={
+                        isPublished
+                          ? "font-mono w-full glass-subtle border border-primary/30 text-primary hover:bg-primary/10 bg-transparent"
+                          : "font-mono w-full bg-gradient-to-r from-[#3FB1F0] to-[#7C7BF7] hover:opacity-95 text-white font-bold shadow-lg shadow-primary/20 border-0"
+                      }
+                      data-testid="button-publish-prompt"
+                    >
+                      {publishPrompt.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : isPublished ? (
+                        <Check className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      {isPublished ? "UNPUBLISH" : "PUBLISH THIS RUN"}
+                    </Button>
+
+                    {/* Detail rows */}
+                    <div className="glass-subtle rounded-xl divide-y divide-border/20 border border-border/20">
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                          Run ID
+                        </div>
+                        <div className="font-mono text-sm">
+                          {sessionId ? `#${sessionId}` : "—"}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                          Tokens used
+                        </div>
+                        <div className="font-mono text-sm">
+                          {tokensUsed ? tokensUsed.toLocaleString() : "—"}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                          Output length
+                        </div>
+                        <div className="font-mono text-sm">
+                          {output ? `${output.length.toLocaleString()} chars` : "—"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setLocation("/history")}
+                      className="font-mono text-xs text-muted-foreground hover:text-foreground self-start"
+                    >
+                      <HistoryIcon className="h-3.5 w-3.5 mr-1.5" />
+                      View all published runs
+                    </Button>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </motion.div>
           )}
         </AnimatePresence>
