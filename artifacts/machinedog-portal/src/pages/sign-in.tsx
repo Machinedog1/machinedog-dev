@@ -73,18 +73,6 @@ export default function SignInPage() {
           <Logo size="sm" />
           <nav className="flex items-center gap-2 sm:gap-3">
             <a
-              href={workHref}
-              className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wider uppercase text-white/80 transition hover:text-white"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              }}
-            >
-              Projects
-            </a>
-            <a
               href={intakeHref}
               className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wider uppercase text-white/80 transition hover:text-white"
               style={{
