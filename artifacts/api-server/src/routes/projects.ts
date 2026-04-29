@@ -257,6 +257,22 @@ async function ensureOwner(projectId: number, clientId: number): Promise<Project
   return project ?? null;
 }
 
+// Admins can act on every project; owners only on theirs. Used by mutations
+// where we want admins to manage collaboration on any project.
+async function ensureOwnerOrAdmin(
+  projectId: number,
+  client: { id: number; isAdmin: boolean },
+): Promise<Project | null> {
+  if (client.isAdmin) {
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+    return project ?? null;
+  }
+  return ensureOwner(projectId, client.id);
+}
+
 router.get(
   "/projects/:id/members",
   requireAuth,
@@ -268,7 +284,11 @@ router.get(
       res.status(400).json({ error: params.error.message });
       return;
     }
-    const project = await ensureOwner(params.data.id, req.dbClient!.id);
+    // Admins can audit collaboration on any project; otherwise only the owner.
+    const project = await ensureOwnerOrAdmin(params.data.id, {
+      id: req.dbClient!.id,
+      isAdmin: req.dbClient!.isAdmin,
+    });
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -303,7 +323,12 @@ router.post(
       res.status(400).json({ error: body.error.message });
       return;
     }
-    const project = await ensureOwner(params.data.id, req.dbClient!.id);
+    // Admins can attach collaborators to any project; otherwise only the
+    // project owner may invite.
+    const project = await ensureOwnerOrAdmin(params.data.id, {
+      id: req.dbClient!.id,
+      isAdmin: req.dbClient!.isAdmin,
+    });
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -427,7 +452,11 @@ router.delete(
       res.status(400).json({ error: params.error.message });
       return;
     }
-    const project = await ensureOwner(params.data.id, req.dbClient!.id);
+    // Admins can remove collaborators on any project for incident response.
+    const project = await ensureOwnerOrAdmin(params.data.id, {
+      id: req.dbClient!.id,
+      isAdmin: req.dbClient!.isAdmin,
+    });
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;

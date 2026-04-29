@@ -4,6 +4,7 @@ import {
   useListAllProjects,
   useListClients,
   useReassignProjectOwner,
+  useInviteProjectMember,
   getListAllProjectsQueryKey,
 } from "@workspace/api-client-react";
 import {
@@ -16,6 +17,7 @@ import {
   ExternalLink,
   Github,
   UserCog,
+  UserPlus,
   Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -42,6 +44,8 @@ export default function AdminProjects() {
   const { data, isLoading } = useListAllProjects();
   const { data: clientsData } = useListClients({ limit: 500, offset: 0 });
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [inviteEmails, setInviteEmails] = useState<Record<number, string>>({});
+  const [invitingIds, setInvitingIds] = useState<Set<number>>(new Set());
 
   const reassign = useReassignProjectOwner({
     mutation: {
@@ -54,6 +58,30 @@ export default function AdminProjects() {
         toast({ title: "Reassign failed", description: msg, variant: "destructive" });
       },
       onSettled: () => setPendingId(null),
+    },
+  });
+
+  const invite = useInviteProjectMember({
+    mutation: {
+      onSuccess: (_data, vars) => {
+        setInviteEmails((prev) => ({ ...prev, [vars.id]: "" }));
+        toast({
+          title: "Collaborator attached",
+          description:
+            "They'll see this project in their portal. If they're new, they'll get an invite email.",
+        });
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Failed to attach";
+        toast({ title: "Attach failed", description: msg, variant: "destructive" });
+      },
+      onSettled: (_data, _err, vars) => {
+        setInvitingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(vars.id);
+          return next;
+        });
+      },
     },
   });
 
@@ -76,6 +104,32 @@ export default function AdminProjects() {
   function handleReassign(projectId: number, newClientId: number) {
     setPendingId(projectId);
     reassign.mutate({ id: projectId, data: { clientId: newClientId } });
+  }
+
+  function handleInvite(projectId: number) {
+    const raw = (inviteEmails[projectId] ?? "").trim().toLowerCase();
+    if (!raw) {
+      toast({
+        title: "Email required",
+        description: "Type an email to attach as collaborator.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+      toast({
+        title: "Invalid email",
+        description: "That doesn't look like an email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setInvitingIds((prev) => {
+      const next = new Set(prev);
+      next.add(projectId);
+      return next;
+    });
+    invite.mutate({ id: projectId, data: { email: raw } });
   }
 
   return (
@@ -214,6 +268,55 @@ export default function AdminProjects() {
                     {isPending && (
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-border/20">
+                  <label
+                    htmlFor={`invite-${project.id}`}
+                    className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"
+                  >
+                    <UserPlus className="h-3 w-3" />
+                    Attach collaborator
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={`invite-${project.id}`}
+                      type="email"
+                      placeholder="client@example.com"
+                      aria-label={`Attach collaborator to ${project.title}`}
+                      data-testid={`input-invite-${project.id}`}
+                      value={inviteEmails[project.id] ?? ""}
+                      disabled={invitingIds.has(project.id)}
+                      onChange={(e) =>
+                        setInviteEmails((prev) => ({
+                          ...prev,
+                          [project.id]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleInvite(project.id);
+                        }
+                      }}
+                      className="flex-1 min-w-0 text-xs font-mono bg-background ring-1 ring-border/40 rounded-md px-2 py-1.5 focus:outline-none focus:ring-primary/50 focus:ring-2"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Attach collaborator to ${project.title}`}
+                      data-testid={`button-invite-${project.id}`}
+                      disabled={invitingIds.has(project.id)}
+                      onClick={() => handleInvite(project.id)}
+                      className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-md bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shrink-0"
+                    >
+                      {invitingIds.has(project.id) ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3 w-3" />
+                      )}
+                      Attach
+                    </button>
                   </div>
                 </div>
 

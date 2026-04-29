@@ -403,7 +403,10 @@ router.get("/admin/projects", async (_req, res): Promise<void> => {
     .select()
     .from(projectsTable)
     .orderBy(desc(projectsTable.updatedAt));
-  res.json(ListAllProjectsResponse.parse({ data: rows }));
+  // Admins can see and act on every project; surface "owner" as viewerRole
+  // so the response satisfies the Project schema (which requires viewerRole).
+  const data = rows.map((r) => ({ ...r, viewerRole: "owner" as const }));
+  res.json(ListAllProjectsResponse.parse({ data }));
 });
 
 router.patch("/admin/projects/:id/owner", async (req, res): Promise<void> => {
