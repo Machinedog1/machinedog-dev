@@ -19,6 +19,7 @@ import type {
 import type {
   AdjustBalanceBody,
   AdminStats,
+  AgentThreadResponse,
   BuildOrderList,
   ChangeRequest,
   ChangeRequestDetail,
@@ -2261,6 +2262,182 @@ export const useCreateChangeRequest = <
 > => {
   return useMutation(getCreateChangeRequestMutationOptions(options));
 };
+
+/**
+ * @summary Submit a request and immediately kick off the full agent pipeline (distill + patch) in the background
+ */
+export const getSubmitAgentChangeRequestUrl = (id: number) => {
+  return `/api/projects/${id}/change-requests/agent`;
+};
+
+export const submitAgentChangeRequest = async (
+  id: number,
+  createChangeRequestBody: CreateChangeRequestBody,
+  options?: RequestInit,
+): Promise<ChangeRequest> => {
+  return customFetch<ChangeRequest>(getSubmitAgentChangeRequestUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createChangeRequestBody),
+  });
+};
+
+export const getSubmitAgentChangeRequestMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitAgentChangeRequest>>,
+    TError,
+    { id: number; data: BodyType<CreateChangeRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitAgentChangeRequest>>,
+  TError,
+  { id: number; data: BodyType<CreateChangeRequestBody> },
+  TContext
+> => {
+  const mutationKey = ["submitAgentChangeRequest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitAgentChangeRequest>>,
+    { id: number; data: BodyType<CreateChangeRequestBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return submitAgentChangeRequest(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitAgentChangeRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitAgentChangeRequest>>
+>;
+export type SubmitAgentChangeRequestMutationBody =
+  BodyType<CreateChangeRequestBody>;
+export type SubmitAgentChangeRequestMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a request and immediately kick off the full agent pipeline (distill + patch) in the background
+ */
+export const useSubmitAgentChangeRequest = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitAgentChangeRequest>>,
+    TError,
+    { id: number; data: BodyType<CreateChangeRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitAgentChangeRequest>>,
+  TError,
+  { id: number; data: BodyType<CreateChangeRequestBody> },
+  TContext
+> => {
+  return useMutation(getSubmitAgentChangeRequestMutationOptions(options));
+};
+
+/**
+ * @summary Get all change requests for a project plus their events, ordered for chat-style rendering
+ */
+export const getGetProjectAgentThreadUrl = (id: number) => {
+  return `/api/projects/${id}/agent-thread`;
+};
+
+export const getProjectAgentThread = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AgentThreadResponse> => {
+  return customFetch<AgentThreadResponse>(getGetProjectAgentThreadUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProjectAgentThreadQueryKey = (id: number) => {
+  return [`/api/projects/${id}/agent-thread`] as const;
+};
+
+export const getGetProjectAgentThreadQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProjectAgentThread>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProjectAgentThread>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProjectAgentThreadQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProjectAgentThread>>
+  > = ({ signal }) => getProjectAgentThread(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProjectAgentThread>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProjectAgentThreadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProjectAgentThread>>
+>;
+export type GetProjectAgentThreadQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get all change requests for a project plus their events, ordered for chat-style rendering
+ */
+
+export function useGetProjectAgentThread<
+  TData = Awaited<ReturnType<typeof getProjectAgentThread>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProjectAgentThread>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProjectAgentThreadQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get a change request with its event timeline

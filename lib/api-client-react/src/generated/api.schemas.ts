@@ -638,6 +638,34 @@ export interface CreateChangeRequestBody {
   rawRequest: string;
 }
 
+export interface AgentThreadItem {
+  changeRequest: ChangeRequest;
+  events: ChangeRequestEvent[];
+}
+
+export type AgentThreadResponseProject = {
+  id: number;
+  title: string;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  githubDefaultBranch: string;
+  /** @nullable */
+  previewUrlTemplate?: string | null;
+  /** @nullable */
+  productionUrl?: string | null;
+  /** @nullable */
+  liveUrl?: string | null;
+  githubConfigured: boolean;
+};
+
+export interface AgentThreadResponse {
+  project: AgentThreadResponseProject;
+  /** Change requests with their events, ordered by createdAt ascending (oldest first) */
+  items: AgentThreadItem[];
+}
+
 export type ListMyPromptsParams = {
   limit?: number;
   offset?: number;

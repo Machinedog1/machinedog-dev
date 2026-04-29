@@ -50,7 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ProjectChangeRequestsPanel } from "@/components/change-requests/ProjectChangeRequestsPanel";
+import { AgentConversation } from "@/components/change-requests/AgentConversation";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -349,12 +349,7 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <LiveSitePanel
-        productionUrl={project.productionUrl ?? project.liveUrl ?? null}
-        title={project.title}
-      />
-
-      <ProjectChangeRequestsPanel projectId={project.id} />
+      <AgentConversation projectId={project.id} isOwner={isOwner} />
       <ProjectPromptPanel projectId={project.id} />
       <ProjectCommentsPanel projectId={project.id} isOwner={isOwner} />
       <ProjectFilesPanel projectId={project.id} isOwner={isOwner} />

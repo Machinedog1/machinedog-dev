@@ -23,6 +23,8 @@ import {
   RequestChangePublishParams,
   MarkChangeDeployedParams,
   RollbackChangeRequestParams,
+  SubmitAgentChangeRequestParams,
+  GetProjectAgentThreadParams,
 } from "@workspace/api-zod";
 import {
   requireAuth,
@@ -593,6 +595,269 @@ router.post(
     await appendEvent(cr.id, "deploy_marked", "Marked as deployed in production.", client.id);
     const emails = await lookupEmails([updated.requesterClientId]);
     res.json(serializeChangeRequest(updated, emails));
+  },
+);
+
+// ─── Agent pipeline ────────────────────────────────────────────────────────
+
+async function runAgentPipeline(
+  changeRequestId: number,
+  rawRequest: string,
+  projectContext: {
+    title: string;
+    description: string;
+    summary: string;
+    githubOwner: string | null;
+    githubRepo: string | null;
+    githubDefaultBranch: string;
+  },
+): Promise<void> {
+  try {
+    await updateChangeRequest(changeRequestId, { status: "distilling", errorMessage: null });
+    await appendEvent(
+      changeRequestId,
+      "distill_started",
+      "Reading your project and turning your request into a plan.",
+      null,
+    );
+    const spec = await distillChangeRequest(rawRequest, projectContext);
+    await updateChangeRequest(changeRequestId, {
+      status: "distilled",
+      title: spec.title?.slice(0, 200) || "Untitled change",
+      distilledSpec: spec as unknown as Record<string, unknown>,
+    });
+    await appendEvent(
+      changeRequestId,
+      "distill_succeeded",
+      `Plan ready — ${spec.files.length} file(s) to touch. Drafting the code now…`,
+      null,
+      { fileCount: spec.files.length },
+    );
+  } catch (err) {
+    logger.error({ err, changeRequestId }, "Agent distill step failed");
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await updateChangeRequest(changeRequestId, { status: "failed", errorMessage: message });
+    await appendEvent(
+      changeRequestId,
+      "distill_failed",
+      `Couldn't form a plan: ${message}`,
+      null,
+    );
+    return;
+  }
+
+  try {
+    await updateChangeRequest(changeRequestId, { status: "generating_patch" });
+    await appendEvent(
+      changeRequestId,
+      "patch_started",
+      "Writing the file changes…",
+      null,
+    );
+    const [crRow] = await db
+      .select()
+      .from(changeRequestsTable)
+      .where(eq(changeRequestsTable.id, changeRequestId));
+    if (!crRow || !crRow.distilledSpec) {
+      throw new Error("Distilled spec missing");
+    }
+    const patch = await generateChangePatch(
+      crRow.distilledSpec as unknown as DistilledSpec,
+      projectContext,
+    );
+    await updateChangeRequest(changeRequestId, {
+      status: "patched",
+      patchSummary: patch.summary,
+      patchFiles: patch.fileChanges as unknown as Record<string, unknown>[],
+    });
+    await appendEvent(
+      changeRequestId,
+      "patch_succeeded",
+      `Drafted ${patch.fileChanges.length} file change(s). Review the plan and click Publish when you're happy.`,
+      null,
+      {
+        fileCount: patch.fileChanges.length,
+        commitMessage: patch.commitMessage,
+      },
+    );
+  } catch (err) {
+    logger.error({ err, changeRequestId }, "Agent patch step failed");
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await updateChangeRequest(changeRequestId, { status: "failed", errorMessage: message });
+    await appendEvent(
+      changeRequestId,
+      "patch_failed",
+      `Couldn't draft the code: ${message}`,
+      null,
+    );
+  }
+}
+
+router.post(
+  "/projects/:id/change-requests/agent",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = SubmitAgentChangeRequestParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: { code: "bad_request", message: "Invalid project id" } });
+      return;
+    }
+    const body = CreateChangeRequestBody.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: { code: "bad_request", message: "Invalid request body" } });
+      return;
+    }
+    const wordCount = body.data.rawRequest.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount < 6) {
+      res.status(400).json({
+        error: {
+          code: "bad_request",
+          message: "Describe the change in more than five words so the agent has enough to work with.",
+        },
+      });
+      return;
+    }
+    const client = req.dbClient!;
+    const access = await loadViewableProject(params.data.id, client.id, client.email);
+    if (!access) {
+      res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
+      return;
+    }
+
+    // Enforce one active agent run per project (server-side guard).
+    const IN_PROGRESS_STATUSES: ChangeRequestStatus[] = [
+      "draft",
+      "distilling",
+      "distilled",
+      "generating_patch",
+    ];
+    const [active] = await db
+      .select({ id: changeRequestsTable.id })
+      .from(changeRequestsTable)
+      .where(
+        and(
+          eq(changeRequestsTable.projectId, access.project.id),
+          inArray(changeRequestsTable.status, IN_PROGRESS_STATUSES),
+        ),
+      )
+      .limit(1);
+    if (active) {
+      res.status(409).json({
+        error: {
+          code: "agent_busy",
+          message:
+            "The agent is still working on the previous request. Please wait for it to finish.",
+        },
+      });
+      return;
+    }
+
+    const fallbackTitle = body.data.rawRequest.split("\n")[0]!.slice(0, 80);
+    const [cr] = await db
+      .insert(changeRequestsTable)
+      .values({
+        projectId: access.project.id,
+        requesterClientId: client.id,
+        status: "draft",
+        title: (body.data.title?.trim() || fallbackTitle).slice(0, 200),
+        rawRequest: body.data.rawRequest,
+      })
+      .returning();
+    await appendEvent(cr.id, "created", "Request received.", client.id);
+
+    const projectContext = {
+      title: access.project.title,
+      description: access.project.description ?? "",
+      summary: access.project.summary ?? "",
+      githubOwner: access.project.githubOwner,
+      githubRepo: access.project.githubRepo,
+      githubDefaultBranch: access.project.githubDefaultBranch,
+    };
+
+    void runAgentPipeline(cr.id, body.data.rawRequest, projectContext).catch((err) => {
+      logger.error({ err, changeRequestId: cr.id }, "Agent pipeline crashed");
+    });
+
+    const emails = new Map<number, string>([[client.id, client.email]]);
+    res.status(201).json(serializeChangeRequest(cr, emails));
+  },
+);
+
+router.get(
+  "/projects/:id/agent-thread",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = GetProjectAgentThreadParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: { code: "bad_request", message: "Invalid project id" } });
+      return;
+    }
+    const client = req.dbClient!;
+    const access = await loadViewableProject(params.data.id, client.id, client.email);
+    if (!access) {
+      res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
+      return;
+    }
+    const project = access.project;
+
+    const crs = await db
+      .select()
+      .from(changeRequestsTable)
+      .where(eq(changeRequestsTable.projectId, project.id))
+      .orderBy(changeRequestsTable.createdAt);
+
+    const crIds = crs.map((c) => c.id);
+    const events: ChangeRequestEvent[] = crIds.length
+      ? await db
+          .select()
+          .from(changeRequestEventsTable)
+          .where(inArray(changeRequestEventsTable.changeRequestId, crIds))
+          .orderBy(changeRequestEventsTable.createdAt)
+      : [];
+
+    const actorIds = events
+      .map((e) => e.actorClientId)
+      .filter((id): id is number => typeof id === "number");
+    const allClientIds = [...crs.map((c) => c.requesterClientId), ...actorIds];
+    const emails = await lookupEmails(allClientIds);
+
+    const eventsByCr = new Map<number, ChangeRequestEvent[]>();
+    for (const e of events) {
+      const arr = eventsByCr.get(e.changeRequestId) ?? [];
+      arr.push(e);
+      eventsByCr.set(e.changeRequestId, arr);
+    }
+
+    res.json({
+      project: {
+        id: project.id,
+        title: project.title,
+        githubOwner: project.githubOwner,
+        githubRepo: project.githubRepo,
+        githubDefaultBranch: project.githubDefaultBranch,
+        previewUrlTemplate: project.previewUrlTemplate,
+        productionUrl: project.productionUrl,
+        liveUrl: project.liveUrl,
+        githubConfigured: !!(project.githubOwner && project.githubRepo),
+      },
+      items: crs.map((cr) => ({
+        changeRequest: serializeChangeRequest(cr, emails),
+        events: (eventsByCr.get(cr.id) ?? []).map((e) => ({
+          id: e.id,
+          changeRequestId: e.changeRequestId,
+          kind: e.kind,
+          message: e.message,
+          actorClientId: e.actorClientId,
+          actorEmail: e.actorClientId ? emails.get(e.actorClientId) ?? null : null,
+          metadata: (e.metadata as Record<string, unknown> | null) ?? null,
+          createdAt: e.createdAt,
+        })),
+      })),
+    });
   },
 );
 

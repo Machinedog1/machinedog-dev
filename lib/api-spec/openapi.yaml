@@ -552,6 +552,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChangeRequest"
 
+  /projects/{id}/change-requests/agent:
+    post:
+      operationId: submitAgentChangeRequest
+      tags: [change-requests]
+      summary: Submit a request and immediately kick off the full agent pipeline (distill + patch) in the background
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChangeRequestBody"
+      responses:
+        "201":
+          description: Created and pipeline started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+
+  /projects/{id}/agent-thread:
+    get:
+      operationId: getProjectAgentThread
+      tags: [change-requests]
+      summary: Get all change requests for a project plus their events, ordered for chat-style rendering
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Unified thread payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentThreadResponse"
+
   /change-requests/{id}:
     get:
       operationId: getChangeRequest
@@ -1881,3 +1925,46 @@ components:
           minLength: 4
           maxLength: 8000
       required: [rawRequest]
+
+    AgentThreadItem:
+      type: object
+      properties:
+        changeRequest:
+          $ref: "#/components/schemas/ChangeRequest"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeRequestEvent"
+      required: [changeRequest, events]
+
+    AgentThreadResponse:
+      type: object
+      properties:
+        project:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            githubOwner:
+              type: ["string", "null"]
+            githubRepo:
+              type: ["string", "null"]
+            githubDefaultBranch:
+              type: string
+            previewUrlTemplate:
+              type: ["string", "null"]
+            productionUrl:
+              type: ["string", "null"]
+            liveUrl:
+              type: ["string", "null"]
+            githubConfigured:
+              type: boolean
+          required: [id, title, githubDefaultBranch, githubConfigured]
+        items:
+          type: array
+          description: Change requests with their events, ordered by createdAt ascending (oldest first)
+          items:
+            $ref: "#/components/schemas/AgentThreadItem"
+      required: [project, items]

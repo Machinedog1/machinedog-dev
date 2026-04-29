@@ -558,6 +558,119 @@ export const CreateChangeRequestBody = zod.object({
 });
 
 /**
+ * @summary Submit a request and immediately kick off the full agent pipeline (distill + patch) in the background
+ */
+export const SubmitAgentChangeRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const submitAgentChangeRequestBodyTitleMax = 200;
+
+export const submitAgentChangeRequestBodyRawRequestMin = 4;
+export const submitAgentChangeRequestBodyRawRequestMax = 8000;
+
+export const SubmitAgentChangeRequestBody = zod.object({
+  title: zod.string().max(submitAgentChangeRequestBodyTitleMax).optional(),
+  rawRequest: zod
+    .string()
+    .min(submitAgentChangeRequestBodyRawRequestMin)
+    .max(submitAgentChangeRequestBodyRawRequestMax),
+});
+
+/**
+ * @summary Get all change requests for a project plus their events, ordered for chat-style rendering
+ */
+export const GetProjectAgentThreadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProjectAgentThreadResponse = zod.object({
+  project: zod.object({
+    id: zod.number(),
+    title: zod.string(),
+    githubOwner: zod.string().nullish(),
+    githubRepo: zod.string().nullish(),
+    githubDefaultBranch: zod.string(),
+    previewUrlTemplate: zod.string().nullish(),
+    productionUrl: zod.string().nullish(),
+    liveUrl: zod.string().nullish(),
+    githubConfigured: zod.boolean(),
+  }),
+  items: zod
+    .array(
+      zod.object({
+        changeRequest: zod.object({
+          id: zod.number(),
+          projectId: zod.number(),
+          requesterClientId: zod.number(),
+          requesterEmail: zod.string().nullish(),
+          status: zod.enum([
+            "draft",
+            "distilling",
+            "distilled",
+            "generating_patch",
+            "patched",
+            "snapshot_taken",
+            "pr_open",
+            "awaiting_publish",
+            "merged",
+            "awaiting_deploy",
+            "deployed",
+            "rolled_back",
+            "failed",
+          ]),
+          title: zod.string(),
+          rawRequest: zod.string(),
+          distilledSpec: zod
+            .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+            .optional()
+            .describe(
+              "Structured spec emitted by Claude. Shape depends on the model output.",
+            ),
+          patchSummary: zod.string().nullish(),
+          patchFiles: zod
+            .union([
+              zod.array(zod.record(zod.string(), zod.unknown())),
+              zod.null(),
+            ])
+            .optional()
+            .describe("List of file changes Claude proposed."),
+          githubBranch: zod.string().nullish(),
+          githubPrNumber: zod.number().nullish(),
+          githubPrUrl: zod.string().nullish(),
+          snapshotTag: zod.string().nullish(),
+          snapshotSha: zod.string().nullish(),
+          previewUrl: zod.string().nullish(),
+          errorMessage: zod.string().nullish(),
+          requestedPublishAt: zod.coerce.date().nullish(),
+          mergedAt: zod.coerce.date().nullish(),
+          deployedAt: zod.coerce.date().nullish(),
+          rolledBackAt: zod.coerce.date().nullish(),
+          createdAt: zod.coerce.date(),
+          updatedAt: zod.coerce.date(),
+        }),
+        events: zod.array(
+          zod.object({
+            id: zod.number(),
+            changeRequestId: zod.number(),
+            kind: zod.string(),
+            message: zod.string(),
+            actorClientId: zod.number().nullish(),
+            actorEmail: zod.string().nullish(),
+            metadata: zod
+              .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+              .optional(),
+            createdAt: zod.coerce.date(),
+          }),
+        ),
+      }),
+    )
+    .describe(
+      "Change requests with their events, ordered by createdAt ascending (oldest first)",
+    ),
+});
+
+/**
  * @summary Get a change request with its event timeline
  */
 export const GetChangeRequestParams = zod.object({
