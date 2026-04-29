@@ -1015,6 +1015,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProjectList"
 
+  /admin/projects/{id}/owner:
+    patch:
+      operationId: reassignProjectOwner
+      tags: [admin]
+      summary: Reassign a project to a different client (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReassignProjectOwnerBody"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
   /admin/orders:
     get:
       operationId: listAllBuildOrders
@@ -1291,6 +1316,13 @@ components:
         coverImageUrl:
           type: string
       required: [title, description]
+
+    ReassignProjectOwnerBody:
+      type: object
+      properties:
+        clientId:
+          type: integer
+      required: [clientId]
 
     UpdateProjectBody:
       type: object

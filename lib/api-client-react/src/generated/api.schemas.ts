@@ -179,6 +179,10 @@ export interface CreateProjectBody {
   coverImageUrl?: string;
 }
 
+export interface ReassignProjectOwnerBody {
+  clientId: number;
+}
+
 export type UpdateProjectBodyStatus =
   (typeof UpdateProjectBodyStatus)[keyof typeof UpdateProjectBodyStatus];
 

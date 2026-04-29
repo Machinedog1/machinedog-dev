@@ -56,6 +56,7 @@ import type {
   PromptSessionList,
   PublicCheckoutBody,
   PublishPromptBody,
+  ReassignProjectOwnerBody,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
   SubmitLeadBody,
@@ -4281,6 +4282,94 @@ export function useListAllProjects<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Reassign a project to a different client (admin only)
+ */
+export const getReassignProjectOwnerUrl = (id: number) => {
+  return `/api/admin/projects/${id}/owner`;
+};
+
+export const reassignProjectOwner = async (
+  id: number,
+  reassignProjectOwnerBody: ReassignProjectOwnerBody,
+  options?: RequestInit,
+): Promise<Project> => {
+  return customFetch<Project>(getReassignProjectOwnerUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(reassignProjectOwnerBody),
+  });
+};
+
+export const getReassignProjectOwnerMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reassignProjectOwner>>,
+    TError,
+    { id: number; data: BodyType<ReassignProjectOwnerBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reassignProjectOwner>>,
+  TError,
+  { id: number; data: BodyType<ReassignProjectOwnerBody> },
+  TContext
+> => {
+  const mutationKey = ["reassignProjectOwner"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reassignProjectOwner>>,
+    { id: number; data: BodyType<ReassignProjectOwnerBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return reassignProjectOwner(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReassignProjectOwnerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reassignProjectOwner>>
+>;
+export type ReassignProjectOwnerMutationBody =
+  BodyType<ReassignProjectOwnerBody>;
+export type ReassignProjectOwnerMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reassign a project to a different client (admin only)
+ */
+export const useReassignProjectOwner = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reassignProjectOwner>>,
+    TError,
+    { id: number; data: BodyType<ReassignProjectOwnerBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reassignProjectOwner>>,
+  TError,
+  { id: number; data: BodyType<ReassignProjectOwnerBody> },
+  TContext
+> => {
+  return useMutation(getReassignProjectOwnerMutationOptions(options));
+};
 
 /**
  * @summary List paid build deposits and retainer subscriptions (admin only)

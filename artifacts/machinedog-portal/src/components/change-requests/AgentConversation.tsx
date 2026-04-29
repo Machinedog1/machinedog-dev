@@ -6,11 +6,13 @@ import {
   useRequestChangePublish,
   useRollbackChangeRequest,
   useMarkChangeDeployed,
+  useRequestUploadUrl,
+  useAddProjectFile,
   getGetProjectAgentThreadQueryKey,
   type ChangeRequest,
   type ChangeRequestEvent,
 } from "@workspace/api-client-react";
-import { Loader2, Send, Sparkles, AlertTriangle, Globe2, Rocket, ArrowDown } from "lucide-react";
+import { Loader2, Send, Sparkles, AlertTriangle, Globe2, Rocket, ArrowDown, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -74,8 +76,10 @@ export function AgentConversation({
   const { toast } = useToast();
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const queryKey = getGetProjectAgentThreadQueryKey(projectId);
   const { data, isLoading, error } = useGetProjectAgentThread(projectId, {
@@ -129,6 +133,59 @@ export function AgentConversation({
       },
     },
   });
+
+  const requestUploadMutation = useRequestUploadUrl();
+  const addFileMutation = useAddProjectFile();
+
+  async function handleFileSelected(file: File) {
+    const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+    if (file.size > MAX_BYTES) {
+      toast({
+        title: "File too large",
+        description: "Maximum upload size is 25 MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const upload = await requestUploadMutation.mutateAsync({
+        data: {
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "application/octet-stream",
+        },
+      });
+      const putRes = await fetch(upload.uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!putRes.ok) {
+        throw new Error(`Upload failed (${putRes.status})`);
+      }
+      await addFileMutation.mutateAsync({
+        id: projectId,
+        data: {
+          name: file.name,
+          contentType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          objectPath: upload.objectPath,
+        },
+      });
+      const reference = `[file: ${file.name}](${upload.objectPath})`;
+      setInput((prev) => (prev.trim() ? `${prev.trimEnd()}\n${reference}` : reference));
+      toast({
+        title: "Attached",
+        description: `${file.name} added to your message.`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast({ title: "Upload failed", description: msg, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  }
 
   const rollbackMutation = useRollbackChangeRequest({
     mutation: {
@@ -378,10 +435,38 @@ export function AgentConversation({
               rows={2}
               data-testid="textarea-agent-input"
             />
-            <div className="flex items-center justify-between px-2 pb-2 pt-0">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground/80 px-1 truncate">
-                <Sparkles className="h-3 w-3 text-primary/70 shrink-0" />
-                <span className="truncate">Claude · plans, drafts, never ships without you</span>
+            <div className="flex items-center justify-between px-2 pb-2 pt-0 gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  data-testid="input-file-upload"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleFileSelected(f);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading || anyInProgress}
+                  aria-label="Attach a file"
+                  title="Attach a file"
+                  data-testid="button-attach-file"
+                  className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Paperclip className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80 px-1 truncate min-w-0">
+                  <Sparkles className="h-3 w-3 text-primary/70 shrink-0" />
+                  <span className="truncate">Claude · plans, drafts, never ships without you</span>
+                </div>
               </div>
               <Button
                 type="submit"

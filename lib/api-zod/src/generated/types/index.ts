@@ -67,6 +67,7 @@ export * from "./promptSession";
 export * from "./promptSessionList";
 export * from "./publicCheckoutBody";
 export * from "./publishPromptBody";
+export * from "./reassignProjectOwnerBody";
 export * from "./requestUploadUrlBody";
 export * from "./requestUploadUrlResponse";
 export * from "./submitLeadBody";

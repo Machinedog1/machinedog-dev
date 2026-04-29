@@ -25,6 +25,7 @@ import {
   ResendClientInviteParams,
   ResendClientInviteResponse,
   ListAllProjectsResponse,
+  ReassignProjectOwnerBody,
   ListAllBuildOrdersQueryParams,
   ListAllBuildOrdersResponse,
 } from "@workspace/api-zod";
@@ -403,6 +404,64 @@ router.get("/admin/projects", async (_req, res): Promise<void> => {
     .from(projectsTable)
     .orderBy(desc(projectsTable.updatedAt));
   res.json(ListAllProjectsResponse.parse({ data: rows }));
+});
+
+router.patch("/admin/projects/:id/owner", async (req, res): Promise<void> => {
+  const projectId = Number(req.params.id);
+  if (!Number.isFinite(projectId)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+  const body = ReassignProjectOwnerBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const newOwnerId = body.data.clientId;
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, projectId));
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (project.clientId === newOwnerId) {
+    res.json({ ...project, viewerRole: "owner" });
+    return;
+  }
+
+  const [newOwner] = await db
+    .select()
+    .from(clientsTable)
+    .where(eq(clientsTable.id, newOwnerId));
+  if (!newOwner) {
+    res.status(404).json({ error: "Target client not found" });
+    return;
+  }
+  if (newOwner.status === "suspended") {
+    res.status(400).json({ error: "Cannot assign to a suspended client." });
+    return;
+  }
+
+  const [updated] = await db
+    .update(projectsTable)
+    .set({ clientId: newOwnerId })
+    .where(eq(projectsTable.id, projectId))
+    .returning();
+
+  req.log.info(
+    {
+      projectId,
+      previousOwnerId: project.clientId,
+      newOwnerId,
+      newOwnerEmail: newOwner.email,
+    },
+    "Admin reassigned project owner",
+  );
+
+  res.json({ ...updated, viewerRole: "owner" });
 });
 
 router.get("/admin/orders", async (req, res): Promise<void> => {

@@ -1368,6 +1368,38 @@ export const ListAllProjectsResponse = zod.object({
 });
 
 /**
+ * @summary Reassign a project to a different client (admin only)
+ */
+export const ReassignProjectOwnerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ReassignProjectOwnerBody = zod.object({
+  clientId: zod.number(),
+});
+
+export const ReassignProjectOwnerResponse = zod.object({
+  id: zod.number(),
+  clientId: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  summary: zod.string(),
+  liveUrl: zod.string().nullish(),
+  coverImageUrl: zod.string().nullish(),
+  status: zod.enum(["draft", "active", "completed", "archived"]),
+  consultingBookingId: zod.number().nullish(),
+  githubOwner: zod.string().nullish(),
+  githubRepo: zod.string().nullish(),
+  githubDefaultBranch: zod.string(),
+  previewUrlTemplate: zod.string().nullish(),
+  productionUrl: zod.string().nullish(),
+  operatorEmail: zod.string().nullish(),
+  viewerRole: zod.enum(["owner", "collaborator"]),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List paid build deposits and retainer subscriptions (admin only)
  */
 export const listAllBuildOrdersQueryLimitDefault = 100;
