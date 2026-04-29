@@ -6,7 +6,6 @@ import {
   Terminal,
   History,
   Coins,
-  FolderGit2,
   Briefcase,
   Settings,
   ShieldAlert,
@@ -44,7 +43,6 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/", label: "Console", icon: Terminal },
     { href: "/history", label: "History", icon: History },
     { href: "/tokens", label: "Tokens", icon: Coins },
-    { href: "/projects", label: "Projects", icon: FolderGit2 },
     { href: "/consulting", label: "Consulting", icon: Briefcase },
   ];
 
