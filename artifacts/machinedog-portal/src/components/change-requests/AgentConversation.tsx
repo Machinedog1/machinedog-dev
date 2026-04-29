@@ -10,20 +10,21 @@ import {
   type ChangeRequest,
   type ChangeRequestEvent,
 } from "@workspace/api-client-react";
-import { Loader2, Send, Sparkles, AlertTriangle } from "lucide-react";
+import { Loader2, Send, Sparkles, AlertTriangle, Globe2, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserMessage,
   StatusMessage,
   PlanCard,
   PatchCard,
-  PublishCard,
   isInProgress,
   eventTone,
 } from "./AgentMessage";
 import { LivePreviewPane } from "./LivePreviewPane";
+import { PublishTab } from "./PublishTab";
 
 const PUBLISH_NOTE =
   "GitHub repo not yet wired up — Publish only emails the operator. The PR/preview integration arrives in the next release.";
@@ -299,29 +300,21 @@ export function AgentConversation({
                   />
                 )}
 
-                {/* Publish card */}
+                {/* Publish hint — full controls live in the Publish tab */}
                 {showPublishCard && (
                   <div className="ml-11">
-                    <PublishCard
-                      changeRequest={cr}
-                      onPublish={() => publishMutation.mutate({ id: cr.id })}
-                      onRollback={() => rollbackMutation.mutate({ id: cr.id })}
-                      onMarkDeployed={() => markDeployedMutation.mutate({ id: cr.id })}
-                      publishPending={
-                        publishMutation.isPending &&
-                        publishMutation.variables?.id === cr.id
-                      }
-                      rollbackPending={
-                        rollbackMutation.isPending &&
-                        rollbackMutation.variables?.id === cr.id
-                      }
-                      markDeployedPending={
-                        markDeployedMutation.isPending &&
-                        markDeployedMutation.variables?.id === cr.id
-                      }
-                      canMarkDeployed={isOwner}
-                      noteCopy={PUBLISH_NOTE}
-                    />
+                    <div className="rounded-lg ring-1 ring-primary/30 bg-primary/5 px-3 py-2 text-xs flex items-center gap-2">
+                      <Rocket className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="text-foreground">
+                        {cr.status === "deployed"
+                          ? "Live in production."
+                          : cr.status === "rolled_back"
+                          ? "Rolled back."
+                          : cr.status === "awaiting_deploy" || cr.status === "merged"
+                          ? "Operator notified — open the Publish tab to track or roll back."
+                          : "Ready to ship — open the Publish tab to review and publish."}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -374,13 +367,66 @@ export function AgentConversation({
         </form>
       </div>
 
-      {/* RIGHT: Live preview */}
+      {/* RIGHT: Tabbed preview / publish */}
       <div className="min-h-0">
-        <LivePreviewPane
-          previewUrl={null}
-          productionUrl={project?.productionUrl}
-          liveUrl={project?.liveUrl}
-        />
+        <Tabs defaultValue="preview" className="flex flex-col h-full glass rounded-2xl ring-1 ring-border/30 overflow-hidden">
+          <TabsList className="rounded-none border-b border-border/30 bg-muted/20 h-auto p-1 justify-start shrink-0">
+            <TabsTrigger
+              value="preview"
+              className="font-mono text-xs uppercase tracking-wider data-[state=active]:bg-background"
+            >
+              <Globe2 className="h-3.5 w-3.5 mr-1.5" />
+              Preview
+            </TabsTrigger>
+            <TabsTrigger
+              value="publish"
+              className="font-mono text-xs uppercase tracking-wider data-[state=active]:bg-background"
+            >
+              <Rocket className="h-3.5 w-3.5 mr-1.5" />
+              Publish
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent
+            value="preview"
+            className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+            forceMount
+          >
+            <LivePreviewPane
+              previewUrl={null}
+              productionUrl={project?.productionUrl}
+              liveUrl={project?.liveUrl}
+            />
+          </TabsContent>
+          <TabsContent
+            value="publish"
+            className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+            forceMount
+          >
+            <PublishTab
+              items={items}
+              onPublish={(id) => publishMutation.mutate({ id })}
+              onRollback={(id) => rollbackMutation.mutate({ id })}
+              onMarkDeployed={(id) => markDeployedMutation.mutate({ id })}
+              publishPendingId={
+                publishMutation.isPending
+                  ? publishMutation.variables?.id ?? null
+                  : null
+              }
+              rollbackPendingId={
+                rollbackMutation.isPending
+                  ? rollbackMutation.variables?.id ?? null
+                  : null
+              }
+              markDeployedPendingId={
+                markDeployedMutation.isPending
+                  ? markDeployedMutation.variables?.id ?? null
+                  : null
+              }
+              canMarkDeployed={isOwner}
+              noteCopy={PUBLISH_NOTE}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
