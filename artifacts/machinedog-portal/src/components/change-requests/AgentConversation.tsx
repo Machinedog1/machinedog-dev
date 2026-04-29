@@ -10,16 +10,18 @@ import {
   type ChangeRequest,
   type ChangeRequestEvent,
 } from "@workspace/api-client-react";
-import { Loader2, Send, Sparkles, AlertTriangle, Globe2, Rocket } from "lucide-react";
+import { Loader2, Send, Sparkles, AlertTriangle, Globe2, Rocket, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserMessage,
+  AgentHeader,
   StatusMessage,
   PlanCard,
   PatchCard,
+  InlinePublishHint,
   isInProgress,
   eventTone,
 } from "./AgentMessage";
@@ -71,6 +73,7 @@ export function AgentConversation({
   const qc = useQueryClient();
   const { toast } = useToast();
   const [input, setInput] = useState("");
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
 
@@ -150,6 +153,7 @@ export function AgentConversation({
     if (!el) return;
     if (stickToBottomRef.current) {
       el.scrollTop = el.scrollHeight;
+      setShowJumpToLatest(false);
     }
   }, [items]);
 
@@ -158,6 +162,15 @@ export function AgentConversation({
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     stickToBottomRef.current = nearBottom;
+    setShowJumpToLatest(!nearBottom);
+  }
+
+  function jumpToLatest() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    stickToBottomRef.current = true;
+    setShowJumpToLatest(false);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -203,33 +216,53 @@ export function AgentConversation({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 h-[calc(100vh-7rem)] min-h-[700px]">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-4 h-[calc(100vh-7rem)] min-h-[700px]">
       {/* LEFT: Conversation */}
-      <div className="flex flex-col glass rounded-2xl ring-1 ring-border/30 overflow-hidden min-h-0">
-        <div className="px-4 py-3 border-b border-border/30 bg-muted/20 shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="font-mono text-sm uppercase tracking-wider">
-              Agent Thread
-            </h3>
+      <div className="flex flex-col glass rounded-2xl ring-1 ring-border/30 overflow-hidden min-h-0 relative">
+        <div className="flex items-center justify-between px-4 h-11 border-b border-border/30 bg-muted/20 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-primary to-primary/60 ring-1 ring-primary/40 flex items-center justify-center shrink-0">
+              <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h3 className="font-mono text-[12px] uppercase tracking-wider leading-tight">
+                Agent
+              </h3>
+              <div className="text-[10px] text-muted-foreground/80 leading-tight truncate">
+                {project?.title ?? "Project"}
+              </div>
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            One continuous conversation per project. Describe a change in plain
-            English — the agent plans it and drafts the code. You click Publish.
-          </div>
+          {anyInProgress ? (
+            <div className="flex items-center gap-1.5 text-[10.5px] font-mono uppercase tracking-wider text-blue-300 shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+              Working
+            </div>
+          ) : items.length > 0 ? (
+            <div className="flex items-center gap-1.5 text-[10.5px] font-mono uppercase tracking-wider text-emerald-300/80 shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Idle
+            </div>
+          ) : null}
         </div>
 
         <div
           ref={scrollerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0"
+          className="flex-1 overflow-y-auto px-3 py-4 space-y-6 min-h-0"
+          data-testid="agent-thread-scroller"
         >
           {items.length === 0 && (
-            <div className="text-center text-muted-foreground py-12">
-              <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary/50" />
-              <div className="text-sm">No conversation yet.</div>
-              <div className="text-xs mt-1">
-                Send your first request below to get started.
+            <div className="text-center text-muted-foreground py-16 px-6">
+              <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 ring-1 ring-primary/20 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-[14px] text-foreground/90 font-medium">
+                Start a conversation
+              </div>
+              <div className="text-[12px] mt-1 max-w-xs mx-auto">
+                Describe a change in plain English. The agent will plan, draft
+                the code, and let you review before anything ships.
               </div>
             </div>
           )}
@@ -250,7 +283,7 @@ export function AgentConversation({
               | { path: string; contents: string }[];
             const showPlan = !!distilledSpec && (cr.status !== "draft");
             const showPatch = patchFiles.length > 0;
-            const showPublishCard =
+            const showPublishHint =
               cr.status === "patched" ||
               cr.status === "awaiting_publish" ||
               cr.status === "pr_open" ||
@@ -259,7 +292,7 @@ export function AgentConversation({
               cr.status === "deployed" ||
               cr.status === "rolled_back";
             return (
-              <div key={cr.id} className="space-y-4">
+              <div key={cr.id} className="space-y-2.5">
                 {/* User's original request */}
                 <UserMessage
                   email={cr.requesterEmail ?? null}
@@ -267,31 +300,23 @@ export function AgentConversation({
                   createdAt={cr.createdAt}
                 />
 
-                {/* Timeline of agent events as bubbles */}
+                {/* Single agent header per request */}
+                <div className="pt-1">
+                  <AgentHeader time={visibleEvents[0]?.createdAt ?? cr.updatedAt} />
+                </div>
+
+                {/* Inline tool-call style status rows */}
                 {visibleEvents.map((ev) => (
                   <StatusMessage
                     key={ev.id}
                     text={ev.message}
                     tone={eventTone(ev.kind)}
                     createdAt={ev.createdAt}
+                    kind={ev.kind}
                   />
                 ))}
 
-                {/* Plan card when distilled */}
-                {showPlan && distilledSpec && (
-                  <div className="ml-11">
-                    <PlanCard spec={distilledSpec} />
-                  </div>
-                )}
-
-                {/* Patch card when files exist */}
-                {showPatch && (
-                  <div className="ml-11">
-                    <PatchCard files={patchFiles} summary={cr.patchSummary ?? null} />
-                  </div>
-                )}
-
-                {/* In-progress shimmer if mid-pipeline and no event yet */}
+                {/* In-progress shimmer if mid-pipeline */}
                 {isInProgress(cr.status) && headline && (
                   <StatusMessage
                     text={headline}
@@ -300,34 +325,40 @@ export function AgentConversation({
                   />
                 )}
 
-                {/* Publish hint — full controls live in the Publish tab */}
-                {showPublishCard && (
-                  <div className="ml-11">
-                    <div className="rounded-lg ring-1 ring-primary/30 bg-primary/5 px-3 py-2 text-xs flex items-center gap-2">
-                      <Rocket className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="text-foreground">
-                        {cr.status === "deployed"
-                          ? "Live in production."
-                          : cr.status === "rolled_back"
-                          ? "Rolled back."
-                          : cr.status === "awaiting_deploy" || cr.status === "merged"
-                          ? "Operator notified — open the Publish tab to track or roll back."
-                          : "Ready to ship — open the Publish tab to review and publish."}
-                      </span>
-                    </div>
-                  </div>
+                {/* Plan card */}
+                {showPlan && distilledSpec && <PlanCard spec={distilledSpec} />}
+
+                {/* Patch card */}
+                {showPatch && (
+                  <PatchCard files={patchFiles} summary={cr.patchSummary ?? null} />
                 )}
+
+                {/* Publish hint — full controls live in the Publish tab */}
+                {showPublishHint && <InlinePublishHint status={cr.status} />}
               </div>
             );
           })}
         </div>
+
+        {/* Jump to latest */}
+        {showJumpToLatest && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            data-testid="button-jump-to-latest"
+            className="absolute bottom-[calc(108px+12px)] left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-mono uppercase tracking-wider shadow-lg shadow-primary/30 ring-1 ring-primary-foreground/20 hover:bg-primary/90 transition"
+          >
+            <ArrowDown className="h-3 w-3" />
+            Latest
+          </button>
+        )}
 
         {/* Composer */}
         <form
           onSubmit={handleSubmit}
           className="border-t border-border/30 p-3 bg-muted/10 shrink-0"
         >
-          <div className="flex items-end gap-2">
+          <div className="rounded-xl ring-1 ring-border/40 bg-background focus-within:ring-primary/40 focus-within:ring-2 transition-shadow overflow-hidden">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -340,29 +371,38 @@ export function AgentConversation({
               placeholder={
                 anyInProgress
                   ? "Agent is working… please wait."
-                  : "Describe a change. e.g. 'Add a contact form to the homepage.'"
+                  : "Describe a change in plain English. Cmd/Ctrl + Enter to send."
               }
               disabled={anyInProgress || submitMutation.isPending}
-              className="min-h-[64px] max-h-[180px] resize-none font-mono text-sm bg-background"
+              className="min-h-[60px] max-h-[180px] resize-none font-mono text-[13px] bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:outline-none px-3 py-2.5"
               rows={2}
+              data-testid="textarea-agent-input"
             />
-            <Button
-              type="submit"
-              disabled={
-                anyInProgress || submitMutation.isPending || !input.trim()
-              }
-              className="font-mono shrink-0"
-            >
-              {submitMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              <span className="ml-2 hidden sm:inline">SEND</span>
-            </Button>
+            <div className="flex items-center justify-between px-2 pb-2 pt-0">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground/80 px-1 truncate">
+                <Sparkles className="h-3 w-3 text-primary/70 shrink-0" />
+                <span className="truncate">Claude · plans, drafts, never ships without you</span>
+              </div>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={
+                  anyInProgress || submitMutation.isPending || !input.trim()
+                }
+                className="font-mono h-8 px-3 shrink-0"
+                data-testid="button-agent-send"
+              >
+                {submitMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                <span className="ml-1.5 text-[11px]">Send</span>
+              </Button>
+            </div>
           </div>
-          <div className="text-[10px] font-mono text-muted-foreground mt-1.5 px-1">
-            Cmd/Ctrl + Enter to send. {PUBLISH_NOTE}
+          <div className="text-[10px] font-mono text-muted-foreground/70 mt-1.5 px-1">
+            {PUBLISH_NOTE}
           </div>
         </form>
       </div>
