@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -28,11 +30,21 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { signOut } = useAuth();
   const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("md.sidebarCollapsed") === "1";
+  });
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("md.sidebarCollapsed", collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -79,137 +91,235 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed md:static inset-y-0 left-0 z-40 w-64 border-r border-border/20 glass flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0",
+          "fixed md:static inset-y-0 left-0 z-40 border-r border-border/20 glass flex flex-col transition-[width,transform] duration-300 ease-in-out md:translate-x-0",
+          collapsed ? "md:w-16 w-64" : "w-64",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="h-14 flex items-center justify-between px-6 border-b border-border/20 hidden md:flex">
-          <Logo size="sm" />
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
-          >
-            {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </button>
+        <div className={cn(
+          "h-14 items-center border-b border-border/20 hidden md:flex",
+          collapsed ? "justify-center px-2" : "justify-between px-6",
+        )}>
+          {!collapsed && <Logo size="sm" />}
+          <div className="flex items-center gap-1">
+            {!collapsed && (
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
+                title={theme === "dark" ? "Light mode" : "Dark mode"}
+              >
+                {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </button>
+            )}
+            <button
+              onClick={() => setCollapsed((c) => !c)}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              data-testid="button-toggle-sidebar"
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-8">
+        <div className={cn(
+          "flex-1 overflow-y-auto py-6 flex flex-col gap-8",
+          collapsed ? "md:px-2" : "px-4",
+        )}>
           {me && (
-            <div className="px-2 flex flex-col gap-2">
-              <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Fuel</div>
+            collapsed ? (
               <Link href="/tokens">
-                <div className="glass-subtle rounded-full px-3 py-2 flex items-center gap-3 border border-border/20 cursor-pointer hover:bg-muted/10 transition-colors relative overflow-hidden group">
+                <div
+                  className="hidden md:flex items-center justify-center h-10 w-10 mx-auto rounded-full glass-subtle border border-border/20 cursor-pointer hover:bg-muted/10 transition-colors relative overflow-hidden"
+                  title={`${me.tokenBalance.toLocaleString()} TKNS · Buy tokens`}
+                >
                   <div
                     className="absolute inset-0 bg-primary/10 transition-all duration-500 ease-out"
                     style={{ width: `${Math.min(100, (me.tokenBalance / 50000) * 100)}%` }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
                   <Coins className="h-4 w-4 text-primary relative z-10" />
-                  <div className="flex items-baseline gap-1.5 relative z-10 flex-1">
-                    <span className="text-lg font-bold font-mono text-foreground tracking-tighter tabular-nums leading-none">
-                      {me.tokenBalance.toLocaleString()}
-                    </span>
-                    <span className="text-[10px] font-mono text-muted-foreground leading-none">TKNS</span>
-                  </div>
                 </div>
               </Link>
-              <Link href="/tokens">
-                <button
-                  type="button"
-                  className="w-full rounded-full px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-lg shadow-primary/30 hover:opacity-95 transition-opacity"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
-                  }}
-                >
-                  Buy tokens
-                </button>
-              </Link>
-            </div>
+            ) : (
+              <div className="px-2 flex flex-col gap-2">
+                <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Fuel</div>
+                <Link href="/tokens">
+                  <div className="glass-subtle rounded-full px-3 py-2 flex items-center gap-3 border border-border/20 cursor-pointer hover:bg-muted/10 transition-colors relative overflow-hidden group">
+                    <div
+                      className="absolute inset-0 bg-primary/10 transition-all duration-500 ease-out"
+                      style={{ width: `${Math.min(100, (me.tokenBalance / 50000) * 100)}%` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
+                    <Coins className="h-4 w-4 text-primary relative z-10" />
+                    <div className="flex items-baseline gap-1.5 relative z-10 flex-1">
+                      <span className="text-lg font-bold font-mono text-foreground tracking-tighter tabular-nums leading-none">
+                        {me.tokenBalance.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] font-mono text-muted-foreground leading-none">TKNS</span>
+                    </div>
+                  </div>
+                </Link>
+                <Link href="/tokens">
+                  <button
+                    type="button"
+                    className="w-full rounded-full px-3 py-2 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-lg shadow-primary/30 hover:opacity-95 transition-opacity"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                    }}
+                  >
+                    Buy tokens
+                  </button>
+                </Link>
+              </div>
+            )
           )}
 
           <nav className="flex flex-col gap-1">
-            <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">
-              Workspace
-            </div>
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                  location === item.href || (item.href !== "/" && location.startsWith(item.href))
-                    ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          {me?.isAdmin && (
-            <nav className="flex flex-col gap-1">
+            {!collapsed && (
               <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">
-                Admin
+                Workspace
               </div>
-              {adminItems.map((item) => (
+            )}
+            {navItems.map((item) => {
+              const isActive =
+                location === item.href || (item.href !== "/" && location.startsWith(item.href));
+              return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  title={collapsed ? item.label : undefined}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                    location === item.href || (item.href !== "/admin" && location.startsWith(item.href))
+                    "flex items-center rounded-lg text-sm font-medium transition-all duration-200",
+                    collapsed
+                      ? "md:justify-center md:px-0 md:py-2.5 px-3 py-2 gap-3"
+                      : "gap-3 px-3 py-2",
+                    isActive
                       ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {collapsed ? <span className="md:hidden">{item.label}</span> : item.label}
                 </Link>
-              ))}
+              );
+            })}
+          </nav>
+
+          {me?.isAdmin && (
+            <nav className="flex flex-col gap-1">
+              {!collapsed && (
+                <div className="text-xs font-mono text-muted-foreground px-2 mb-2 uppercase tracking-wider">
+                  Admin
+                </div>
+              )}
+              {adminItems.map((item) => {
+                const isActive =
+                  location === item.href || (item.href !== "/admin" && location.startsWith(item.href));
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={collapsed ? item.label : undefined}
+                    className={cn(
+                      "flex items-center rounded-lg text-sm font-medium transition-all duration-200",
+                      collapsed
+                        ? "md:justify-center md:px-0 md:py-2.5 px-3 py-2 gap-3"
+                        : "gap-3 px-3 py-2",
+                      isActive
+                        ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {collapsed ? <span className="md:hidden">{item.label}</span> : item.label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
         </div>
 
-        <div className="p-4 border-t border-border/20 mt-auto glass-subtle">
+        <div className={cn(
+          "border-t border-border/20 mt-auto glass-subtle",
+          collapsed ? "md:p-2 p-4" : "p-4",
+        )}>
           <Link
             href="/settings"
+            title={collapsed ? "Settings" : undefined}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 mb-3",
+              "flex items-center rounded-lg text-sm font-medium transition-all duration-200 mb-3",
+              collapsed
+                ? "md:justify-center md:px-0 md:py-2.5 px-3 py-2 gap-3"
+                : "gap-3 px-3 py-2",
               location.startsWith("/settings")
                 ? "bg-primary/10 text-primary glass-subtle border-primary/20 shadow-sm"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent",
             )}
           >
-            <Settings className="h-4 w-4" />
-            Settings
+            <Settings className="h-4 w-4 shrink-0" />
+            {collapsed ? <span className="md:hidden">Settings</span> : "Settings"}
           </Link>
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div
-              className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white shrink-0 ring-1 ring-border/50"
-              style={{
-                background:
-                  "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
-              }}
-            >
-              {initial}
+          {collapsed ? (
+            <div className="hidden md:flex flex-col items-center gap-2">
+              <div
+                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white ring-1 ring-border/50"
+                style={{
+                  background:
+                    "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
+                }}
+                title={me?.email ?? ""}
+              >
+                {initial}
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
-            <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-              <span className="text-sm font-medium truncate">{me?.email}</span>
-              <span className="text-xs text-muted-foreground truncate font-mono opacity-70">
-                {me?.id ? `ID:${me.id}` : ""}
-              </span>
+          ) : (
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div
+                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white shrink-0 ring-1 ring-border/50"
+                style={{
+                  background:
+                    "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
+                }}
+              >
+                {initial}
+              </div>
+              <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                <span className="text-sm font-medium truncate">{me?.email}</span>
+                <span className="text-xs text-muted-foreground truncate font-mono opacity-70">
+                  {me?.id ? `ID:${me.id}` : ""}
+                </span>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
+          )}
+
+          {collapsed && (
             <button
-              onClick={handleSignOut}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-              title="Sign out"
+              onClick={toggleTheme}
+              className="hidden md:flex w-full justify-center p-1.5 mt-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
+              title={theme === "dark" ? "Light mode" : "Dark mode"}
             >
-              <LogOut className="h-4 w-4" />
+              {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </button>
-          </div>
+          )}
         </div>
       </aside>
 

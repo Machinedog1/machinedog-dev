@@ -203,7 +203,7 @@ export function AgentConversation({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 h-[calc(100vh-12rem)] min-h-[600px]">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 h-[calc(100vh-7rem)] min-h-[700px]">
       {/* LEFT: Conversation */}
       <div className="flex flex-col glass rounded-2xl ring-1 ring-border/30 overflow-hidden min-h-0">
         <div className="px-4 py-3 border-b border-border/30 bg-muted/20 shrink-0">
