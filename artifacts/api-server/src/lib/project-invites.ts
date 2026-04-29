@@ -6,6 +6,11 @@ interface SendProjectInviteEmailArgs {
   projectTitle: string;
   invitedByEmail: string;
   alreadyHasAccount: boolean;
+  /**
+   * Single-use token that lets the recipient land on /accept-invite and set
+   * their password. Required when the account is not yet active.
+   */
+  inviteToken?: string | null;
 }
 
 function getPortalUrl(): string {
@@ -25,8 +30,20 @@ export async function sendProjectInviteEmail(
     return;
   }
   const portal = getPortalUrl();
-  const ctaUrl = args.alreadyHasAccount ? `${portal}/projects` : `${portal}/sign-up`;
-  const ctaLabel = args.alreadyHasAccount ? "Open Machinedog.Dev" : "Create your account";
+  // Active accounts go straight to /projects. Anyone else (new email,
+  // suspended, or invited-but-not-yet-activated) needs the accept-invite
+  // flow with a token so they can set a password and have any pending
+  // project memberships auto-attached on first login.
+  const ctaUrl = args.alreadyHasAccount
+    ? `${portal}/projects`
+    : args.inviteToken
+    ? `${portal}/accept-invite?token=${encodeURIComponent(args.inviteToken)}`
+    : `${portal}/sign-up`;
+  const ctaLabel = args.alreadyHasAccount
+    ? "Open Machinedog.Dev"
+    : args.inviteToken
+    ? "Accept invite & set password"
+    : "Create your account";
 
   const subject = `${args.invitedByEmail} invited you to ${args.projectTitle} on Machinedog.Dev`;
 
@@ -35,7 +52,9 @@ export async function sendProjectInviteEmail(
     "",
     args.alreadyHasAccount
       ? `Sign in to view the project: ${ctaUrl}`
-      : `Create your account using this email (${args.to}) to accept the invite: ${ctaUrl}`,
+      : args.inviteToken
+      ? `Accept your invite and set a password (${args.to}): ${ctaUrl}\n\nThe project will be waiting for you in your projects list as soon as you sign in. The link expires in 7 days.`
+      : `Use this email (${args.to}) to request access: ${ctaUrl}`,
     "",
     "— The Machinedog team",
   ].join("\n");
@@ -52,6 +71,8 @@ export async function sendProjectInviteEmail(
           ${
             args.alreadyHasAccount
               ? "Sign in with your existing account to open the project."
+              : args.inviteToken
+              ? `Click below to set a password for <strong>${escapeHtml(args.to)}</strong>. The project will be waiting in your projects list as soon as you sign in. The link expires in 7 days.`
               : `Create your account with <strong>${escapeHtml(args.to)}</strong> to accept the invitation. We'll attach you to the project automatically.`
           }
         </p>

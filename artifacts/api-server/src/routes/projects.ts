@@ -44,6 +44,9 @@ import { sendProjectInviteEmail } from "../lib/project-invites";
 import { logger } from "../lib/logger";
 import { runClaudePrompt } from "../lib/anthropic";
 import { computeChargedTokens } from "../lib/billing";
+import { generateSecureToken } from "../lib/passwords";
+
+const PROJECT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const router: IRouter = Router();
 
@@ -326,7 +329,14 @@ router.post(
         ),
       );
 
-    const isClientActive = existingClient?.status === "active";
+    if (existingClient?.status === "suspended") {
+      res
+        .status(409)
+        .json({ error: "This account is suspended and cannot be invited." });
+      return;
+    }
+    const isClientActive =
+      existingClient?.status === "active" && !!existingClient.passwordHash;
     let row;
     if (existingMember) {
       [row] = await db
@@ -355,11 +365,39 @@ router.post(
         .returning();
     }
 
+    // Make sure a client row exists for this email and, when the invitee
+    // can't sign in yet, mint a fresh invite token so the email can take
+    // them straight to /accept-invite. Active accounts already have a
+    // password and don't need a token.
+    let inviteToken: string | null = null;
+    const needsToken =
+      !existingClient || existingClient.status !== "active" || !existingClient.passwordHash;
+
     if (!existingClient) {
+      const newToken = generateSecureToken(32);
+      const expiresAt = new Date(Date.now() + PROJECT_INVITE_TTL_MS);
       await db
         .insert(clientsTable)
-        .values({ userId: `pending:${email}`, email, status: "invited" })
-        .onConflictDoNothing();
+        .values({
+          userId: `pending:${email}`,
+          email,
+          status: "invited",
+          inviteToken: newToken,
+          inviteTokenExpiresAt: expiresAt,
+        })
+        .onConflictDoUpdate({
+          target: clientsTable.email,
+          set: { inviteToken: newToken, inviteTokenExpiresAt: expiresAt },
+        });
+      inviteToken = newToken;
+    } else if (needsToken) {
+      const newToken = generateSecureToken(32);
+      const expiresAt = new Date(Date.now() + PROJECT_INVITE_TTL_MS);
+      await db
+        .update(clientsTable)
+        .set({ inviteToken: newToken, inviteTokenExpiresAt: expiresAt })
+        .where(eq(clientsTable.id, existingClient.id));
+      inviteToken = newToken;
     }
 
     try {
@@ -367,7 +405,8 @@ router.post(
         to: email,
         projectTitle: project.title,
         invitedByEmail: req.dbClient!.email,
-        alreadyHasAccount: Boolean(existingClient),
+        alreadyHasAccount: Boolean(existingClient && existingClient.status === "active"),
+        inviteToken,
       });
     } catch (err) {
       logger.warn({ err }, "Failed to send project invite email");
