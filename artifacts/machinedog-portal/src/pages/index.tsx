@@ -114,7 +114,7 @@ export default function PromptConsole() {
           CONSOLE
         </h1>
         <p className="text-muted-foreground text-sm font-mono flex items-center gap-2">
-          <span className="text-xs px-2 py-0.5 rounded glass-subtle text-primary border-primary/20">CLAUDE-3.5-SONNET</span>
+          <span className="text-xs px-2 py-0.5 rounded glass-subtle text-primary border-primary/20">MACHINEDOG</span>
           Enter system parameters or codebase snippets below.
         </p>
       </div>

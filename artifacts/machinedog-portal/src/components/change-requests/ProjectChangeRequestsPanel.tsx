@@ -124,7 +124,7 @@ export function ProjectChangeRequestsPanel({ projectId }: { projectId: number })
     if (wordCount < 6) {
       toast({
         title: "Tell us a bit more",
-        description: "Describe the change in more than five words so Claude has enough to work with.",
+        description: "Describe the change in more than five words so Machinedog has enough to work with.",
         variant: "destructive",
       });
       return;
