@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useListMyProjects, useCreateProject } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,21 @@ export default function ProjectsPage() {
   const createProject = useCreateProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [location, setLocation] = useLocation();
+
+  // Auto-open the create dialog when navigated to with ?new=1 (e.g. from the
+  // ProjectsPicker "New project" footer link). Clears the query param after
+  // opening so a refresh doesn't re-trigger.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "1") {
+      setOpen(true);
+      params.delete("new");
+      const next = params.toString();
+      setLocation(next ? `/projects?${next}` : "/projects", { replace: true });
+    }
+  }, [location, setLocation]);
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");

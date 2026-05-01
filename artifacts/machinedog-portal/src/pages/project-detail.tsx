@@ -42,6 +42,8 @@ import {
   Trash2,
   Users,
   Zap,
+  LayoutPanelLeft,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +53,7 @@ import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentConversation } from "@/components/change-requests/AgentConversation";
+import { LivePreviewPane } from "@/components/change-requests/LivePreviewPane";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -86,6 +89,26 @@ export default function ProjectDetailPage() {
     status: "draft" as "draft" | "active" | "completed" | "archived",
   });
   const [inviteEmail, setInviteEmail] = useState("");
+  // Replit-style split view: agent on the left, full-height live preview on the right.
+  // Defaults to "workspace" if a productionUrl/liveUrl exists; otherwise "details".
+  // User preference persists per-project in localStorage.
+  const hasPreview = !!(project?.productionUrl || project?.liveUrl);
+  const [view, setView] = useState<"workspace" | "details">("details");
+  useEffect(() => {
+    if (!project) return;
+    const stored = window.localStorage.getItem(`md.projectView.${project.id}`);
+    if (stored === "workspace" || stored === "details") {
+      setView(stored);
+    } else {
+      setView(project.productionUrl || project.liveUrl ? "workspace" : "details");
+    }
+  }, [project?.id, project?.productionUrl, project?.liveUrl]);
+  function handleViewChange(next: "workspace" | "details") {
+    setView(next);
+    if (project) {
+      window.localStorage.setItem(`md.projectView.${project.id}`, next);
+    }
+  }
 
   useEffect(() => {
     if (project) {
@@ -193,13 +216,66 @@ export default function ProjectDetailPage() {
   };
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full gap-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <Link href="/projects">
-          <Button variant="ghost" size="sm" className="font-mono text-muted-foreground">
-            <ArrowLeft className="h-4 w-4 mr-2" /> ALL_PROJECTS
-          </Button>
-        </Link>
+    <div
+      className={
+        view === "workspace"
+          ? "h-full flex flex-col p-3 md:p-4 w-full gap-3 overflow-hidden"
+          : "min-h-full flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full gap-6"
+      }
+    >
+      <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
+        <div className="flex items-center gap-2">
+          <Link href="/projects">
+            <Button variant="ghost" size="sm" className="font-mono text-muted-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" /> ALL_PROJECTS
+            </Button>
+          </Link>
+          {/* View toggle: Workspace (Replit-style split) vs Details (full editor) */}
+          <div
+            role="group"
+            aria-label="Project view"
+            className="flex items-center gap-0.5 rounded-lg ring-1 ring-border/30 bg-background/40 p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => handleViewChange("workspace")}
+              aria-pressed={view === "workspace"}
+              aria-label="Switch to workspace view"
+              data-testid="button-view-workspace"
+              title={
+                hasPreview
+                  ? "Workspace view: agent + live preview"
+                  : "Workspace view: agent + preview pane (set a Production URL to fill the preview)"
+              }
+              className={
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-colors " +
+                (view === "workspace"
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40")
+              }
+            >
+              <LayoutPanelLeft className="h-3.5 w-3.5" />
+              Workspace
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewChange("details")}
+              aria-pressed={view === "details"}
+              aria-label="Switch to details view"
+              data-testid="button-view-details"
+              title="Details view: full editor, files, comments, collaborators"
+              className={
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-colors " +
+                (view === "details"
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40")
+              }
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Details
+            </button>
+          </div>
+        </div>
         <span
           className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20"
         >
@@ -207,6 +283,63 @@ export default function ProjectDetailPage() {
         </span>
       </div>
 
+      {view === "workspace" && (
+        <>
+          {/* Compact title strip when in workspace mode */}
+          <div className="glass rounded-xl px-4 py-2.5 flex items-center gap-3 shrink-0">
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              <h1 className="text-base font-bold tracking-tight truncate">
+                {project.title}
+              </h1>
+              <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground shrink-0">
+                {project.status}
+              </span>
+              {project.productionUrl && (
+                <a
+                  href={project.productionUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-[11px] font-mono text-primary hover:underline truncate hidden sm:inline-flex items-center gap-1 min-w-0"
+                  title={project.productionUrl}
+                >
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{project.productionUrl.replace(/^https?:\/\//, "")}</span>
+                </a>
+              )}
+            </div>
+            {isOwner && (
+              <Button
+                onClick={() => {
+                  handleViewChange("details");
+                  setEditing(true);
+                }}
+                variant="ghost"
+                size="sm"
+                className="font-mono shrink-0"
+                data-testid="button-edit-from-workspace"
+              >
+                <Pencil className="h-3 w-3 mr-1.5" /> EDIT
+              </Button>
+            )}
+          </div>
+
+          {/* Replit-style split: agent on the left, full-height preview on the right */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(360px,42%)_1fr] gap-3 overflow-hidden">
+            <div className="min-h-0 overflow-hidden flex flex-col">
+              <AgentConversation projectId={project.id} isOwner={isOwner} compact />
+            </div>
+            <div className="min-h-0 overflow-hidden hidden lg:flex flex-col">
+              <LivePreviewPane
+                previewUrl={null}
+                productionUrl={project.productionUrl}
+                liveUrl={project.liveUrl}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {view === "details" && (<>
       <div className="glass-strong rounded-2xl overflow-hidden">
         {project.coverImageUrl && (
           <div
@@ -422,6 +555,7 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMeQueryKey, getListMyPromptsQueryKey } from "@workspace/api-client-react";
+import { ProjectsPicker } from "@/components/ProjectsPicker";
 
 type ActiveTab = "preview" | "publish";
 
@@ -219,6 +220,11 @@ export default function PromptConsole() {
 
         <div className="flex-1" />
 
+        {/* Projects picker — open any project you have access to */}
+        <div className="shrink-0 mr-1">
+          <ProjectsPicker />
+        </div>
+
         {/* Token chip + top up */}
         {me && (
           <div className="flex items-center gap-1.5 shrink-0">
@@ -329,7 +335,7 @@ export default function PromptConsole() {
                 {/* Action rows */}
                 <ActionRow
                   icon={CircleDot}
-                  text="Routing prompt to Claude"
+                  text="Routing prompt to Machinedog"
                   state={submitPrompt.isPending ? "working" : "done"}
                 />
                 <ActionRow

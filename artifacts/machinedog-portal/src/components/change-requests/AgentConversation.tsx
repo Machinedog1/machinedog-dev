@@ -68,9 +68,17 @@ function statusHeadline(cr: ChangeRequest): string | null {
 export function AgentConversation({
   projectId,
   isOwner = false,
+  compact = false,
 }: {
   projectId: number;
   isOwner?: boolean;
+  /**
+   * When true, render conversation only (no internal preview/publish right pane)
+   * and fill the parent's available height instead of using a viewport-based
+   * fixed height. Used by the project-detail "Workspace" split where
+   * a separate LivePreviewPane is rendered alongside.
+   */
+  compact?: boolean;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -273,7 +281,13 @@ export function AgentConversation({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-4 h-[calc(100vh-7rem)] min-h-[700px]">
+    <div
+      className={
+        compact
+          ? "grid grid-cols-1 gap-4 h-full min-h-0"
+          : "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-4 h-[calc(100vh-7rem)] min-h-[700px]"
+      }
+    >
       {/* LEFT: Conversation */}
       <div className="flex flex-col glass rounded-2xl ring-1 ring-border/30 overflow-hidden min-h-0 relative">
         <div className="flex items-center justify-between px-4 h-11 border-b border-border/30 bg-muted/20 shrink-0">
@@ -465,7 +479,7 @@ export function AgentConversation({
                 </button>
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80 px-1 truncate min-w-0">
                   <Sparkles className="h-3 w-3 text-primary/70 shrink-0" />
-                  <span className="truncate">Claude · plans, drafts, never ships without you</span>
+                  <span className="truncate">Machinedog · plans, drafts, never ships without you</span>
                 </div>
               </div>
               <Button
@@ -492,7 +506,9 @@ export function AgentConversation({
         </form>
       </div>
 
-      {/* RIGHT: Tabbed preview / publish */}
+      {/* RIGHT: Tabbed preview / publish — hidden in compact mode where the
+          parent (project-detail Workspace view) renders its own LivePreviewPane. */}
+      {!compact && (
       <div className="min-h-0">
         <Tabs defaultValue="preview" className="flex flex-col h-full glass rounded-2xl ring-1 ring-border/30 overflow-hidden">
           <TabsList className="rounded-none border-b border-border/30 bg-muted/20 h-auto p-1 justify-start shrink-0">
@@ -553,6 +569,7 @@ export function AgentConversation({
           </TabsContent>
         </Tabs>
       </div>
+      )}
     </div>
   );
 }
