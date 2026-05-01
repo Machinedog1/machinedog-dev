@@ -229,6 +229,20 @@
   100% { transform: scale(1) translate(0, 0); }
 }
 
+@keyframes md-eye-pulse-kf {
+  0%, 100% { opacity: 0.55; filter: blur(0.5px); }
+  50%      { opacity: 1;    filter: blur(0px); }
+}
+
+.md-eye-pulse {
+  animation: md-eye-pulse-kf 2.4s ease-in-out infinite;
+  will-change: opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-eye-pulse { animation: none; opacity: 0.85; }
+}
+
 .bg-mesh {
   position: fixed;
   inset: -10%;

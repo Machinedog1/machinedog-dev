@@ -1,9 +1,48 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
 import huskyPortrait from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_1777252211433.png";
+
+const HUSKY_NATURAL_W = 1024;
+const HUSKY_NATURAL_H = 1536;
+const EYE_X_FRACTION = 0.283;
+const EYE_Y_FRACTION = 0.367;
+const EYE_DIAMETER_FRACTION = 0.085;
+
+function useEyeOverlay(
+  containerRef: RefObject<HTMLElement | null>,
+  objectPosX: number,
+  objectPosY: number,
+) {
+  const [pos, setPos] = useState({ x: 0, y: 0, diameter: 0, ready: false });
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const compute = () => {
+      const cw = el.clientWidth;
+      const ch = el.clientHeight;
+      if (cw <= 0 || ch <= 0) return;
+      const scale = Math.max(cw / HUSKY_NATURAL_W, ch / HUSKY_NATURAL_H);
+      const renderedW = HUSKY_NATURAL_W * scale;
+      const renderedH = HUSKY_NATURAL_H * scale;
+      const xOffset = (cw - renderedW) * objectPosX;
+      const yOffset = (ch - renderedH) * objectPosY;
+      setPos({
+        x: xOffset + EYE_X_FRACTION * renderedW,
+        y: yOffset + EYE_Y_FRACTION * renderedH,
+        diameter: EYE_DIAMETER_FRACTION * renderedH,
+        ready: true,
+      });
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerRef, objectPosX, objectPosY]);
+  return pos;
+}
 
 export default function SignInPage() {
   const intakeHref = `${import.meta.env.BASE_URL}intake`.replace(/\/+/g, "/");
@@ -18,6 +57,11 @@ export default function SignInPage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const canSubmit = emailAddress.trim().length > 0 && password.length > 0 && !isSubmitting;
+
+  const desktopHuskyRef = useRef<HTMLDivElement>(null);
+  const mobileHuskyRef = useRef<HTMLDivElement>(null);
+  const desktopEye = useEyeOverlay(desktopHuskyRef, 0.5, 0.32);
+  const mobileEye = useEyeOverlay(mobileHuskyRef, 0.5, 0.3);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -39,6 +83,7 @@ export default function SignInPage() {
       style={{ background: "hsl(220 45% 3%)" }}
     >
       <div
+        ref={desktopHuskyRef}
         className="hidden lg:block absolute inset-0 bg-cover bg-no-repeat lg:bg-[position:50%_32%]"
         style={{
           backgroundImage: `url(${huskyPortrait})`,
@@ -53,6 +98,23 @@ export default function SignInPage() {
             "radial-gradient(ellipse 70% 35% at 52% 38%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
         }}
       />
+      {/* Pulsing cybernetic eye glow — locked to the husky's cybernetic eye
+          in image-coordinates via useEyeOverlay, so it tracks the eye no
+          matter how the viewport is resized. */}
+      {desktopEye.ready && (
+        <div
+          className="hidden lg:block absolute pointer-events-none mix-blend-screen md-eye-pulse rounded-full"
+          aria-hidden
+          style={{
+            left: desktopEye.x - desktopEye.diameter / 2,
+            top: desktopEye.y - desktopEye.diameter / 2,
+            width: desktopEye.diameter,
+            height: desktopEye.diameter,
+            background:
+              "radial-gradient(circle, hsla(195,100%,68%,1) 0%, hsla(200,100%,55%,0.55) 35%, transparent 70%)",
+          }}
+        />
+      )}
       <div
         className="hidden lg:block absolute inset-0 pointer-events-none"
         style={{
@@ -87,7 +149,10 @@ export default function SignInPage() {
           </nav>
         </header>
 
-        <div className="lg:hidden relative w-full h-[58vh] min-h-[340px] max-h-[500px] overflow-hidden mt-3">
+        <div
+          ref={mobileHuskyRef}
+          className="lg:hidden relative w-full h-[58vh] min-h-[340px] max-h-[500px] overflow-hidden mt-3"
+        >
           <img
             src={huskyPortrait}
             alt=""
@@ -107,6 +172,21 @@ export default function SignInPage() {
                 "radial-gradient(ellipse 70% 35% at 50% 42%, hsla(200,95%,55%,0.30) 0%, transparent 60%)",
             }}
           />
+          {/* Mobile cybernetic eye pulse — locked to the eye via useEyeOverlay. */}
+          {mobileEye.ready && (
+            <div
+              aria-hidden
+              className="absolute pointer-events-none mix-blend-screen md-eye-pulse rounded-full"
+              style={{
+                left: mobileEye.x - mobileEye.diameter / 2,
+                top: mobileEye.y - mobileEye.diameter / 2,
+                width: mobileEye.diameter,
+                height: mobileEye.diameter,
+                background:
+                  "radial-gradient(circle, hsla(195,100%,68%,1) 0%, hsla(200,100%,55%,0.55) 35%, transparent 70%)",
+              }}
+            />
+          )}
           <div
             aria-hidden
             className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"

@@ -30,8 +30,11 @@ import {
 import { LivePreviewPane } from "./LivePreviewPane";
 import { PublishTab } from "./PublishTab";
 
-const PUBLISH_NOTE =
-  "GitHub repo not yet wired up — Publish only emails the operator. The PR/preview integration arrives in the next release.";
+const PUBLISH_NOTE_NO_GITHUB =
+  "GitHub repo not connected for this project — Publish only emails the operator to deploy manually. Add GitHub owner/repo in project settings to enable PRs and previews.";
+
+const PUBLISH_NOTE_GITHUB_READY =
+  "Publish opens a PR against the project repo, merges it, then notifies the operator to deploy.";
 
 const HIDDEN_EVENT_KINDS = new Set<ChangeRequestEvent["kind"]>([
   "snapshot_created",
@@ -501,7 +504,9 @@ export function AgentConversation({
             </div>
           </div>
           <div className="text-[10px] font-mono text-muted-foreground/70 mt-1.5 px-1">
-            {PUBLISH_NOTE}
+            {project?.githubConfigured
+              ? PUBLISH_NOTE_GITHUB_READY
+              : PUBLISH_NOTE_NO_GITHUB}
           </div>
         </form>
       </div>
@@ -564,7 +569,11 @@ export function AgentConversation({
                   : null
               }
               canMarkDeployed={isOwner}
-              noteCopy={PUBLISH_NOTE}
+              noteCopy={
+                project?.githubConfigured
+                  ? PUBLISH_NOTE_GITHUB_READY
+                  : PUBLISH_NOTE_NO_GITHUB
+              }
             />
           </TabsContent>
         </Tabs>
