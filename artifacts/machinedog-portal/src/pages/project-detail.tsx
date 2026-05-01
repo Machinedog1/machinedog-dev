@@ -27,6 +27,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  ChevronLeft,
   ExternalLink,
   FileUp,
   Files,
@@ -34,11 +35,19 @@ import {
   Loader2,
   Mail,
   MessageSquare,
+  MoreHorizontal,
   Pencil,
   RefreshCw,
+  Rocket,
   Save,
   Send,
+  Sparkles,
+  Eye,
   Terminal,
+  Database,
+  KeyRound,
+  Plus,
+  X,
   Trash2,
   Users,
   Zap,
@@ -54,6 +63,22 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentConversation } from "@/components/change-requests/AgentConversation";
 import { LivePreviewPane } from "@/components/change-requests/LivePreviewPane";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -108,6 +133,118 @@ export default function ProjectDetailPage() {
     if (project) {
       window.localStorage.setItem(`md.projectView.${project.id}`, next);
     }
+  }
+
+  // Invite dialog state — used by the workspace top-bar "Invite" button to
+  // open a small modal that calls useInviteProjectMember.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteDialogEmail, setInviteDialogEmail] = useState("");
+
+  function submitInvite() {
+    if (!project) return;
+    const email = inviteDialogEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ variant: "destructive", title: "Invalid email" });
+      return;
+    }
+    inviteMember.mutate(
+      { id: project.id, data: { email } },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Collaborator invited",
+            description: `${email} can now access this project.`,
+          });
+          setInviteDialogEmail("");
+          setInviteOpen(false);
+          queryClient.invalidateQueries({
+            queryKey: getListProjectMembersQueryKey(project.id),
+          });
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Try again.";
+          toast({ variant: "destructive", title: "Invite failed", description: msg });
+        },
+      },
+    );
+  }
+
+  // "Set production URL" inline dialog — opened by Republish when no
+  // productionUrl is set, and by the overflow menu's "Set production URL" item.
+  // Saves directly via useUpdateProject and (optionally) opens the URL after.
+  const [prodUrlOpen, setProdUrlOpen] = useState(false);
+  const [prodUrlInput, setProdUrlInput] = useState("");
+
+  function openProdUrlDialog() {
+    setProdUrlInput(project?.productionUrl ?? "");
+    setProdUrlOpen(true);
+  }
+
+  function submitProductionUrl(opts?: { openAfter?: boolean }) {
+    if (!project) return;
+    const raw = prodUrlInput.trim();
+    if (!raw) {
+      toast({ variant: "destructive", title: "URL required" });
+      return;
+    }
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      const u = new URL(normalized);
+      if (u.protocol !== "http:" && u.protocol !== "https:") {
+        throw new Error("bad protocol");
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Invalid URL" });
+      return;
+    }
+    updateProject.mutate(
+      { id: project.id, data: { productionUrl: normalized } },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Production URL saved",
+            description: normalized,
+          });
+          setProdUrlOpen(false);
+          queryClient.invalidateQueries({
+            queryKey: getGetProjectQueryKey(project.id),
+          });
+          queryClient.invalidateQueries({ queryKey: getListMyProjectsQueryKey() });
+          if (opts?.openAfter) {
+            window.open(normalized, "_blank", "noopener,noreferrer");
+          }
+        },
+        onError: (err: unknown) => {
+          toast({
+            variant: "destructive",
+            title: "Couldn't save URL",
+            description: errorMessage(err, "Try again."),
+          });
+        },
+      },
+    );
+  }
+
+  // "Republish" — pragmatic publish-to-prod for projects without a real deploy
+  // pipeline. If a productionUrl is set, open it in a new tab. Otherwise open
+  // the inline "Set production URL" dialog so the user can configure one
+  // without leaving the workspace view.
+  function handleRepublish() {
+    if (!project) return;
+    if (project.productionUrl) {
+      window.open(project.productionUrl, "_blank", "noopener,noreferrer");
+      toast({
+        title: "Opening production",
+        description: "Production URL opened in a new tab.",
+      });
+      return;
+    }
+    openProdUrlDialog();
+    toast({
+      title: "Set a Production URL",
+      description:
+        "Add the live URL of your published site so Republish has a target.",
+    });
   }
 
   useEffect(() => {
@@ -223,121 +360,365 @@ export default function ProjectDetailPage() {
           : "min-h-full flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full gap-6"
       }
     >
-      <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
-        <div className="flex items-center gap-2">
-          <Link href="/projects">
-            <Button variant="ghost" size="sm" className="font-mono text-muted-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" /> ALL_PROJECTS
-            </Button>
-          </Link>
-          {/* View toggle: Workspace (Replit-style split) vs Details (full editor) */}
-          <div
-            role="group"
-            aria-label="Project view"
-            className="flex items-center gap-0.5 rounded-lg ring-1 ring-border/30 bg-background/40 p-0.5"
-          >
-            <button
-              type="button"
-              onClick={() => handleViewChange("workspace")}
-              aria-pressed={view === "workspace"}
-              aria-label="Switch to workspace view"
-              data-testid="button-view-workspace"
-              title={
-                hasPreview
-                  ? "Workspace view: agent + live preview"
-                  : "Workspace view: agent + preview pane (set a Production URL to fill the preview)"
-              }
-              className={
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-colors " +
-                (view === "workspace"
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40")
-              }
-            >
-              <LayoutPanelLeft className="h-3.5 w-3.5" />
-              Workspace
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewChange("details")}
-              aria-pressed={view === "details"}
-              aria-label="Switch to details view"
-              data-testid="button-view-details"
-              title="Details view: full editor, files, comments, collaborators"
-              className={
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-colors " +
-                (view === "details"
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40")
-              }
-            >
-              <Layers className="h-3.5 w-3.5" />
-              Details
-            </button>
-          </div>
-        </div>
-        <span
-          className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20"
+      {view === "workspace" ? (
+        /* ─── Replit-style IDE chrome ─────────────────────────────────────── */
+        <div
+          className="glass rounded-xl ring-1 ring-border/30 px-1.5 h-11 flex items-center gap-1 shrink-0 overflow-x-auto"
+          data-testid="workspace-chrome"
         >
-          {project.viewerRole === "owner" ? "Owner" : "Collaborator"}
-        </span>
-      </div>
+          {/* Back chevron */}
+          <Link href="/projects">
+            <button
+              type="button"
+              title="Back to all projects"
+              aria-label="Back to all projects"
+              data-testid="button-back-projects"
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition shrink-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </Link>
 
-      {view === "workspace" && (
-        <>
-          {/* Compact title strip when in workspace mode */}
-          <div className="glass rounded-xl px-4 py-2.5 flex items-center gap-3 shrink-0">
-            <div className="min-w-0 flex-1 flex items-center gap-3">
-              <h1 className="text-base font-bold tracking-tight truncate">
+          {/* Workspace tabs (Replit-style) — Agent is the active surface;
+              Preview/Publishing/Console/Database/Secrets are decorative
+              placeholders that match the IDE metaphor. They render with a
+              dismiss "X" affordance for visual fidelity but currently no-op. */}
+          <ChromeTab
+            icon={<Sparkles className="h-3.5 w-3.5" />}
+            label="Agent"
+            active
+            testId="tab-workspace-agent"
+          />
+          <ChromeTab
+            icon={<Eye className="h-3.5 w-3.5" />}
+            label="Preview"
+            dismissible
+            testId="tab-workspace-preview"
+          />
+          <ChromeTab
+            icon={<Rocket className="h-3.5 w-3.5" />}
+            label="Publishing"
+            dismissible
+            testId="tab-workspace-publishing"
+          />
+          <ChromeTab
+            icon={<Terminal className="h-3.5 w-3.5" />}
+            label="Console"
+            dismissible
+            testId="tab-workspace-console"
+          />
+          <ChromeTab
+            icon={<Database className="h-3.5 w-3.5" />}
+            label="Database"
+            dismissible
+            testId="tab-workspace-database"
+          />
+          <ChromeTab
+            icon={<KeyRound className="h-3.5 w-3.5" />}
+            label="Secrets"
+            dismissible
+            testId="tab-workspace-secrets"
+          />
+          <button
+            type="button"
+            aria-label="Add tab (coming soon)"
+            title="Add tab — coming soon"
+            data-testid="button-tab-add"
+            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition shrink-0"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="flex-1" />
+
+          {/* Right cluster: Invite / Republish / overflow menu */}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setInviteOpen(true)}
+              data-testid="button-workspace-invite"
+              className="hidden sm:inline-flex items-center gap-1 px-2.5 h-7 rounded-md ring-1 ring-border/30 bg-background/60 hover:bg-background/80 transition font-mono text-[11px] text-foreground/90 shrink-0"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Invite
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleRepublish}
+            data-testid="button-workspace-republish"
+            title={
+              project.productionUrl
+                ? `Open the production site (${project.productionUrl})`
+                : "Publish to production — set a Production URL first"
+            }
+            className="inline-flex items-center gap-1 px-2.5 h-7 rounded-md font-mono text-[11px] font-bold shadow-md shadow-primary/20 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white shrink-0"
+          >
+            <Rocket className="h-3.5 w-3.5" />
+            Republish
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="More actions"
+                data-testid="button-workspace-menu"
+                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition shrink-0"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-wider">
                 {project.title}
-              </h1>
-              <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground shrink-0">
-                {project.status}
-              </span>
-              {project.productionUrl && (
-                <a
-                  href={project.productionUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-[11px] font-mono text-primary hover:underline truncate hidden sm:inline-flex items-center gap-1 min-w-0"
-                  title={project.productionUrl}
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{project.productionUrl.replace(/^https?:\/\//, "")}</span>
-                </a>
-              )}
-            </div>
-            {isOwner && (
-              <Button
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
                 onClick={() => {
                   handleViewChange("details");
                   setEditing(true);
                 }}
-                variant="ghost"
-                size="sm"
-                className="font-mono shrink-0"
-                data-testid="button-edit-from-workspace"
+                data-testid="menu-edit-project"
               >
-                <Pencil className="h-3 w-3 mr-1.5" /> EDIT
+                <Pencil className="h-3.5 w-3.5 mr-2" />
+                Edit project
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleViewChange("details")}
+                data-testid="menu-switch-details"
+              >
+                <Layers className="h-3.5 w-3.5 mr-2" />
+                Switch to details view
+              </DropdownMenuItem>
+              {isOwner && (
+                <DropdownMenuItem
+                  onClick={openProdUrlDialog}
+                  data-testid="menu-set-production-url"
+                >
+                  <Globe className="h-3.5 w-3.5 mr-2" />
+                  {project.productionUrl
+                    ? "Change production URL"
+                    : "Set production URL"}
+                </DropdownMenuItem>
+              )}
+              {project.productionUrl && (
+                <DropdownMenuItem asChild>
+                  <a
+                    href={project.productionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="menu-open-production"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                    Open production
+                  </a>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                {project.viewerRole === "owner" ? "Owner" : "Collaborator"}
+              </DropdownMenuLabel>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : (
+        /* ─── Details mode header (back button + view toggle + role pill) ── */
+        <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
+          <div className="flex items-center gap-2">
+            <Link href="/projects">
+              <Button variant="ghost" size="sm" className="font-mono text-muted-foreground">
+                <ArrowLeft className="h-4 w-4 mr-2" /> ALL_PROJECTS
               </Button>
-            )}
-          </div>
-
-          {/* Replit-style split: agent on the left, full-height preview on the right */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(360px,42%)_1fr] gap-3 overflow-hidden">
-            <div className="min-h-0 overflow-hidden flex flex-col">
-              <AgentConversation projectId={project.id} isOwner={isOwner} compact />
+            </Link>
+            <div
+              role="group"
+              aria-label="Project view"
+              className="flex items-center gap-0.5 rounded-lg ring-1 ring-border/30 bg-background/40 p-0.5"
+            >
+              <button
+                type="button"
+                onClick={() => handleViewChange("workspace")}
+                aria-pressed={false}
+                aria-label="Switch to workspace view"
+                data-testid="button-view-workspace"
+                title={
+                  hasPreview
+                    ? "Workspace view: agent + live preview"
+                    : "Workspace view: agent + preview pane (set a Production URL to fill the preview)"
+                }
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              >
+                <LayoutPanelLeft className="h-3.5 w-3.5" />
+                Workspace
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewChange("details")}
+                aria-pressed={true}
+                aria-label="Switch to details view"
+                data-testid="button-view-details"
+                title="Details view: full editor, files, comments, collaborators"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-colors bg-primary/15 text-primary"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Details
+              </button>
             </div>
-            <div className="min-h-0 overflow-hidden hidden lg:flex flex-col">
-              <LivePreviewPane
-                previewUrl={null}
-                productionUrl={project.productionUrl}
-                liveUrl={project.liveUrl}
-              />
-            </div>
           </div>
-        </>
+          <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
+            {project.viewerRole === "owner" ? "Owner" : "Collaborator"}
+          </span>
+        </div>
       )}
+
+      {view === "workspace" && (
+        /* Replit-style split: agent on the left, full-height preview on the right */
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(360px,42%)_1fr] gap-3 overflow-hidden">
+          <div className="min-h-0 overflow-hidden flex flex-col">
+            <AgentConversation projectId={project.id} isOwner={isOwner} compact />
+          </div>
+          <div className="min-h-0 overflow-hidden hidden lg:flex flex-col">
+            <LivePreviewPane
+              previewUrl={null}
+              productionUrl={project.productionUrl}
+              liveUrl={project.liveUrl}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Invite collaborator dialog — opened from the workspace top bar. */}
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite collaborator</DialogTitle>
+            <DialogDescription>
+              They'll get access as soon as they sign in with this email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label
+              htmlFor="invite-dialog-email"
+              className="text-xs font-mono font-bold text-muted-foreground tracking-wider uppercase"
+            >
+              Email address
+            </label>
+            <Input
+              id="invite-dialog-email"
+              type="email"
+              autoComplete="email"
+              placeholder="collaborator@example.com"
+              value={inviteDialogEmail}
+              onChange={(e) => setInviteDialogEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitInvite();
+              }}
+              data-testid="input-invite-dialog-email"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setInviteOpen(false)}
+              data-testid="button-invite-dialog-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitInvite}
+              disabled={inviteMember.isPending || !inviteDialogEmail.trim()}
+              data-testid="button-invite-dialog-submit"
+              className="bg-gradient-to-r from-[#3FB1F0] to-[#7C7BF7] text-white font-bold"
+            >
+              {inviteMember.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Inviting...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-3.5 w-3.5 mr-1.5" /> Send invite
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set / change production URL dialog — opened from Republish (when no
+          URL is set) or from the overflow menu. Owner-only. Persists via
+          useUpdateProject and refreshes the project query so the iframe and
+          Republish target update immediately. */}
+      <Dialog open={prodUrlOpen} onOpenChange={setProdUrlOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {project.productionUrl ? "Change production URL" : "Set production URL"}
+            </DialogTitle>
+            <DialogDescription>
+              The live URL of your published site. Republish opens this URL in a new
+              tab and the workspace preview pane loads it inside the iframe.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label
+              htmlFor="prod-url-input"
+              className="text-xs font-mono font-bold text-muted-foreground tracking-wider uppercase"
+            >
+              Production URL
+            </label>
+            <Input
+              id="prod-url-input"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="https://app.example.com"
+              value={prodUrlInput}
+              onChange={(e) => setProdUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitProductionUrl();
+              }}
+              data-testid="input-prod-url"
+            />
+            <p className="text-[11px] text-muted-foreground/80">
+              Tip: include the protocol (we'll add <code>https://</code> if you don't).
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setProdUrlOpen(false)}
+              data-testid="button-prod-url-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => submitProductionUrl()}
+              disabled={updateProject.isPending || !prodUrlInput.trim()}
+              data-testid="button-prod-url-save"
+            >
+              {updateProject.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> Save
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => submitProductionUrl({ openAfter: true })}
+              disabled={updateProject.isPending || !prodUrlInput.trim()}
+              data-testid="button-prod-url-save-open"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold"
+            >
+              <Rocket className="h-3.5 w-3.5 mr-1.5" /> Save & Republish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {view === "details" && (<>
       <div className="glass-strong rounded-2xl overflow-hidden">
@@ -556,6 +937,58 @@ export default function ProjectDetailPage() {
         </div>
       )}
       </>)}
+    </div>
+  );
+}
+
+function ChromeTab({
+  icon,
+  label,
+  active = false,
+  dismissible = false,
+  testId,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  /** When true, renders a small "×" affordance like Replit's IDE tabs. The
+   *  click is currently a no-op (the tab strip is decorative outside Agent),
+   *  but the visual matches the reference. */
+  dismissible?: boolean;
+  testId?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div
+      className={
+        "h-8 inline-flex items-center gap-1.5 pl-2 rounded-md text-[12px] font-mono transition-colors shrink-0 group " +
+        (active
+          ? "bg-background/80 text-foreground ring-1 ring-border/40 shadow-sm pr-2"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 pr-1")
+      }
+      data-testid={testId}
+      data-active={active ? "true" : "false"}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className="inline-flex items-center gap-1.5 cursor-default"
+      >
+        <span className={active ? "text-primary" : ""}>{icon}</span>
+        <span className="truncate">{label}</span>
+      </button>
+      {dismissible && !active && (
+        <button
+          type="button"
+          aria-label={`Close ${label} tab`}
+          tabIndex={-1}
+          className="h-4 w-4 inline-flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }

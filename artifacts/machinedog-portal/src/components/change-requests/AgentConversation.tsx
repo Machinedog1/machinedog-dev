@@ -296,8 +296,8 @@ export function AgentConversation({
               <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
             <div className="flex flex-col min-w-0">
-              <h3 className="font-mono text-[12px] uppercase tracking-wider leading-tight">
-                Agent
+              <h3 className="font-mono text-[12px] uppercase tracking-wider leading-tight truncate">
+                {compact ? "Published your App" : "Agent"}
               </h3>
               <div className="text-[10px] text-muted-foreground/80 leading-tight truncate">
                 {project?.title ?? "Project"}

@@ -212,6 +212,28 @@ export function LivePreviewPane({
         )}
       </div>
 
+      {/* Auth/upload notice — matches Replit's preview pane chrome. Only shown
+          when there's a real URL loaded; encourages users to test sensitive
+          flows in a real browser tab where third-party cookies aren't blocked. */}
+      {url && (
+        <div
+          className="px-3 py-1.5 text-[11px] flex items-center justify-between gap-2 shrink-0 bg-orange-500/15 text-orange-200 border-t border-b border-orange-500/30"
+          data-testid="preview-auth-banner"
+        >
+          <span className="truncate">
+            Open a new tab to test authentication and file uploads.
+          </span>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-wider text-orange-100 hover:text-white shrink-0"
+          >
+            <ExternalLink className="h-3 w-3" /> Open
+          </a>
+        </div>
+      )}
+
       {/* Preview surface */}
       <div className="flex-1 min-h-0 bg-[radial-gradient(circle_at_50%_0%,_hsl(220_15%_15%),_hsl(220_15%_8%))] flex items-center justify-center overflow-auto">
         {url ? (
