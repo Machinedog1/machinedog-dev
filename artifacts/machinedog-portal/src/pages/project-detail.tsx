@@ -66,6 +66,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentConversation } from "@/components/change-requests/AgentConversation";
 import { LivePreviewPane } from "@/components/change-requests/LivePreviewPane";
+import { WorkspaceSplit } from "@/components/change-requests/WorkspaceSplit";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -777,12 +778,14 @@ export default function ProjectDetailPage() {
       )}
 
       {view === "workspace" && (
-        /* Replit-style split: agent on the left, full-height preview on the right */
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(360px,42%)_1fr] gap-3 overflow-hidden">
-          <div className="min-h-0 overflow-hidden flex flex-col">
+        /* Replit-style split: agent on the left, full-height preview on the right.
+           The divider is draggable; width is persisted per project. */
+        <WorkspaceSplit
+          storageKey={`md.workspaceSplit.project.${project.id}`}
+          left={
             <AgentConversation projectId={project.id} isOwner={isOwner} compact />
-          </div>
-          <div className="min-h-0 overflow-hidden hidden lg:flex flex-col">
+          }
+          right={
             <LivePreviewPane
               previewUrl={null}
               productionUrl={project.productionUrl}
@@ -790,8 +793,8 @@ export default function ProjectDetailPage() {
               onSetProductionUrl={isOwner ? openProdUrlDialog : undefined}
               onSetDevUrl={isOwner ? openDevUrlDialog : undefined}
             />
-          </div>
-        </div>
+          }
+        />
       )}
 
       {/* Invite collaborator dialog — opened from the workspace top bar. */}
