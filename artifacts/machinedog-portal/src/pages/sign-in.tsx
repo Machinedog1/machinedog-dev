@@ -117,10 +117,21 @@ export default function SignInPage() {
           />
         </div>
 
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(420px,0.95fr)] items-end lg:items-center gap-6 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-16 pt-6 lg:pt-0">
-          <div className="order-1 lg:order-1 w-full max-w-xl">
+        {/* Layout: on lg+ screens, both the hero card and the sign-in card
+            stack in a single right-aligned column so the husky portrait
+            background shows on the left half. Sized to fit above the fold
+            on a 720px viewport (header ~80px + 2 cards ~580px + padding). */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_minmax(380px,440px)] items-end lg:items-center gap-6 lg:gap-8 px-5 sm:px-8 lg:px-12 pb-8 lg:pb-10 pt-4 lg:pt-0">
+          {/* Empty spacer on the left so the right column hugs the right
+              edge while leaving the husky portrait visible. */}
+          <div className="hidden lg:block" aria-hidden />
+
+          <div className="order-1 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0 flex flex-col gap-4 lg:gap-5">
+            {/* Compact hero card — sits above the sign-in card on lg+. The
+                headline collapses to a single line at this width so the
+                combined stack stays above the fold. */}
             <div
-              className="relative rounded-[28px] p-5 sm:p-7 lg:p-8 overflow-hidden"
+              className="relative rounded-[24px] p-5 sm:p-6 overflow-hidden"
               style={{
                 background:
                   "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)",
@@ -150,21 +161,20 @@ export default function SignInPage() {
               />
               <div className="relative">
                 <div
-                  className="mb-4 text-[11px] sm:text-xs font-mono tracking-[0.28em] uppercase"
+                  className="mb-2 text-[10px] font-mono tracking-[0.28em] uppercase"
                   style={{ color: "hsl(200 95% 70%)" }}
                 >
                   Invite-only AI atelier
                 </div>
                 <h1
-                  className="text-white uppercase font-extrabold leading-[0.95] tracking-tight break-words"
+                  className="text-white uppercase font-extrabold leading-[1.02] tracking-tight"
                   style={{
-                    fontSize: "clamp(1.5rem, 7vw, 4.5rem)",
+                    fontSize: "clamp(1.5rem, 2.6vw, 2rem)",
                     textShadow: "0 4px 40px rgba(0,0,0,0.45)",
-                    letterSpacing: "-0.01em",
+                    letterSpacing: "-0.015em",
                   }}
                 >
-                  We forge
-                  <br />
+                  We forge{" "}
                   <span
                     style={{
                       WebkitTextFillColor: "transparent",
@@ -174,20 +184,17 @@ export default function SignInPage() {
                     }}
                   >
                     digital
-                  </span>
-                  <br />
+                  </span>{" "}
                   intelligence
                 </h1>
-                <p className="mt-5 max-w-md text-base sm:text-lg leading-relaxed text-white/75">
-                  Machinedog.Dev is a private engineering atelier. Sign in with
-                  your invited account to access prompts, projects, and
-                  consulting hours.
+                <p className="mt-2 text-[13px] sm:text-sm leading-snug text-white/70">
+                  Machinedog.Dev is a private engineering atelier. Sign in
+                  for prompts, projects, and consulting hours.
                 </p>
               </div>
             </div>
-          </div>
 
-          <div className="order-2 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto min-w-0">
+            <div className="w-full min-w-0">
             <div
               className="relative rounded-[28px] p-5 sm:p-8 overflow-hidden"
               style={{
@@ -327,6 +334,7 @@ export default function SignInPage() {
                   </p>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </main>
