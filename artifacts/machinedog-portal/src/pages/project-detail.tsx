@@ -859,10 +859,10 @@ export default function ProjectDetailPage() {
           project's productionUrl so the Production env tab in the preview
           pane reflects the new target immediately. */}
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg !bg-card !backdrop-blur-none border border-border/60 shadow-2xl">
           <DialogHeader>
             <DialogTitle>Publish Dev → Production</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-muted-foreground">
               This promotes your current Dev site to Production and notifies
               the operator to confirm the deploy. The change is logged so you
               can roll back if needed.
