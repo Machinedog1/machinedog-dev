@@ -81,28 +81,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// Replit hosts a project at two mirrored hostnames: `<repl>.replit.dev` for
-// the live development server and `<repl>.replit.app` for the published
-// deployment. When only one is configured on a project we can infer the
-// other and silently backfill it. These helpers return null for any URL that
-// isn't a Replit hostname (custom domains stay manual).
-function inferDevFromProd(prodUrl: string): string | null {
-  try {
-    const u = new URL(prodUrl);
-    if (!u.hostname.endsWith(".replit.app")) return null;
-    const stem = u.hostname.slice(0, -".replit.app".length);
-    if (!stem) return null;
-    return `${u.protocol}//${stem}.replit.dev`;
-  } catch {
-    return null;
-  }
-}
+// Legacy Replit hosting used a 1:1 mapping between dev (`<repl>.replit.dev`)
+// and prod (`<repl>.replit.app`) hostnames, so when a user pastes a legacy
+// dev URL we can backfill the matching prod URL. Modern Replit dev URLs use
+// a per-run UUID host (`<uuid>-00-xxx.<region>.replit.dev`) that has NO
+// stable relationship to the published `.replit.app`, so we never derive
+// in either direction for those — they have to be set manually.
+//
+// Direction note: we only auto-derive Dev → Prod, never Prod → Dev. The
+// reverse direction would generate dead URLs for any modern project (the
+// legacy `<slug>.replit.dev` host returns NXDOMAIN today).
 function inferProdFromDev(devUrl: string): string | null {
   try {
     const u = new URL(devUrl);
     if (!u.hostname.endsWith(".replit.dev")) return null;
     const stem = u.hostname.slice(0, -".replit.dev".length);
     if (!stem) return null;
+    // Modern dev hosts contain a hyphen ("<uuid>-00-...") and/or a region
+    // sub-subdomain. A legacy host is a single label with no hyphen and no
+    // dot. Refuse to derive anything else — silently — to avoid creating
+    // broken prod URLs that the user then has to clean up.
+    if (stem.includes(".") || stem.includes("-")) return null;
     return `${u.protocol}//${stem}.replit.app`;
   } catch {
     return null;
@@ -168,22 +167,17 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // Auto-derive Dev URL ↔ Production URL on project load. Replit hosts use a
-  // 1:1 mapping between dev (`<repl>.replit.dev`) and prod (`<repl>.replit.app`)
-  // hostnames — when only one is configured we backfill the other so the env
-  // switcher shows both immediately without the user having to type anything.
-  // Owner-only; runs once per fetched project state. Custom-domain projects
-  // (anything not ending in .replit.app/.replit.dev) are left untouched.
+  // Auto-derive Production URL from a legacy Dev URL on project load. Modern
+  // Replit dev URLs (UUID hosts) cannot be mapped to a prod URL, so this only
+  // fires for the old `<slug>.replit.dev` shape. Never derives in the reverse
+  // direction — see `inferProdFromDev` for why. Owner-only; runs once per
+  // fetched project state.
   const autoDerivedRef = useRef<number | null>(null);
   useEffect(() => {
     if (!project || !isOwner) return;
     if (autoDerivedRef.current === project.id) return;
 
-    const inferred: { liveUrl?: string; productionUrl?: string } = {};
-    if (!project.liveUrl && project.productionUrl) {
-      const dev = inferDevFromProd(project.productionUrl);
-      if (dev) inferred.liveUrl = dev;
-    }
+    const inferred: { productionUrl?: string } = {};
     if (!project.productionUrl && project.liveUrl) {
       const prod = inferProdFromDev(project.liveUrl);
       if (prod) inferred.productionUrl = prod;
