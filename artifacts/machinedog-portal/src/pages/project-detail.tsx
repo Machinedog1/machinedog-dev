@@ -55,6 +55,7 @@ import {
   Zap,
   LayoutPanelLeft,
   Layers,
+  Code2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,6 +82,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+// Replit hosts a project at two mirrored hostnames: `<repl>.replit.dev` for
+// the live development server and `<repl>.replit.app` for the published
+// deployment. When only one is configured on a project we can infer the
+// other and silently backfill it. These helpers return null for any URL that
+// isn't a Replit hostname (custom domains stay manual).
+function inferDevFromProd(prodUrl: string): string | null {
+  try {
+    const u = new URL(prodUrl);
+    if (!u.hostname.endsWith(".replit.app")) return null;
+    const stem = u.hostname.slice(0, -".replit.app".length);
+    if (!stem) return null;
+    return `${u.protocol}//${stem}.replit.dev`;
+  } catch {
+    return null;
+  }
+}
+function inferProdFromDev(devUrl: string): string | null {
+  try {
+    const u = new URL(devUrl);
+    if (!u.hostname.endsWith(".replit.dev")) return null;
+    const stem = u.hostname.slice(0, -".replit.dev".length);
+    if (!stem) return null;
+    return `${u.protocol}//${stem}.replit.app`;
+  } catch {
+    return null;
+  }
+}
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -140,6 +169,47 @@ export default function ProjectDetailPage() {
       window.localStorage.setItem(`md.projectView.${project.id}`, next);
     }
   }
+
+  // Auto-derive Dev URL ↔ Production URL on project load. Replit hosts use a
+  // 1:1 mapping between dev (`<repl>.replit.dev`) and prod (`<repl>.replit.app`)
+  // hostnames — when only one is configured we backfill the other so the env
+  // switcher shows both immediately without the user having to type anything.
+  // Owner-only; runs once per fetched project state. Custom-domain projects
+  // (anything not ending in .replit.app/.replit.dev) are left untouched.
+  const autoDerivedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!project || !isOwner) return;
+    if (autoDerivedRef.current === project.id) return;
+
+    const inferred: { liveUrl?: string; productionUrl?: string } = {};
+    if (!project.liveUrl && project.productionUrl) {
+      const dev = inferDevFromProd(project.productionUrl);
+      if (dev) inferred.liveUrl = dev;
+    }
+    if (!project.productionUrl && project.liveUrl) {
+      const prod = inferProdFromDev(project.liveUrl);
+      if (prod) inferred.productionUrl = prod;
+    }
+    if (Object.keys(inferred).length === 0) {
+      autoDerivedRef.current = project.id;
+      return;
+    }
+
+    autoDerivedRef.current = project.id;
+    updateProject.mutate(
+      { id: project.id, data: inferred },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({
+            queryKey: getGetProjectQueryKey(project.id),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListMyProjectsQueryKey(),
+          });
+        },
+      },
+    );
+  }, [project?.id, project?.liveUrl, project?.productionUrl, isOwner]);
 
   // Invite dialog state — used by the workspace top-bar "Invite" button to
   // open a small modal that calls useInviteProjectMember.
@@ -216,6 +286,65 @@ export default function ProjectDetailPage() {
             queryKey: getGetProjectQueryKey(project.id),
           });
           queryClient.invalidateQueries({ queryKey: getListMyProjectsQueryKey() });
+          if (opts?.openAfter) {
+            window.open(normalized, "_blank", "noopener,noreferrer");
+          }
+        },
+        onError: (err: unknown) => {
+          toast({
+            variant: "destructive",
+            title: "Couldn't save URL",
+            description: errorMessage(err, "Try again."),
+          });
+        },
+      },
+    );
+  }
+
+  // "Set Dev URL" inline dialog — mirrors the production URL dialog so the
+  // user can configure their .replit.dev (or other dev host) without leaving
+  // the workspace. The Dev URL is what the agent iterates against and what
+  // Publish promotes to Production. Persists to project.liveUrl.
+  const [devUrlOpen, setDevUrlOpen] = useState(false);
+  const [devUrlInput, setDevUrlInput] = useState("");
+
+  function openDevUrlDialog() {
+    setDevUrlInput(project?.liveUrl ?? "");
+    setDevUrlOpen(true);
+  }
+
+  function submitDevUrl(opts?: { openAfter?: boolean }) {
+    if (!project) return;
+    const raw = devUrlInput.trim();
+    if (!raw) {
+      toast({ variant: "destructive", title: "URL required" });
+      return;
+    }
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      const u = new URL(normalized);
+      if (u.protocol !== "http:" && u.protocol !== "https:") {
+        throw new Error("bad protocol");
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Invalid URL" });
+      return;
+    }
+    updateProject.mutate(
+      { id: project.id, data: { liveUrl: normalized } },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Dev URL saved",
+            description: normalized,
+          });
+          setDevUrlOpen(false);
+          queryClient.invalidateQueries({
+            queryKey: getGetProjectQueryKey(project.id),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListMyProjectsQueryKey(),
+          });
           if (opts?.openAfter) {
             window.open(normalized, "_blank", "noopener,noreferrer");
           }
@@ -559,6 +688,15 @@ export default function ProjectDetailPage() {
               </DropdownMenuItem>
               {isOwner && (
                 <DropdownMenuItem
+                  onClick={openDevUrlDialog}
+                  data-testid="menu-set-dev-url"
+                >
+                  <Code2 className="h-3.5 w-3.5 mr-2" />
+                  {project.liveUrl ? "Change Dev URL" : "Set Dev URL"}
+                </DropdownMenuItem>
+              )}
+              {isOwner && (
+                <DropdownMenuItem
                   onClick={openProdUrlDialog}
                   data-testid="menu-set-production-url"
                 >
@@ -650,17 +788,7 @@ export default function ProjectDetailPage() {
               productionUrl={project.productionUrl}
               liveUrl={project.liveUrl}
               onSetProductionUrl={isOwner ? openProdUrlDialog : undefined}
-              onSetDevUrl={
-                isOwner
-                  ? () => {
-                      // Reuse the Edit form for Dev URL — there's no
-                      // dedicated dialog (yet), and the Edit form already
-                      // has a Live URL field.
-                      handleViewChange("details");
-                      setEditing(true);
-                    }
-                  : undefined
-              }
+              onSetDevUrl={isOwner ? openDevUrlDialog : undefined}
             />
           </div>
         </div>
@@ -885,6 +1013,83 @@ export default function ProjectDetailPage() {
               className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold"
             >
               <Rocket className="h-3.5 w-3.5 mr-1.5" /> Save & Republish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set / change Dev URL dialog — opened from the env switcher (when no
+          Dev URL is configured) or from the empty-state Set Dev URL button.
+          The Dev URL is the project's iteration target (typically your
+          .replit.dev domain). Persists to project.liveUrl. */}
+      <Dialog open={devUrlOpen} onOpenChange={setDevUrlOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {project.liveUrl ? "Change Dev URL" : "Set Dev URL"}
+            </DialogTitle>
+            <DialogDescription>
+              The development URL of your project — typically your Replit
+              <code className="mx-1">.replit.dev</code> domain. The workspace
+              preview pane loads this URL inside the iframe when the Dev env
+              tab is selected, and Publish promotes it to Production.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label
+              htmlFor="dev-url-input"
+              className="text-xs font-mono font-bold text-muted-foreground tracking-wider uppercase"
+            >
+              Dev URL
+            </label>
+            <Input
+              id="dev-url-input"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="https://your-project.replit.dev"
+              value={devUrlInput}
+              onChange={(e) => setDevUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitDevUrl();
+              }}
+              data-testid="input-dev-url"
+            />
+            <p className="text-[11px] text-muted-foreground/80">
+              Tip: include the protocol (we'll add <code>https://</code> if you don't).
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setDevUrlOpen(false)}
+              data-testid="button-dev-url-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => submitDevUrl()}
+              disabled={updateProject.isPending || !devUrlInput.trim()}
+              data-testid="button-dev-url-save"
+            >
+              {updateProject.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> Save
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => submitDevUrl({ openAfter: true })}
+              disabled={updateProject.isPending || !devUrlInput.trim()}
+              data-testid="button-dev-url-save-open"
+              className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white font-bold"
+            >
+              <Code2 className="h-3.5 w-3.5 mr-1.5" /> Save & Open
             </Button>
           </DialogFooter>
         </DialogContent>
