@@ -1407,21 +1407,27 @@ export default function ProjectDetailPage() {
                   maxLength={160}
                 />
               </Field>
-              <Field label="LIVE URL">
+              <Field label="DEV URL">
                 <Input
                   value={form.liveUrl}
                   onChange={(e) => setForm((f) => ({ ...f, liveUrl: e.target.value }))}
-                  placeholder="https://beesuite.farm"
+                  placeholder="https://your-app.replit.dev — auto-updated by the heartbeat snippet"
                   type="url"
                 />
+                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
+                  The development URL the agent iterates against. Auto-set by the heartbeat snippet, or paste it here.
+                </p>
               </Field>
               <Field label="PRODUCTION URL (LIVE PREVIEW)">
                 <Input
                   value={form.productionUrl}
                   onChange={(e) => setForm((f) => ({ ...f, productionUrl: e.target.value }))}
-                  placeholder="https://app.beesuite.farm  — embedded in the Live Site panel"
+                  placeholder="https://beesuite.farm — embedded in the Live Site panel"
                   type="url"
                 />
+                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
+                  The published production URL clients see when Publish is hit.
+                </p>
               </Field>
               <Field label="COVER IMAGE URL">
                 <Input
