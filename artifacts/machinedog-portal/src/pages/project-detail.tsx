@@ -583,6 +583,18 @@ export default function ProjectDetailPage() {
               previewUrl={null}
               productionUrl={project.productionUrl}
               liveUrl={project.liveUrl}
+              onSetProductionUrl={isOwner ? openProdUrlDialog : undefined}
+              onSetDevUrl={
+                isOwner
+                  ? () => {
+                      // Reuse the Edit form for Dev URL — there's no
+                      // dedicated dialog (yet), and the Edit form already
+                      // has a Live URL field.
+                      handleViewChange("details");
+                      setEditing(true);
+                    }
+                  : undefined
+              }
             />
           </div>
         </div>

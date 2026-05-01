@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   RefreshCw,
@@ -9,6 +9,10 @@ import {
   Smartphone,
   Lock,
   PictureInPicture2,
+  Code2,
+  Rocket,
+  Plus,
+  GitPullRequest,
 } from "lucide-react";
 
 type Viewport = "desktop" | "tablet" | "mobile";
@@ -18,6 +22,9 @@ const VIEWPORT_WIDTHS: Record<Viewport, number | null> = {
   tablet: 768,
   mobile: 390,
 };
+
+/** The three environments the workspace preview can target. */
+type Env = "dev" | "prod" | "preview";
 
 function isSafeHttpUrl(url: string | null | undefined): url is string {
   if (!url) return false;
@@ -50,33 +57,71 @@ export function LivePreviewPane({
   previewUrl,
   productionUrl,
   liveUrl,
+  onSetProductionUrl,
+  onSetDevUrl,
 }: {
   previewUrl: string | null | undefined;
   productionUrl: string | null | undefined;
   liveUrl: string | null | undefined;
+  /** Optional callback to open a "set production URL" dialog when the user
+   *  clicks Production in the env switcher and no URL is configured. */
+  onSetProductionUrl?: () => void;
+  /** Optional callback to open a "set dev URL" dialog when the user clicks
+   *  Dev in the env switcher and no URL is configured. */
+  onSetDevUrl?: () => void;
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [viewport, setViewport] = useState<Viewport>("desktop");
 
-  const url = isSafeHttpUrl(previewUrl)
-    ? previewUrl
-    : isSafeHttpUrl(productionUrl)
-    ? productionUrl
-    : isSafeHttpUrl(liveUrl)
-    ? liveUrl
-    : null;
+  // Available environments (only those with a URL configured count as
+  // "available" for switching purposes — but Dev/Prod tabs always render so
+  // the user can see what's missing and click to set it).
+  const envs = useMemo(
+    () => ({
+      dev: isSafeHttpUrl(liveUrl) ? liveUrl : null,
+      prod: isSafeHttpUrl(productionUrl) ? productionUrl : null,
+      preview: isSafeHttpUrl(previewUrl) ? previewUrl : null,
+    }),
+    [liveUrl, productionUrl, previewUrl],
+  );
 
-  const sourceLabel = isSafeHttpUrl(previewUrl)
-    ? "PR PREVIEW"
-    : isSafeHttpUrl(productionUrl)
-    ? "PRODUCTION"
-    : isSafeHttpUrl(liveUrl)
-    ? "LIVE"
-    : null;
+  // Default selected env: prefer PR preview when present (most actionable),
+  // then production (canonical live), then dev. The selection is sticky for
+  // the session — but we re-default whenever the user's available envs change.
+  const initialEnv: Env = envs.preview ? "preview" : envs.prod ? "prod" : "dev";
+  const [selectedEnv, setSelectedEnv] = useState<Env>(initialEnv);
 
-  const sourceTone = isSafeHttpUrl(previewUrl)
-    ? "text-amber-300 ring-amber-500/30 bg-amber-500/10"
-    : "text-emerald-300 ring-emerald-500/30 bg-emerald-500/10";
+  // If the env the user picked stops having a URL (e.g. preview removed),
+  // gracefully fall back so the iframe never points at a dangling state.
+  useEffect(() => {
+    if (!envs[selectedEnv]) {
+      const fallback: Env = envs.preview
+        ? "preview"
+        : envs.prod
+        ? "prod"
+        : envs.dev
+        ? "dev"
+        : selectedEnv; // keep selection so the empty state can prompt to set it
+      if (fallback !== selectedEnv) setSelectedEnv(fallback);
+    }
+  }, [envs, selectedEnv]);
+
+  const url = envs[selectedEnv];
+
+  const sourceLabel =
+    selectedEnv === "preview" ? "PR PREVIEW" : selectedEnv === "prod" ? "PRODUCTION" : "DEV";
+  const sourceTone =
+    selectedEnv === "preview"
+      ? "text-amber-300 ring-amber-500/30 bg-amber-500/10"
+      : selectedEnv === "prod"
+      ? "text-emerald-300 ring-emerald-500/30 bg-emerald-500/10"
+      : "text-sky-300 ring-sky-500/30 bg-sky-500/10";
+
+  function handleEnvClick(env: Env) {
+    setSelectedEnv(env);
+    if (env === "prod" && !envs.prod && onSetProductionUrl) onSetProductionUrl();
+    if (env === "dev" && !envs.dev && onSetDevUrl) onSetDevUrl();
+  }
 
   const frameWidth = VIEWPORT_WIDTHS[viewport];
   const frameStyle: React.CSSProperties =
@@ -90,6 +135,66 @@ export function LivePreviewPane({
 
   return (
     <div className="flex flex-col h-full glass rounded-2xl overflow-hidden ring-1 ring-border/30">
+      {/* Environment switcher — Dev / Production / PR Preview. Always renders
+          Dev + Production so users can see what's missing and click to set it.
+          PR Preview only appears when an active preview URL exists. */}
+      <div
+        className="flex items-center gap-1 px-3 h-9 border-b border-border/30 bg-muted/10 shrink-0 overflow-x-auto"
+        role="tablist"
+        aria-label="Preview environment"
+        data-testid="preview-env-switcher"
+      >
+        <EnvTab
+          icon={<Code2 className="h-3.5 w-3.5" />}
+          label="Dev"
+          host={envs.dev ? prettyHost(envs.dev) : "not set"}
+          active={selectedEnv === "dev"}
+          missing={!envs.dev}
+          onClick={() => handleEnvClick("dev")}
+          tone="sky"
+          testId="env-tab-dev"
+        />
+        <EnvTab
+          icon={<Rocket className="h-3.5 w-3.5" />}
+          label="Production"
+          host={envs.prod ? prettyHost(envs.prod) : "not set"}
+          active={selectedEnv === "prod"}
+          missing={!envs.prod}
+          onClick={() => handleEnvClick("prod")}
+          tone="emerald"
+          testId="env-tab-prod"
+        />
+        {envs.preview && (
+          <EnvTab
+            icon={<GitPullRequest className="h-3.5 w-3.5" />}
+            label="PR Preview"
+            host={prettyHost(envs.preview)}
+            active={selectedEnv === "preview"}
+            missing={false}
+            onClick={() => handleEnvClick("preview")}
+            tone="amber"
+            testId="env-tab-preview"
+          />
+        )}
+        {/* Quick-add: only show "+" when a configurable env is missing AND we
+            have a callback wired up. Keeps the row clean otherwise. */}
+        {((!envs.dev && onSetDevUrl) || (!envs.prod && onSetProductionUrl)) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!envs.prod && onSetProductionUrl) onSetProductionUrl();
+              else if (!envs.dev && onSetDevUrl) onSetDevUrl();
+            }}
+            title="Add a URL for the missing environment"
+            aria-label="Add environment URL"
+            data-testid="env-tab-add"
+            className="ml-1 h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition shrink-0"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Browser chrome */}
       <div className="flex items-center gap-2 px-3 h-11 border-b border-border/30 bg-muted/20 shrink-0">
         {/* Traffic-light dots */}
@@ -257,13 +362,36 @@ export function LivePreviewPane({
             </div>
             <div className="space-y-1">
               <div className="text-sm text-foreground/90 font-medium">
-                No preview yet
+                No {selectedEnv === "prod" ? "production" : selectedEnv === "dev" ? "dev" : "preview"} URL set
               </div>
               <div className="text-xs max-w-xs">
-                Add a Production URL on the project to preview the site here, or wait
-                for a PR preview to come online.
+                {selectedEnv === "prod"
+                  ? "Add a Production URL so this iframe loads your live site."
+                  : selectedEnv === "dev"
+                  ? "Add a Dev URL (e.g. your Replit .replit.dev domain) so this iframe loads your in-progress build."
+                  : "Open a change request to generate a PR preview."}
               </div>
             </div>
+            {selectedEnv === "prod" && onSetProductionUrl && (
+              <button
+                type="button"
+                onClick={onSetProductionUrl}
+                data-testid="empty-set-prod-url"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 h-8 rounded-md font-mono text-[11px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+              >
+                <Rocket className="h-3.5 w-3.5" /> Set Production URL
+              </button>
+            )}
+            {selectedEnv === "dev" && onSetDevUrl && (
+              <button
+                type="button"
+                onClick={onSetDevUrl}
+                data-testid="empty-set-dev-url"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 h-8 rounded-md font-mono text-[11px] font-bold bg-gradient-to-r from-sky-500 to-indigo-500 text-white"
+              >
+                <Code2 className="h-3.5 w-3.5" /> Set Dev URL
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -285,5 +413,68 @@ export function LivePreviewPane({
         )}
       </div>
     </div>
+  );
+}
+
+/** A single tab in the Dev/Production/PR-Preview env switcher.
+ *  - `active`  highlights the tab and shows a colored bottom-border accent.
+ *  - `missing` renders the tab in a muted "set me" state so the user knows
+ *    the URL isn't configured yet.
+ */
+function EnvTab({
+  icon,
+  label,
+  host,
+  active,
+  missing,
+  onClick,
+  tone,
+  testId,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  host: string;
+  active: boolean;
+  missing: boolean;
+  onClick: () => void;
+  tone: "sky" | "emerald" | "amber";
+  testId: string;
+}) {
+  const accent =
+    tone === "sky"
+      ? "border-sky-400 text-sky-300"
+      : tone === "emerald"
+      ? "border-emerald-400 text-emerald-300"
+      : "border-amber-400 text-amber-300";
+  const dot =
+    tone === "sky" ? "bg-sky-400" : tone === "emerald" ? "bg-emerald-400" : "bg-amber-400";
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      data-testid={testId}
+      className={
+        "h-7 inline-flex items-center gap-1.5 px-2.5 rounded-md transition-colors shrink-0 border-b-2 " +
+        (active
+          ? `bg-background/70 ${accent}`
+          : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40")
+      }
+      title={missing ? `${label} URL not set — click to configure` : `${label}: ${host}`}
+    >
+      <span className={active ? "" : "opacity-70"}>{icon}</span>
+      <span className="font-mono text-[11px] uppercase tracking-wider">{label}</span>
+      {missing ? (
+        <span className="font-mono text-[10px] text-muted-foreground/70 italic">set</span>
+      ) : (
+        <>
+          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+          <span className="font-mono text-[10.5px] text-foreground/70 max-w-[140px] truncate hidden md:inline">
+            {host}
+          </span>
+        </>
+      )}
+    </button>
   );
 }
