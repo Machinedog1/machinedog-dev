@@ -8,6 +8,7 @@ import {
   Tablet,
   Smartphone,
   Lock,
+  PictureInPicture2,
 } from "lucide-react";
 
 type Viewport = "desktop" | "tablet" | "mobile";
@@ -164,18 +165,50 @@ export function LivePreviewPane({
           })}
         </div>
 
-        {/* Open in new tab */}
-        {url && (
+        {/* Pop out — open in a chrome-less popup window (great for second-monitor preview) */}
+        <button
+          type="button"
+          onClick={() => {
+            if (!url) return;
+            window.open(
+              url,
+              `machinedog-preview-${url}`,
+              "popup,width=1280,height=900,toolbar=0,location=0,menubar=0,status=0,resizable=1",
+            );
+          }}
+          disabled={!url}
+          aria-label="Pop preview out into a separate window"
+          title="Pop out into a separate window"
+          data-testid="button-preview-popout"
+          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <PictureInPicture2 className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Open in new tab — always visible; disabled when no URL is set yet */}
+        {url ? (
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
             title="Open in new tab"
+            aria-label="Open preview in new tab"
             data-testid="link-preview-open"
             className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-label="Open preview in new tab (no URL set)"
+            title="No preview URL set yet — add a Production URL on the project to enable"
+            data-testid="link-preview-open"
+            className="p-1.5 rounded-md text-muted-foreground/40 cursor-not-allowed shrink-0"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </button>
         )}
       </div>
 
