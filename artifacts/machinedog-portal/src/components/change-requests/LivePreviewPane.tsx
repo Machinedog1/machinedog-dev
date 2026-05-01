@@ -10,8 +10,6 @@ import {
   Lock,
   PictureInPicture2,
   Code2,
-  Rocket,
-  Plus,
   GitPullRequest,
 } from "lucide-react";
 
@@ -23,8 +21,9 @@ const VIEWPORT_WIDTHS: Record<Viewport, number | null> = {
   mobile: 390,
 };
 
-/** The three environments the workspace preview can target. */
-type Env = "dev" | "prod" | "preview";
+/** Environments the workspace preview can target. Production is intentionally
+ *  excluded — for the live customer-facing site, just open it in a new tab. */
+type Env = "dev" | "preview";
 
 function isSafeHttpUrl(url: string | null | undefined): url is string {
   if (!url) return false;
@@ -55,17 +54,11 @@ function isSecure(url: string): boolean {
 
 export function LivePreviewPane({
   previewUrl,
-  productionUrl,
   liveUrl,
-  onSetProductionUrl,
   onSetDevUrl,
 }: {
   previewUrl: string | null | undefined;
-  productionUrl: string | null | undefined;
   liveUrl: string | null | undefined;
-  /** Optional callback to open a "set production URL" dialog when the user
-   *  clicks Production in the env switcher and no URL is configured. */
-  onSetProductionUrl?: () => void;
   /** Optional callback to open a "set dev URL" dialog when the user clicks
    *  Dev in the env switcher and no URL is configured. */
   onSetDevUrl?: () => void;
@@ -73,53 +66,41 @@ export function LivePreviewPane({
   const [reloadKey, setReloadKey] = useState(0);
   const [viewport, setViewport] = useState<Viewport>("desktop");
 
-  // Available environments (only those with a URL configured count as
-  // "available" for switching purposes — but Dev/Prod tabs always render so
-  // the user can see what's missing and click to set it).
+  // Available environments. Dev always renders (so the user can see what's
+  // missing and click to set it); PR Preview only appears when a preview URL
+  // is wired up.
   const envs = useMemo(
     () => ({
       dev: isSafeHttpUrl(liveUrl) ? liveUrl : null,
-      prod: isSafeHttpUrl(productionUrl) ? productionUrl : null,
       preview: isSafeHttpUrl(previewUrl) ? previewUrl : null,
     }),
-    [liveUrl, productionUrl, previewUrl],
+    [liveUrl, previewUrl],
   );
 
-  // Default selected env: Dev first (that's where the agent is iterating), then
-  // PR Preview (when present), then Production. The selection is sticky for
-  // the session — but we re-default whenever the user's available envs change.
-  const initialEnv: Env = envs.dev ? "dev" : envs.preview ? "preview" : "prod";
+  // Default selected env: Dev first (that's where the agent is iterating),
+  // then PR Preview when present.
+  const initialEnv: Env = envs.dev ? "dev" : envs.preview ? "preview" : "dev";
   const [selectedEnv, setSelectedEnv] = useState<Env>(initialEnv);
 
   // If the env the user picked stops having a URL (e.g. preview removed),
   // gracefully fall back so the iframe never points at a dangling state.
   useEffect(() => {
     if (!envs[selectedEnv]) {
-      const fallback: Env = envs.dev
-        ? "dev"
-        : envs.preview
-        ? "preview"
-        : envs.prod
-        ? "prod"
-        : selectedEnv; // keep selection so the empty state can prompt to set it
+      const fallback: Env = envs.dev ? "dev" : envs.preview ? "preview" : selectedEnv;
       if (fallback !== selectedEnv) setSelectedEnv(fallback);
     }
   }, [envs, selectedEnv]);
 
   const url = envs[selectedEnv];
 
-  const sourceLabel =
-    selectedEnv === "preview" ? "PR PREVIEW" : selectedEnv === "prod" ? "PRODUCTION" : "DEV";
+  const sourceLabel = selectedEnv === "preview" ? "PR PREVIEW" : "DEV";
   const sourceTone =
     selectedEnv === "preview"
       ? "text-amber-300 ring-amber-500/30 bg-amber-500/10"
-      : selectedEnv === "prod"
-      ? "text-emerald-300 ring-emerald-500/30 bg-emerald-500/10"
       : "text-sky-300 ring-sky-500/30 bg-sky-500/10";
 
   function handleEnvClick(env: Env) {
     setSelectedEnv(env);
-    if (env === "prod" && !envs.prod && onSetProductionUrl) onSetProductionUrl();
     if (env === "dev" && !envs.dev && onSetDevUrl) onSetDevUrl();
   }
 
@@ -135,9 +116,10 @@ export function LivePreviewPane({
 
   return (
     <div className="flex flex-col h-full glass rounded-2xl overflow-hidden ring-1 ring-border/30">
-      {/* Environment switcher — Dev / Production / PR Preview. Always renders
-          Dev + Production so users can see what's missing and click to set it.
-          PR Preview only appears when an active preview URL exists. */}
+      {/* Environment switcher — Dev (always rendered so users can see what's
+          missing and click to set it) plus PR Preview when present. Production
+          is intentionally excluded — for the live customer site, just open
+          it in a new tab. */}
       <div
         className="flex items-center gap-1 px-3 h-9 border-b border-border/30 bg-muted/10 shrink-0 overflow-x-auto"
         role="tablist"
@@ -154,16 +136,6 @@ export function LivePreviewPane({
           tone="sky"
           testId="env-tab-dev"
         />
-        <EnvTab
-          icon={<Rocket className="h-3.5 w-3.5" />}
-          label="Production"
-          host={envs.prod ? prettyHost(envs.prod) : "not set"}
-          active={selectedEnv === "prod"}
-          missing={!envs.prod}
-          onClick={() => handleEnvClick("prod")}
-          tone="emerald"
-          testId="env-tab-prod"
-        />
         {envs.preview && (
           <EnvTab
             icon={<GitPullRequest className="h-3.5 w-3.5" />}
@@ -175,23 +147,6 @@ export function LivePreviewPane({
             tone="amber"
             testId="env-tab-preview"
           />
-        )}
-        {/* Quick-add: only show "+" when a configurable env is missing AND we
-            have a callback wired up. Keeps the row clean otherwise. */}
-        {((!envs.dev && onSetDevUrl) || (!envs.prod && onSetProductionUrl)) && (
-          <button
-            type="button"
-            onClick={() => {
-              if (!envs.prod && onSetProductionUrl) onSetProductionUrl();
-              else if (!envs.dev && onSetDevUrl) onSetDevUrl();
-            }}
-            title="Add a URL for the missing environment"
-            aria-label="Add environment URL"
-            data-testid="env-tab-add"
-            className="ml-1 h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition shrink-0"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
         )}
       </div>
 
@@ -308,7 +263,7 @@ export function LivePreviewPane({
             type="button"
             disabled
             aria-label="Open preview in new tab (no URL set)"
-            title="No preview URL set yet — add a Production URL on the project to enable"
+            title="No preview URL set yet — add a Dev URL on the project to enable"
             data-testid="link-preview-open"
             className="p-1.5 rounded-md text-muted-foreground/40 cursor-not-allowed shrink-0"
           >
@@ -362,26 +317,14 @@ export function LivePreviewPane({
             </div>
             <div className="space-y-1">
               <div className="text-sm text-foreground/90 font-medium">
-                No {selectedEnv === "prod" ? "production" : selectedEnv === "dev" ? "dev" : "preview"} URL set
+                No {selectedEnv === "dev" ? "dev" : "preview"} URL set
               </div>
               <div className="text-xs max-w-xs">
-                {selectedEnv === "prod"
-                  ? "Add a Production URL so this iframe loads your live site."
-                  : selectedEnv === "dev"
-                  ? "Add a Dev URL (e.g. your Replit .replit.dev domain) so this iframe loads your in-progress build."
+                {selectedEnv === "dev"
+                  ? "Add a Dev URL (your Replit .replit.dev domain) so this iframe loads your in-progress build."
                   : "Open a change request to generate a PR preview."}
               </div>
             </div>
-            {selectedEnv === "prod" && onSetProductionUrl && (
-              <button
-                type="button"
-                onClick={onSetProductionUrl}
-                data-testid="empty-set-prod-url"
-                className="mt-2 inline-flex items-center gap-1.5 px-3 h-8 rounded-md font-mono text-[11px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-              >
-                <Rocket className="h-3.5 w-3.5" /> Set Production URL
-              </button>
-            )}
             {selectedEnv === "dev" && onSetDevUrl && (
               <button
                 type="button"
@@ -416,7 +359,7 @@ export function LivePreviewPane({
   );
 }
 
-/** A single tab in the Dev/Production/PR-Preview env switcher.
+/** A single tab in the Dev/PR-Preview env switcher.
  *  - `active`  highlights the tab and shows a colored bottom-border accent.
  *  - `missing` renders the tab in a muted "set me" state so the user knows
  *    the URL isn't configured yet.
@@ -437,17 +380,14 @@ function EnvTab({
   active: boolean;
   missing: boolean;
   onClick: () => void;
-  tone: "sky" | "emerald" | "amber";
+  tone: "sky" | "amber";
   testId: string;
 }) {
   const accent =
     tone === "sky"
       ? "border-sky-400 text-sky-300"
-      : tone === "emerald"
-      ? "border-emerald-400 text-emerald-300"
       : "border-amber-400 text-amber-300";
-  const dot =
-    tone === "sky" ? "bg-sky-400" : tone === "emerald" ? "bg-emerald-400" : "bg-amber-400";
+  const dot = tone === "sky" ? "bg-sky-400" : "bg-amber-400";
   return (
     <button
       type="button"

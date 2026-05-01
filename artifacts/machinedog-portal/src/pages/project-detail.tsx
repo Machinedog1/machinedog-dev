@@ -854,9 +854,7 @@ export default function ProjectDetailPage() {
           right={
             <LivePreviewPane
               previewUrl={null}
-              productionUrl={project.productionUrl}
               liveUrl={project.liveUrl}
-              onSetProductionUrl={isOwner ? openProdUrlDialog : undefined}
               onSetDevUrl={isOwner ? openDevUrlDialog : undefined}
             />
           }
@@ -1552,7 +1550,11 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <AgentConversation projectId={project.id} isOwner={isOwner} />
+      <AgentConversation
+        projectId={project.id}
+        isOwner={isOwner}
+        onSetDevUrl={isOwner ? openDevUrlDialog : undefined}
+      />
       <ProjectPromptPanel projectId={project.id} />
       <ProjectCommentsPanel projectId={project.id} isOwner={isOwner} />
       <ProjectFilesPanel projectId={project.id} isOwner={isOwner} />

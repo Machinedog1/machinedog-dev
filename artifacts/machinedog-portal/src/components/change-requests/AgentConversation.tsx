@@ -72,6 +72,7 @@ export function AgentConversation({
   projectId,
   isOwner = false,
   compact = false,
+  onSetDevUrl,
 }: {
   projectId: number;
   isOwner?: boolean;
@@ -82,6 +83,12 @@ export function AgentConversation({
    * a separate LivePreviewPane is rendered alongside.
    */
   compact?: boolean;
+  /**
+   * Forwarded to the internal Preview-tab LivePreviewPane so clicking the Dev
+   * tab opens the parent's "set Dev URL" dialog when the URL isn't configured
+   * yet. Only meaningful when `compact` is false.
+   */
+  onSetDevUrl?: () => void;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -539,8 +546,8 @@ export function AgentConversation({
           >
             <LivePreviewPane
               previewUrl={null}
-              productionUrl={project?.productionUrl}
               liveUrl={project?.liveUrl}
+              onSetDevUrl={onSetDevUrl}
             />
           </TabsContent>
           <TabsContent
