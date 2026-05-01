@@ -9,7 +9,7 @@ const HUSKY_NATURAL_W = 1024;
 const HUSKY_NATURAL_H = 1536;
 const EYE_X_FRACTION = 0.379;
 const EYE_Y_FRACTION = 0.383;
-const EYE_DIAMETER_FRACTION = 0.07;
+const EYE_DIAMETER_FRACTION = 0.049;
 
 function useEyeOverlay(
   containerRef: RefObject<HTMLElement | null>,
