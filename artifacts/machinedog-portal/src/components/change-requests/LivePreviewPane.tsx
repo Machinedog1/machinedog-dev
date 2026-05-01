@@ -85,22 +85,22 @@ export function LivePreviewPane({
     [liveUrl, productionUrl, previewUrl],
   );
 
-  // Default selected env: prefer PR preview when present (most actionable),
-  // then production (canonical live), then dev. The selection is sticky for
+  // Default selected env: Dev first (that's where the agent is iterating), then
+  // PR Preview (when present), then Production. The selection is sticky for
   // the session — but we re-default whenever the user's available envs change.
-  const initialEnv: Env = envs.preview ? "preview" : envs.prod ? "prod" : "dev";
+  const initialEnv: Env = envs.dev ? "dev" : envs.preview ? "preview" : "prod";
   const [selectedEnv, setSelectedEnv] = useState<Env>(initialEnv);
 
   // If the env the user picked stops having a URL (e.g. preview removed),
   // gracefully fall back so the iframe never points at a dangling state.
   useEffect(() => {
     if (!envs[selectedEnv]) {
-      const fallback: Env = envs.preview
+      const fallback: Env = envs.dev
+        ? "dev"
+        : envs.preview
         ? "preview"
         : envs.prod
         ? "prod"
-        : envs.dev
-        ? "dev"
         : selectedEnv; // keep selection so the empty state can prompt to set it
       if (fallback !== selectedEnv) setSelectedEnv(fallback);
     }
