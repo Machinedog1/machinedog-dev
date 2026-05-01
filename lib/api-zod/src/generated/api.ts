@@ -198,6 +198,8 @@ export const ListMyProjectsResponse = zod.object({
       previewUrlTemplate: zod.string().nullish(),
       productionUrl: zod.string().nullish(),
       operatorEmail: zod.string().nullish(),
+      heartbeatToken: zod.string().nullish(),
+      heartbeatAt: zod.coerce.date().nullish(),
       viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -215,6 +217,28 @@ export const CreateProjectBody = zod.object({
   summary: zod.string().optional(),
   liveUrl: zod.string().optional(),
   coverImageUrl: zod.string().optional(),
+});
+
+/**
+ * Public endpoint hit by the heartbeat snippet installed in the client app. Auth is by per-project token (in the body) — no session required, so it works from anywhere the snippet is loaded. Updates the project's liveUrl and heartbeatAt timestamp. Idempotent.
+ * @summary Auto-report a Replit dev URL from a client app
+ */
+export const projectHeartbeatBodyTokenMin = 16;
+
+export const projectHeartbeatBodyDevUrlMin = 8;
+
+export const ProjectHeartbeatBody = zod.object({
+  token: zod.string().min(projectHeartbeatBodyTokenMin),
+  devUrl: zod.string().min(projectHeartbeatBodyDevUrlMin),
+  replId: zod.string().nullish(),
+  replSlug: zod.string().nullish(),
+});
+
+export const ProjectHeartbeatResponse = zod.object({
+  ok: zod.boolean(),
+  projectId: zod.number(),
+  liveUrl: zod.string(),
+  receivedAt: zod.coerce.date(),
 });
 
 /**
@@ -240,6 +264,8 @@ export const GetProjectResponse = zod.object({
   previewUrlTemplate: zod.string().nullish(),
   productionUrl: zod.string().nullish(),
   operatorEmail: zod.string().nullish(),
+  heartbeatToken: zod.string().nullish(),
+  heartbeatAt: zod.coerce.date().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -283,6 +309,8 @@ export const UpdateProjectResponse = zod.object({
   previewUrlTemplate: zod.string().nullish(),
   productionUrl: zod.string().nullish(),
   operatorEmail: zod.string().nullish(),
+  heartbeatToken: zod.string().nullish(),
+  heartbeatAt: zod.coerce.date().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1360,11 +1388,25 @@ export const ListAllProjectsResponse = zod.object({
       previewUrlTemplate: zod.string().nullish(),
       productionUrl: zod.string().nullish(),
       operatorEmail: zod.string().nullish(),
+      heartbeatToken: zod.string().nullish(),
+      heartbeatAt: zod.coerce.date().nullish(),
       viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
     }),
   ),
+});
+
+/**
+ * Generates a fresh heartbeat token, invalidating the old one.
+ * @summary Rotate the heartbeat token (owner only)
+ */
+export const RotateProjectHeartbeatTokenParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RotateProjectHeartbeatTokenResponse = zod.object({
+  heartbeatToken: zod.string(),
 });
 
 /**
@@ -1394,6 +1436,8 @@ export const ReassignProjectOwnerResponse = zod.object({
   previewUrlTemplate: zod.string().nullish(),
   productionUrl: zod.string().nullish(),
   operatorEmail: zod.string().nullish(),
+  heartbeatToken: zod.string().nullish(),
+  heartbeatAt: zod.coerce.date().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),

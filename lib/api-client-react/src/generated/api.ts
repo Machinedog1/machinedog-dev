@@ -49,6 +49,8 @@ import type {
   ProjectCommentList,
   ProjectFile,
   ProjectFileList,
+  ProjectHeartbeatBody,
+  ProjectHeartbeatResponse,
   ProjectList,
   ProjectMember,
   ProjectMemberList,
@@ -59,6 +61,7 @@ import type {
   ReassignProjectOwnerBody,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
+  RotateHeartbeatTokenResponse,
   SubmitLeadBody,
   SubmitLeadResponse,
   SubmitPromptBody,
@@ -961,6 +964,93 @@ export const useCreateProject = <
   TContext
 > => {
   return useMutation(getCreateProjectMutationOptions(options));
+};
+
+/**
+ * Public endpoint hit by the heartbeat snippet installed in the client app. Auth is by per-project token (in the body) — no session required, so it works from anywhere the snippet is loaded. Updates the project's liveUrl and heartbeatAt timestamp. Idempotent.
+ * @summary Auto-report a Replit dev URL from a client app
+ */
+export const getProjectHeartbeatUrl = () => {
+  return `/api/projects/heartbeat`;
+};
+
+export const projectHeartbeat = async (
+  projectHeartbeatBody: ProjectHeartbeatBody,
+  options?: RequestInit,
+): Promise<ProjectHeartbeatResponse> => {
+  return customFetch<ProjectHeartbeatResponse>(getProjectHeartbeatUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(projectHeartbeatBody),
+  });
+};
+
+export const getProjectHeartbeatMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof projectHeartbeat>>,
+    TError,
+    { data: BodyType<ProjectHeartbeatBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof projectHeartbeat>>,
+  TError,
+  { data: BodyType<ProjectHeartbeatBody> },
+  TContext
+> => {
+  const mutationKey = ["projectHeartbeat"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof projectHeartbeat>>,
+    { data: BodyType<ProjectHeartbeatBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return projectHeartbeat(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProjectHeartbeatMutationResult = NonNullable<
+  Awaited<ReturnType<typeof projectHeartbeat>>
+>;
+export type ProjectHeartbeatMutationBody = BodyType<ProjectHeartbeatBody>;
+export type ProjectHeartbeatMutationError = ErrorType<void>;
+
+/**
+ * @summary Auto-report a Replit dev URL from a client app
+ */
+export const useProjectHeartbeat = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof projectHeartbeat>>,
+    TError,
+    { data: BodyType<ProjectHeartbeatBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof projectHeartbeat>>,
+  TError,
+  { data: BodyType<ProjectHeartbeatBody> },
+  TContext
+> => {
+  return useMutation(getProjectHeartbeatMutationOptions(options));
 };
 
 /**
@@ -4282,6 +4372,94 @@ export function useListAllProjects<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Generates a fresh heartbeat token, invalidating the old one.
+ * @summary Rotate the heartbeat token (owner only)
+ */
+export const getRotateProjectHeartbeatTokenUrl = (id: number) => {
+  return `/api/projects/${id}/heartbeat-token`;
+};
+
+export const rotateProjectHeartbeatToken = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RotateHeartbeatTokenResponse> => {
+  return customFetch<RotateHeartbeatTokenResponse>(
+    getRotateProjectHeartbeatTokenUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRotateProjectHeartbeatTokenMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rotateProjectHeartbeatToken>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rotateProjectHeartbeatToken>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["rotateProjectHeartbeatToken"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rotateProjectHeartbeatToken>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return rotateProjectHeartbeatToken(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RotateProjectHeartbeatTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rotateProjectHeartbeatToken>>
+>;
+
+export type RotateProjectHeartbeatTokenMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Rotate the heartbeat token (owner only)
+ */
+export const useRotateProjectHeartbeatToken = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rotateProjectHeartbeatToken>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rotateProjectHeartbeatToken>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRotateProjectHeartbeatTokenMutationOptions(options));
+};
 
 /**
  * @summary Reassign a project to a different client (admin only)

@@ -27,6 +27,14 @@ export const projectsTable = pgTable("projects", {
   // Operator email notified when a client clicks Publish. Falls back to the
   // ADMIN_EMAILS list when unset.
   operatorEmail: text("operator_email"),
+  // Per-project secret used by the heartbeat snippet installed in the client
+  // app to auto-report its current Replit dev URL. Auto-generated on insert;
+  // operator can rotate from the admin UI. The snippet POSTs to
+  // /api/projects/heartbeat with this token + the live REPLIT_DEV_DOMAIN.
+  heartbeatToken: text("heartbeat_token").unique(),
+  // When the snippet last reported in. Lets the UI show a freshness indicator
+  // ("Dev URL refreshed 30s ago") and detect stale links.
+  heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

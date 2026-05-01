@@ -161,6 +161,10 @@ export interface Project {
   productionUrl?: string | null;
   /** @nullable */
   operatorEmail?: string | null;
+  /** @nullable */
+  heartbeatToken?: string | null;
+  /** @nullable */
+  heartbeatAt?: string | null;
   viewerRole: ProjectViewerRole;
   createdAt: string;
   updatedAt: string;
@@ -181,6 +185,28 @@ export interface CreateProjectBody {
 
 export interface ReassignProjectOwnerBody {
   clientId: number;
+}
+
+export interface ProjectHeartbeatBody {
+  /** @minLength 16 */
+  token: string;
+  /** @minLength 8 */
+  devUrl: string;
+  /** @nullable */
+  replId?: string | null;
+  /** @nullable */
+  replSlug?: string | null;
+}
+
+export interface ProjectHeartbeatResponse {
+  ok: boolean;
+  projectId: number;
+  liveUrl: string;
+  receivedAt: string;
+}
+
+export interface RotateHeartbeatTokenResponse {
+  heartbeatToken: string;
 }
 
 export type UpdateProjectBodyStatus =

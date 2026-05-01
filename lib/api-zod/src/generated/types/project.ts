@@ -32,6 +32,10 @@ export interface Project {
   productionUrl?: string | null;
   /** @nullable */
   operatorEmail?: string | null;
+  /** @nullable */
+  heartbeatToken?: string | null;
+  /** @nullable */
+  heartbeatAt?: Date | null;
   viewerRole: ProjectViewerRole;
   createdAt: Date;
   updatedAt: Date;

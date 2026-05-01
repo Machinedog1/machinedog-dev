@@ -238,6 +238,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Project"
 
+  /projects/heartbeat:
+    post:
+      operationId: projectHeartbeat
+      tags: [projects]
+      summary: Auto-report a Replit dev URL from a client app
+      description: >-
+        Public endpoint hit by the heartbeat snippet installed in the client
+        app. Auth is by per-project token (in the body) — no session required,
+        so it works from anywhere the snippet is loaded. Updates the project's
+        liveUrl and heartbeatAt timestamp. Idempotent.
+      security: []  # public; auth is the token in the body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectHeartbeatBody"
+      responses:
+        "200":
+          description: Heartbeat accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectHeartbeatResponse"
+        "401":
+          description: Unknown or rotated token
+        "400":
+          description: Invalid body
+
   /projects/{id}:
     get:
       operationId: getProject
@@ -1015,6 +1044,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProjectList"
 
+  /projects/{id}/heartbeat-token:
+    post:
+      operationId: rotateProjectHeartbeatToken
+      tags: [projects]
+      summary: Rotate the heartbeat token (owner only)
+      description: Generates a fresh heartbeat token, invalidating the old one.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateHeartbeatTokenResponse"
+
   /admin/projects/{id}/owner:
     patch:
       operationId: reassignProjectOwner
@@ -1281,6 +1330,15 @@ components:
           type: ["string", "null"]
         operatorEmail:
           type: ["string", "null"]
+        # Per-project token used by the heartbeat snippet installed in the client
+        # app to auto-report its current Replit dev URL. Returned to owners only.
+        heartbeatToken:
+          type: ["string", "null"]
+        # ISO timestamp of the last heartbeat received. null = snippet has never
+        # checked in (UI shows "not connected").
+        heartbeatAt:
+          type: ["string", "null"]
+          format: date-time
         viewerRole:
           type: string
           enum: [owner, collaborator]
@@ -1323,6 +1381,43 @@ components:
         clientId:
           type: integer
       required: [clientId]
+
+    ProjectHeartbeatBody:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 16
+        devUrl:
+          type: string
+          minLength: 8
+        # Optional metadata reported by the snippet for diagnostics.
+        replId:
+          type: ["string", "null"]
+        replSlug:
+          type: ["string", "null"]
+      required: [token, devUrl]
+
+    ProjectHeartbeatResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        projectId:
+          type: integer
+        liveUrl:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+      required: [ok, projectId, liveUrl, receivedAt]
+
+    RotateHeartbeatTokenResponse:
+      type: object
+      properties:
+        heartbeatToken:
+          type: string
+      required: [heartbeatToken]
 
     UpdateProjectBody:
       type: object

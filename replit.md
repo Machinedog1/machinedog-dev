@@ -103,3 +103,14 @@ Clerk is fully removed. Auth is roll-your-own across the API, web portal, and mo
 - **Mobile** (`artifacts/machinedog-mobile`): `lib/auth.tsx` stores the token in `expo-secure-store` and registers a Bearer-header getter via `setAuthTokenGetter` (called from `api-client-react`). `app/_layout.tsx` wraps `<AuthProvider>` (no Clerk). `(tabs)/_layout.tsx` redirects to `/(auth)/sign-in` when `!isSignedIn`. `(auth)/sign-in.tsx` uses `useAuth().signIn`; `(auth)/sign-up.tsx` is the activate-invite screen (invite token + password). `(tabs)/profile.tsx` uses `useAuth().signOut` and shows email-derived display name.
 - **Bootstrap**: existing client rows have no `passwordHash`. Use `/forgot-password` to send a reset link, or have an admin issue an invite. Admin user `tom@machinedog.com` (id=2) must use `/forgot-password` first to set a password.
 - **Env vars removed**: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_PROXY_URL` — none of these are referenced anywhere now (build script + dev script were both cleaned up).
+
+## Auto-heartbeat (client app → Machinedog Dev URL sync)
+
+Modern Replit dev URLs (`<uuid>-00-...<region>.replit.dev`) change per run, so the legacy slug-based derivation no longer works. Instead, client apps (e.g. BeeSuite) report their live URL via a public heartbeat endpoint.
+
+- **Schema**: `projects.heartbeat_token` (text, unique) + `projects.heartbeat_at` (timestamptz). All projects backfilled with random 32-byte hex tokens on rollout. New projects auto-generate a token on create. `withCollaboratorRole` strips `heartbeatToken` from non-owner responses.
+- **API**:
+  - `POST /api/projects/heartbeat` — public, body `{ token, devUrl, replId?, replSlug? }`. Validates token (401 unknown), URL parse, requires `https`, requires host to be `*.replit.dev` (rejects arbitrary destinations to prevent phishing-via-leaked-token). Sets `liveUrl` to `${protocol}//${host}` and stamps `heartbeatAt`.
+  - `POST /api/projects/:id/heartbeat-token` — owner-only, rotates token (old token immediately stops working).
+- **Snippet** (shown in dialog, also at `artifacts/machinedog-portal/public/heartbeat.js`): tiny IIFE that reads `MACHINEDOG_TOKEN` + `REPLIT_DEV_DOMAIN` env vars and POSTs once on boot. No-op when either env var is missing, so it's safe in production deployments.
+- **UI**: `project-detail.tsx` overflow menu → "Auto-link app" (owner only). Dialog shows status indicator (gray = never seen, amber = stale, emerald = fresh within 10 min), token field with Copy + Rotate, and copy-pasteable snippet code (uses `window.location.origin` so dev/prod machinedog hosts both work). A `useEffect` polls the project query every 2s while the dialog is open so the status flips live as the user wires up their app.

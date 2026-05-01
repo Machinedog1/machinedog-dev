@@ -38,7 +38,12 @@ import {
   AddProjectFileParams,
   AddProjectFileBody,
   DeleteProjectFileParams,
+  ProjectHeartbeatBody,
+  ProjectHeartbeatResponse,
+  RotateProjectHeartbeatTokenParams,
+  RotateProjectHeartbeatTokenResponse,
 } from "@workspace/api-zod";
+import { randomBytes } from "node:crypto";
 import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
 import { sendProjectInviteEmail } from "../lib/project-invites";
 import { logger } from "../lib/logger";
@@ -57,7 +62,19 @@ function withOwnerRole(row: Project): ProjectWithRole {
 }
 
 function withCollaboratorRole(row: Project): ProjectWithRole {
-  return { ...row, viewerRole: "collaborator" };
+  // Strip owner-only fields from collaborator-visible payloads. The heartbeat
+  // token is functionally a per-project secret — anyone with it can overwrite
+  // the project's liveUrl from anywhere on the internet.
+  return {
+    ...row,
+    heartbeatToken: null,
+    viewerRole: "collaborator",
+  };
+}
+
+function generateHeartbeatToken(): string {
+  // 32 hex chars = 128 bits — collision-resistant and short enough to paste.
+  return randomBytes(16).toString("hex");
 }
 
 async function getViewableProject(
@@ -164,9 +181,121 @@ router.post(
         liveUrl: parsed.data.liveUrl?.trim() || null,
         coverImageUrl: parsed.data.coverImageUrl?.trim() || null,
         status: "draft",
+        heartbeatToken: generateHeartbeatToken(),
       })
       .returning();
     res.status(201).json(GetProjectResponse.parse(withOwnerRole(row)));
+  },
+);
+
+// Public heartbeat endpoint — no session auth. Auth is the per-project token
+// in the body. Called by the small snippet installed in client apps to keep
+// liveUrl in sync with the current Replit dev domain (which changes per-run).
+router.post("/projects/heartbeat", async (req, res): Promise<void> => {
+  const body = ProjectHeartbeatBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: { code: "bad_request", message: body.error.message } });
+    return;
+  }
+  const devUrl = body.data.devUrl.trim();
+  // Refuse anything that doesn't look like a URL we'd actually iframe.
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(devUrl);
+  } catch {
+    res.status(400).json({ error: { code: "bad_request", message: "devUrl is not a valid URL" } });
+    return;
+  }
+  if (parsedUrl.protocol !== "https:") {
+    res.status(400).json({ error: { code: "bad_request", message: "devUrl must be https" } });
+    return;
+  }
+  // Lock the heartbeat to Replit-issued dev hosts. Without this, a leaked
+  // token would let an attacker repoint the project's liveUrl (and therefore
+  // the iframe shown to collaborators) at an arbitrary phishing destination.
+  // Allow `*.replit.dev` (any subdomain depth) and the bare apex; everything
+  // else is rejected. Production URLs (`*.replit.app`) are managed via the
+  // separate productionUrl field, not heartbeats.
+  const host = parsedUrl.hostname.toLowerCase();
+  const isReplitDev =
+    host === "replit.dev" || host.endsWith(".replit.dev");
+  if (!isReplitDev) {
+    res.status(400).json({
+      error: {
+        code: "bad_request",
+        message: "devUrl must be a *.replit.dev host",
+      },
+    });
+    return;
+  }
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.heartbeatToken, body.data.token));
+  if (!project) {
+    res.status(401).json({ error: { code: "unauthorized", message: "Unknown token" } });
+    return;
+  }
+
+  const now = new Date();
+  const normalized = `${parsedUrl.protocol}//${parsedUrl.host}`;
+  const [updated] = await db
+    .update(projectsTable)
+    .set({ liveUrl: normalized, heartbeatAt: now })
+    .where(eq(projectsTable.id, project.id))
+    .returning();
+
+  logger.info(
+    {
+      projectId: updated.id,
+      devUrl: normalized,
+      replId: body.data.replId ?? null,
+      replSlug: body.data.replSlug ?? null,
+    },
+    "Project heartbeat received",
+  );
+
+  const payload = ProjectHeartbeatResponse.parse({
+    ok: true,
+    projectId: updated.id,
+    liveUrl: updated.liveUrl ?? normalized,
+    receivedAt: now,
+  });
+  res.json(payload);
+});
+
+// Owner-only: rotate the heartbeat token. Old token immediately stops working.
+router.post(
+  "/projects/:id/heartbeat-token",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const params = RotateProjectHeartbeatTokenParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: { code: "bad_request", message: "Invalid project id" } });
+      return;
+    }
+    const project = await getViewableProject(
+      params.data.id,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
+      return;
+    }
+    if (project.viewerRole !== "owner") {
+      res.status(403).json({ error: { code: "forbidden", message: "Only the owner can rotate the token" } });
+      return;
+    }
+    const newToken = generateHeartbeatToken();
+    await db
+      .update(projectsTable)
+      .set({ heartbeatToken: newToken })
+      .where(eq(projectsTable.id, project.id));
+    res.json(RotateProjectHeartbeatTokenResponse.parse({ heartbeatToken: newToken }));
   },
 );
 

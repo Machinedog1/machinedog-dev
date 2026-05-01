@@ -18,6 +18,7 @@ import {
   useGetMe,
   useCreateChangeRequest,
   useRequestChangePublish,
+  useRotateProjectHeartbeatToken,
   getGetProjectQueryKey,
   getListProjectMembersQueryKey,
   getListMyProjectsQueryKey,
@@ -53,6 +54,10 @@ import {
   LayoutPanelLeft,
   Layers,
   Code2,
+  Copy,
+  Check,
+  RotateCw,
+  Plug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -345,6 +350,72 @@ export default function ProjectDetailPage() {
           toast({
             variant: "destructive",
             title: "Couldn't save URL",
+            description: errorMessage(err, "Try again."),
+          });
+        },
+      },
+    );
+  }
+
+  // "Auto-link app" dialog — shows the per-project heartbeat token plus a
+  // copy-pasteable JS snippet the client drops into their app. The snippet
+  // POSTs `https://${REPLIT_DEV_DOMAIN}` to /api/projects/heartbeat on boot,
+  // so Machinedog's Dev preview always points at the live workspace without
+  // anyone having to re-paste a URL after every Replit run.
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [copied, setCopied] = useState<"token" | "snippet" | null>(null);
+  const rotateToken = useRotateProjectHeartbeatToken();
+
+  // While the dialog is open, poll the project every 2s so the heartbeat
+  // status indicator flips to "live" as soon as the user wires up the
+  // snippet on their side, without requiring a manual page refresh.
+  useEffect(() => {
+    if (!linkDialogOpen || !Number.isFinite(projectId)) return;
+    queryClient.invalidateQueries({
+      queryKey: getGetProjectQueryKey(projectId),
+    });
+    const t = setInterval(() => {
+      queryClient.invalidateQueries({
+        queryKey: getGetProjectQueryKey(projectId),
+      });
+    }, 2000);
+    return () => clearInterval(t);
+  }, [linkDialogOpen, projectId, queryClient]);
+
+  function copyToClipboard(text: string, which: "token" | "snippet") {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(which);
+        setTimeout(() => setCopied(null), 1600);
+      })
+      .catch(() => {
+        toast({ variant: "destructive", title: "Copy failed" });
+      });
+  }
+
+  function handleRotateToken() {
+    if (!project) return;
+    if (
+      !window.confirm(
+        "Rotate the heartbeat token? Your current snippet will stop working until you redeploy with the new token.",
+      )
+    ) {
+      return;
+    }
+    rotateToken.mutate(
+      { id: project.id },
+      {
+        onSuccess: () => {
+          toast({ title: "Token rotated" });
+          queryClient.invalidateQueries({
+            queryKey: getGetProjectQueryKey(project.id),
+          });
+        },
+        onError: (err: unknown) => {
+          toast({
+            variant: "destructive",
+            title: "Couldn't rotate token",
             description: errorMessage(err, "Try again."),
           });
         },
@@ -658,6 +729,20 @@ export default function ProjectDetailPage() {
                 >
                   <Code2 className="h-3.5 w-3.5 mr-2" />
                   {project.liveUrl ? "Change Dev URL" : "Set Dev URL"}
+                </DropdownMenuItem>
+              )}
+              {isOwner && (
+                <DropdownMenuItem
+                  onClick={() => setLinkDialogOpen(true)}
+                  data-testid="menu-auto-link-app"
+                >
+                  <Plug className="h-3.5 w-3.5 mr-2" />
+                  Auto-link app
+                  {project.heartbeatAt && (
+                    <span className="ml-auto text-[10px] text-emerald-500 font-mono">
+                      live
+                    </span>
+                  )}
                 </DropdownMenuItem>
               )}
               {isOwner && (
@@ -1058,6 +1143,195 @@ export default function ProjectDetailPage() {
             >
               <Code2 className="h-3.5 w-3.5 mr-1.5" /> Save & Open
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-link app dialog. Owner-only. Shows the per-project heartbeat
+          token plus a copy-pasteable JS snippet the client drops into their
+          app boot. The snippet POSTs the live `https://${REPLIT_DEV_DOMAIN}`
+          to /api/projects/heartbeat so this project's Dev URL stays current
+          without manual updates. Includes a token rotate action and a status
+          row (last heartbeat) so the user can confirm the snippet wired up. */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-2xl !bg-card !backdrop-blur-none border border-border/60 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plug className="h-4 w-4" /> Auto-link your app
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Drop this snippet into your app and it will report its current
+              Replit Dev URL to Machinedog on every boot. No more re-pasting
+              after each run.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const token = project.heartbeatToken ?? "";
+            const snippet = `// machinedog-heartbeat.js — paste at the top of your server entry
+// (e.g. require("./machinedog-heartbeat") in index.js, or import it).
+// In Replit, set MACHINEDOG_TOKEN in Secrets to the value above.
+(function () {
+  const token = process.env.MACHINEDOG_TOKEN;
+  const dev = process.env.REPLIT_DEV_DOMAIN;
+  if (!token || !dev || typeof fetch !== "function") return;
+  fetch("${window.location.origin}/api/projects/heartbeat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      token,
+      devUrl: "https://" + dev,
+      replId: process.env.REPL_ID || null,
+      replSlug: process.env.REPL_SLUG || null,
+    }),
+  })
+    .then((r) => r.ok && console.log("[machinedog] dev URL reported"))
+    .catch(() => {});
+})();
+`;
+            const heartbeatAt = project.heartbeatAt
+              ? new Date(project.heartbeatAt)
+              : null;
+            const ageMs = heartbeatAt
+              ? Date.now() - heartbeatAt.getTime()
+              : null;
+            const fresh = ageMs !== null && ageMs < 1000 * 60 * 10;
+            return (
+              <div className="space-y-4 py-2 text-sm">
+                {/* Status */}
+                <div
+                  className="rounded-md ring-1 ring-border/40 bg-muted/30 p-3 flex items-center gap-3"
+                  data-testid="heartbeat-status"
+                >
+                  <div
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      fresh
+                        ? "bg-emerald-500 shadow-emerald-500/60 shadow-md animate-pulse"
+                        : heartbeatAt
+                        ? "bg-amber-500"
+                        : "bg-muted-foreground/40"
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Heartbeat
+                    </div>
+                    <div className="text-sm">
+                      {heartbeatAt
+                        ? `Last seen ${format(heartbeatAt, "MMM d, h:mm a")}`
+                        : "Not connected yet"}
+                    </div>
+                    {project.liveUrl && (
+                      <div className="font-mono text-[10px] text-muted-foreground truncate">
+                        {project.liveUrl}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Token */}
+                <div className="space-y-1.5">
+                  <label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>Token (paste as MACHINEDOG_TOKEN secret)</span>
+                    <button
+                      type="button"
+                      onClick={handleRotateToken}
+                      disabled={rotateToken.isPending}
+                      data-testid="button-rotate-token"
+                      className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    >
+                      <RotateCw
+                        className={`h-3 w-3 ${rotateToken.isPending ? "animate-spin" : ""}`}
+                      />
+                      Rotate
+                    </button>
+                  </label>
+                  <div className="flex items-stretch gap-2">
+                    <code
+                      className="flex-1 min-w-0 font-mono text-xs rounded-md ring-1 ring-border/40 bg-background px-3 py-2 break-all"
+                      data-testid="text-heartbeat-token"
+                    >
+                      {token || "(missing — try rotating)"}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(token, "token")}
+                      disabled={!token}
+                      data-testid="button-copy-token"
+                      className="inline-flex items-center gap-1 px-3 rounded-md ring-1 ring-border/40 text-xs font-mono hover:bg-muted/40 disabled:opacity-50"
+                    >
+                      {copied === "token" ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copied === "token" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Snippet */}
+                <div className="space-y-1.5">
+                  <label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>Snippet (save as machinedog-heartbeat.js)</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(snippet, "snippet")}
+                      data-testid="button-copy-snippet"
+                      className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      {copied === "snippet" ? (
+                        <Check className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                      {copied === "snippet" ? "Copied" : "Copy snippet"}
+                    </button>
+                  </label>
+                  <pre className="font-mono text-[11px] rounded-md ring-1 ring-border/40 bg-background px-3 py-2 max-h-64 overflow-auto whitespace-pre">
+                    {snippet}
+                  </pre>
+                </div>
+
+                {/* Steps */}
+                <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>
+                    Save the snippet as{" "}
+                    <code className="font-mono">machinedog-heartbeat.js</code>{" "}
+                    in your app.
+                  </li>
+                  <li>
+                    Import it once on boot —{" "}
+                    <code className="font-mono">
+                      require("./machinedog-heartbeat")
+                    </code>{" "}
+                    or{" "}
+                    <code className="font-mono">
+                      import "./machinedog-heartbeat.js"
+                    </code>
+                    .
+                  </li>
+                  <li>
+                    Add{" "}
+                    <code className="font-mono">MACHINEDOG_TOKEN</code> to your
+                    Replit Secrets with the token above.
+                  </li>
+                  <li>
+                    Restart your Repl. The status above turns green within a
+                    second.
+                  </li>
+                </ol>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setLinkDialogOpen(false)}
+              data-testid="button-link-dialog-close"
+              className="px-3 h-8 rounded-md ring-1 ring-border/40 text-sm font-mono hover:bg-muted/40"
+            >
+              Done
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
