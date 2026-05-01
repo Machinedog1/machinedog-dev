@@ -367,6 +367,11 @@ router.patch(
         ...(body.data.githubDefaultBranch !== undefined && body.data.githubDefaultBranch?.trim() && {
           githubDefaultBranch: body.data.githubDefaultBranch.trim(),
         }),
+        ...(body.data.previewUrlTemplate !== undefined && {
+          previewUrlTemplate: body.data.previewUrlTemplate?.trim()
+            ? body.data.previewUrlTemplate.trim()
+            : null,
+        }),
       })
       .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.clientId, req.dbClient!.id)))
       .returning();

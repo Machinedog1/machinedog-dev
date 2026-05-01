@@ -147,6 +147,11 @@ export default function ProjectDetailPage() {
     productionUrl: "",
     coverImageUrl: "",
     status: "draft" as "draft" | "active" | "completed" | "archived",
+    githubOwner: "",
+    githubRepo: "",
+    githubDefaultBranch: "main",
+    previewUrlTemplate: "",
+    operatorEmail: "",
   });
   const [inviteEmail, setInviteEmail] = useState("");
   // Replit-style split view: agent on the left, full-height live preview on the right.
@@ -515,6 +520,11 @@ export default function ProjectDetailPage() {
         productionUrl: project.productionUrl ?? "",
         coverImageUrl: project.coverImageUrl ?? "",
         status: project.status,
+        githubOwner: project.githubOwner ?? "",
+        githubRepo: project.githubRepo ?? "",
+        githubDefaultBranch: project.githubDefaultBranch ?? "main",
+        previewUrlTemplate: project.previewUrlTemplate ?? "",
+        operatorEmail: project.operatorEmail ?? "",
       });
     }
   }, [project]);
@@ -553,6 +563,13 @@ export default function ProjectDetailPage() {
           productionUrl: form.productionUrl.trim() ? form.productionUrl.trim() : null,
           coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : null,
           status: form.status,
+          githubOwner: form.githubOwner.trim() ? form.githubOwner.trim() : null,
+          githubRepo: form.githubRepo.trim() ? form.githubRepo.trim() : null,
+          githubDefaultBranch: form.githubDefaultBranch.trim() || "main",
+          previewUrlTemplate: form.previewUrlTemplate.trim()
+            ? form.previewUrlTemplate.trim()
+            : null,
+          operatorEmail: form.operatorEmail.trim() ? form.operatorEmail.trim() : null,
         },
       },
       {
@@ -1437,6 +1454,56 @@ export default function ProjectDetailPage() {
                   type="url"
                 />
               </Field>
+              <div className="rounded-lg border border-border/40 bg-muted/30 p-4 flex flex-col gap-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80 font-mono">
+                  GitHub wiring (enables PR previews + auto-merge on Publish)
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="GITHUB OWNER">
+                    <Input
+                      value={form.githubOwner}
+                      onChange={(e) => setForm((f) => ({ ...f, githubOwner: e.target.value }))}
+                      placeholder="e.g. machinedog"
+                    />
+                  </Field>
+                  <Field label="GITHUB REPO">
+                    <Input
+                      value={form.githubRepo}
+                      onChange={(e) => setForm((f) => ({ ...f, githubRepo: e.target.value }))}
+                      placeholder="e.g. beesuite"
+                    />
+                  </Field>
+                  <Field label="DEFAULT BRANCH">
+                    <Input
+                      value={form.githubDefaultBranch}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, githubDefaultBranch: e.target.value }))
+                      }
+                      placeholder="main"
+                    />
+                  </Field>
+                  <Field label="OPERATOR EMAIL">
+                    <Input
+                      value={form.operatorEmail}
+                      onChange={(e) => setForm((f) => ({ ...f, operatorEmail: e.target.value }))}
+                      placeholder="ops@machinedog.com"
+                      type="email"
+                    />
+                  </Field>
+                </div>
+                <Field label="PREVIEW URL TEMPLATE">
+                  <Input
+                    value={form.previewUrlTemplate}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, previewUrlTemplate: e.target.value }))
+                    }
+                    placeholder="https://preview-{branch}.beesuite.farm  (leave blank to fall back to Dev URL)"
+                  />
+                  <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
+                    Use {"{branch}"} as the placeholder. Falls back to Dev URL if blank.
+                  </p>
+                </Field>
+              </div>
               <Field label="DETAILS">
                 <Textarea
                   value={form.description}
