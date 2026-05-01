@@ -43,11 +43,8 @@ import {
   Rocket,
   Save,
   Send,
-  Sparkles,
   Eye,
   Terminal,
-  Database,
-  KeyRound,
   Plus,
   X,
   Trash2,
@@ -575,20 +572,11 @@ export default function ProjectDetailPage() {
             </button>
           </Link>
 
-          {/* Workspace tabs (Replit-style) — Agent is the active surface;
-              Preview/Publishing/Console/Database/Secrets are decorative
-              placeholders that match the IDE metaphor. They render with a
-              dismiss "X" affordance for visual fidelity but currently no-op. */}
-          <ChromeTab
-            icon={<Sparkles className="h-3.5 w-3.5" />}
-            label="Agent"
-            active
-            testId="tab-workspace-agent"
-          />
+          {/* Workspace tabs — only Preview and Publishing are surfaced. */}
           <ChromeTab
             icon={<Eye className="h-3.5 w-3.5" />}
             label="Preview"
-            dismissible
+            active
             testId="tab-workspace-preview"
           />
           <ChromeTab
@@ -596,24 +584,6 @@ export default function ProjectDetailPage() {
             label="Publishing"
             dismissible
             testId="tab-workspace-publishing"
-          />
-          <ChromeTab
-            icon={<Terminal className="h-3.5 w-3.5" />}
-            label="Console"
-            dismissible
-            testId="tab-workspace-console"
-          />
-          <ChromeTab
-            icon={<Database className="h-3.5 w-3.5" />}
-            label="Database"
-            dismissible
-            testId="tab-workspace-database"
-          />
-          <ChromeTab
-            icon={<KeyRound className="h-3.5 w-3.5" />}
-            label="Secrets"
-            dismissible
-            testId="tab-workspace-secrets"
           />
           <button
             type="button"
