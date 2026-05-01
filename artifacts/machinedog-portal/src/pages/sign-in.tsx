@@ -7,9 +7,9 @@ import huskyPortrait from "@assets/F4E50D9E-68CC-4514-8AE0-56D611828FC6_17772522
 
 const HUSKY_NATURAL_W = 1024;
 const HUSKY_NATURAL_H = 1536;
-const EYE_X_FRACTION = 0.283;
-const EYE_Y_FRACTION = 0.367;
-const EYE_DIAMETER_FRACTION = 0.085;
+const EYE_X_FRACTION = 0.379;
+const EYE_Y_FRACTION = 0.383;
+const EYE_DIAMETER_FRACTION = 0.07;
 
 function useEyeOverlay(
   containerRef: RefObject<HTMLElement | null>,
