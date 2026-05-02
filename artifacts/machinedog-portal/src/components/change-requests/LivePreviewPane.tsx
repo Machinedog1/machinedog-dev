@@ -11,6 +11,9 @@ import {
   PictureInPicture2,
   Code2,
   GitPullRequest,
+  Copy,
+  Check,
+  Loader2,
 } from "lucide-react";
 
 type Viewport = "desktop" | "tablet" | "mobile";
@@ -55,12 +58,18 @@ function isSecure(url: string): boolean {
 export function LivePreviewPane({
   previewUrl,
   liveUrl,
+  heartbeatToken,
   onSetDevUrl,
   onSetDevUrlValue,
   isSavingDevUrl,
 }: {
   previewUrl: string | null | undefined;
   liveUrl: string | null | undefined;
+  /** When provided, the empty Dev state shows a one-click copy of a snippet
+   *  that — once pasted into the customer's app — auto-populates this
+   *  preview pane via the /api/projects/heartbeat endpoint. Owner-only
+   *  (collaborators get null on the project payload). */
+  heartbeatToken?: string | null;
   /** Optional callback to open a "set dev URL" dialog when the user clicks
    *  Dev in the env switcher and no URL is configured. */
   onSetDevUrl?: () => void;
@@ -74,6 +83,7 @@ export function LivePreviewPane({
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [viewport, setViewport] = useState<Viewport>("desktop");
+  const [snippetCopied, setSnippetCopied] = useState(false);
 
   // Editable address bar — only relevant for the Dev env. We keep a local
   // draft so typing doesn't immediately re-render every keystroke through
@@ -145,6 +155,38 @@ export function LivePreviewPane({
     selectedEnv === "preview"
       ? "text-amber-300 ring-amber-500/30 bg-amber-500/10"
       : "text-sky-300 ring-sky-500/30 bg-sky-500/10";
+
+  // The auto-populate snippet — drop this into the customer's app and the
+  // .replit.dev URL flows here on every boot. We compute it inline (instead
+  // of importing from a shared constants file) so the only branding/host
+  // surface area is the running portal's origin.
+  const heartbeatSnippet = useMemo(() => {
+    if (!heartbeatToken) return null;
+    const apiOrigin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    return `// machinedog-heartbeat.js — paste at the top of your server entry.
+// Posts your Replit dev URL to Machinedog so the preview auto-populates.
+const u = process.env.REPLIT_DEV_DOMAIN;
+if (u) {
+  fetch("${apiOrigin}/api/projects/heartbeat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token: "${heartbeatToken}", devUrl: \`https://\${u}\` }),
+  }).catch(() => {});
+}`;
+  }, [heartbeatToken]);
+
+  async function copySnippet() {
+    if (!heartbeatSnippet) return;
+    try {
+      await navigator.clipboard.writeText(heartbeatSnippet);
+      setSnippetCopied(true);
+      window.setTimeout(() => setSnippetCopied(false), 1800);
+    } catch {
+      // Fallback: select-all so the user can manually copy. Silent failure
+      // is fine — the textarea is right there to copy from.
+    }
+  }
 
   function handleEnvClick(env: Env) {
     setSelectedEnv(env);
@@ -428,31 +470,84 @@ export function LivePreviewPane({
             />
           </div>
         ) : (
-          <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground gap-3">
-            <div className="h-12 w-12 rounded-full bg-muted/30 ring-1 ring-border/30 flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <div className="space-y-1">
-              <div className="text-sm text-foreground/90 font-medium">
-                No {selectedEnv === "dev" ? "dev" : "preview"} URL set
+          selectedEnv === "dev" && heartbeatSnippet ? (
+            // Owner-facing empty Dev state. The whole point here is to make
+            // "auto populate" obvious: drop this 9-line snippet into your
+            // app, restart it, and the preview shows up here within ~5
+            // seconds (we already poll the project on that interval).
+            <div className="h-full w-full flex flex-col items-center justify-center px-6 py-8 text-muted-foreground gap-4 max-w-2xl mx-auto">
+              <div className="flex items-center gap-3 text-sky-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-xs font-mono uppercase tracking-wider">
+                  Waiting for your app to call home
+                </span>
               </div>
-              <div className="text-xs max-w-xs">
-                {selectedEnv === "dev"
-                  ? "Add a Dev URL (your Replit .replit.dev domain) so this iframe loads your in-progress build."
-                  : "Open a change request to generate a PR preview."}
+              <div className="text-center space-y-1">
+                <div className="text-sm text-foreground/90 font-medium">
+                  Auto-populate this preview
+                </div>
+                <div className="text-xs max-w-md">
+                  Paste this snippet into your app's entry file and restart it.
+                  The Dev URL will appear here automatically — no manual
+                  config, ever.
+                </div>
+              </div>
+              <div className="w-full relative rounded-lg ring-1 ring-border/40 bg-background/80 overflow-hidden">
+                <pre
+                  className="text-[11px] leading-[1.55] font-mono text-foreground/85 px-3 py-3 overflow-x-auto whitespace-pre"
+                  data-testid="text-heartbeat-snippet"
+                >
+                  {heartbeatSnippet}
+                </pre>
+                <button
+                  type="button"
+                  onClick={copySnippet}
+                  data-testid="button-copy-heartbeat-snippet"
+                  className="absolute top-2 right-2 inline-flex items-center gap-1.5 px-2 h-7 rounded-md font-mono text-[10.5px] font-bold bg-background/90 ring-1 ring-border/50 hover:ring-sky-400/60 text-foreground/90 transition-shadow"
+                >
+                  {snippetCopied ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-400" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" /> Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="text-[10.5px] text-muted-foreground/70 text-center max-w-md">
+                Or paste the URL directly into the address bar above. Either
+                way, this view auto-refreshes when a new URL lands.
               </div>
             </div>
-            {selectedEnv === "dev" && onSetDevUrl && (
-              <button
-                type="button"
-                onClick={onSetDevUrl}
-                data-testid="empty-set-dev-url"
-                className="mt-2 inline-flex items-center gap-1.5 px-3 h-8 rounded-md font-mono text-[11px] font-bold bg-gradient-to-r from-sky-500 to-indigo-500 text-white"
-              >
-                <Code2 className="h-3.5 w-3.5" /> Set Dev URL
-              </button>
-            )}
-          </div>
+          ) : (
+            <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground gap-3">
+              <div className="h-12 w-12 rounded-full bg-muted/30 ring-1 ring-border/30 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm text-foreground/90 font-medium">
+                  No {selectedEnv === "dev" ? "dev" : "preview"} URL set
+                </div>
+                <div className="text-xs max-w-xs">
+                  {selectedEnv === "dev"
+                    ? "Ask the project owner to install the heartbeat snippet, or paste the .replit.dev URL into the bar above."
+                    : "Open a change request to generate a PR preview."}
+                </div>
+              </div>
+              {selectedEnv === "dev" && onSetDevUrl && (
+                <button
+                  type="button"
+                  onClick={onSetDevUrl}
+                  data-testid="empty-set-dev-url"
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 h-8 rounded-md font-mono text-[11px] font-bold bg-gradient-to-r from-sky-500 to-indigo-500 text-white"
+                >
+                  <Code2 className="h-3.5 w-3.5" /> Set Dev URL
+                </button>
+              )}
+            </div>
+          )
         )}
       </div>
 

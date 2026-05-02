@@ -944,6 +944,7 @@ export default function ProjectDetailPage() {
             <LivePreviewPane
               previewUrl={null}
               liveUrl={project.liveUrl}
+              heartbeatToken={isOwner ? project.heartbeatToken : null}
               onSetDevUrlValue={isOwner ? saveDevUrlInline : undefined}
               isSavingDevUrl={updateProject.isPending}
             />
