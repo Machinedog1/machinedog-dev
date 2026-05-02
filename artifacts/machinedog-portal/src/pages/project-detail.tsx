@@ -119,8 +119,18 @@ export default function ProjectDetailPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Poll the project every 5s while this page is open so a freshly-reported
+  // heartbeat (Dev URL changed because the Replit container restarted, the
+  // user just installed the snippet, etc.) flows straight into the preview
+  // iframe without requiring a manual refresh. Paused when the tab is hidden
+  // so it stays cheap.
   const projectQuery = useGetProject(projectId, {
-    query: { queryKey: getGetProjectQueryKey(projectId), enabled: Number.isFinite(projectId) },
+    query: {
+      queryKey: getGetProjectQueryKey(projectId),
+      enabled: Number.isFinite(projectId),
+      refetchInterval: 5000,
+      refetchIntervalInBackground: false,
+    },
   });
   const project = projectQuery.data;
   const isOwner = project?.viewerRole === "owner";
@@ -139,6 +149,12 @@ export default function ProjectDetailPage() {
   const removeMember = useRemoveProjectMember();
 
   const [editing, setEditing] = useState(false);
+  // Snapshot of the form values at the moment the user opened the editor.
+  // At save time we diff `form` against this baseline and only send the fields
+  // the user actually changed. This stops the 5s background poll from causing
+  // stale-overwrite: if heartbeat lands a new liveUrl while editing, the user
+  // saving unrelated fields won't clobber the freshly-reported URL.
+  const editBaselineRef = useRef<Record<string, unknown> | null>(null);
   const [form, setForm] = useState({
     title: "",
     summary: "",
@@ -525,9 +541,13 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // Sync the edit form from the server-side project record. Skipped while the
+  // user is actively editing so the 5s background poll (which keeps the dev
+  // preview iframe up-to-date with the latest heartbeat) doesn't wipe in-flight
+  // edits every refetch.
   useEffect(() => {
-    if (project) {
-      setForm({
+    if (project && !editing) {
+      const next = {
         title: project.title,
         summary: project.summary ?? "",
         description: project.description ?? "",
@@ -540,9 +560,25 @@ export default function ProjectDetailPage() {
         githubDefaultBranch: project.githubDefaultBranch ?? "main",
         previewUrlTemplate: project.previewUrlTemplate ?? "",
         operatorEmail: project.operatorEmail ?? "",
-      });
+      };
+      setForm(next);
+      // Clear baseline outside of an edit session so a stale snapshot can't
+      // leak into the next save.
+      editBaselineRef.current = null;
     }
-  }, [project]);
+  }, [project, editing]);
+
+  // The instant edit mode opens, snapshot the current form so the save-time
+  // diff knows what the user started from. Cleared automatically by the
+  // form-sync effect above when editing closes.
+  useEffect(() => {
+    if (editing && editBaselineRef.current === null) {
+      editBaselineRef.current = { ...form };
+    }
+    // Intentionally only depend on `editing` — re-snapshotting on every
+    // keystroke would defeat the diffing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   if (projectQuery.isLoading) {
     return (
@@ -567,25 +603,48 @@ export default function ProjectDetailPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    // Build a sparse patch: only fields the user actually changed since they
+    // entered edit mode. This is what protects heartbeat-driven liveUrl
+    // updates from being clobbered when the admin saves unrelated edits
+    // mid-poll.
+    const baseline = editBaselineRef.current ?? {};
+    const fullPayload = {
+      title: form.title,
+      summary: form.summary,
+      description: form.description,
+      liveUrl: form.liveUrl.trim() ? form.liveUrl.trim() : null,
+      productionUrl: form.productionUrl.trim() ? form.productionUrl.trim() : null,
+      coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : null,
+      status: form.status,
+      githubOwner: form.githubOwner.trim() ? form.githubOwner.trim() : null,
+      githubRepo: form.githubRepo.trim() ? form.githubRepo.trim() : null,
+      githubDefaultBranch: form.githubDefaultBranch.trim() || "main",
+      previewUrlTemplate: form.previewUrlTemplate.trim()
+        ? form.previewUrlTemplate.trim()
+        : null,
+      operatorEmail: form.operatorEmail.trim() ? form.operatorEmail.trim() : null,
+    };
+    const patch: Partial<typeof fullPayload> = {};
+    let changedCount = 0;
+    for (const [key, value] of Object.entries(fullPayload)) {
+      // Compare against the baseline form value (not the live `project` —
+      // that's the whole point: server may have changed under us).
+      if (baseline[key] !== form[key as keyof typeof form]) {
+        (patch as Record<string, unknown>)[key] = value;
+        changedCount++;
+      }
+    }
+    if (changedCount === 0) {
+      // Nothing changed — short-circuit. Closes the editor without a network
+      // round-trip and without clearing freshly-heartbeated server state.
+      setEditing(false);
+      toast({ title: "No changes" });
+      return;
+    }
     updateProject.mutate(
       {
         id: project.id,
-        data: {
-          title: form.title,
-          summary: form.summary,
-          description: form.description,
-          liveUrl: form.liveUrl.trim() ? form.liveUrl.trim() : null,
-          productionUrl: form.productionUrl.trim() ? form.productionUrl.trim() : null,
-          coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : null,
-          status: form.status,
-          githubOwner: form.githubOwner.trim() ? form.githubOwner.trim() : null,
-          githubRepo: form.githubRepo.trim() ? form.githubRepo.trim() : null,
-          githubDefaultBranch: form.githubDefaultBranch.trim() || "main",
-          previewUrlTemplate: form.previewUrlTemplate.trim()
-            ? form.previewUrlTemplate.trim()
-            : null,
-          operatorEmail: form.operatorEmail.trim() ? form.operatorEmail.trim() : null,
-        },
+        data: patch,
       },
       {
         onSuccess: () => {
