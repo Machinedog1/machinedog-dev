@@ -67,6 +67,7 @@ import remarkGfm from "remark-gfm";
 import { AgentConversation } from "@/components/change-requests/AgentConversation";
 import { LivePreviewPane } from "@/components/change-requests/LivePreviewPane";
 import { WorkspaceSplit } from "@/components/change-requests/WorkspaceSplit";
+import { ProjectChangeRequestsPanel } from "@/components/change-requests/ProjectChangeRequestsPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,6 +144,15 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject();
   const inviteMember = useInviteProjectMember();
   const removeMember = useRemoveProjectMember();
+
+  // Which pane shows on the right side of the workspace split. "preview" is
+  // the live iframe of the Repl's dev URL; "publishing" is the
+  // ProjectChangeRequestsPanel listing every CR with per-CR Publish /
+  // Rollback / Mark-Deployed buttons. Toggled by the ChromeTabs in the
+  // workspace top bar.
+  const [workspacePane, setWorkspacePane] = useState<"preview" | "publishing">(
+    "preview",
+  );
 
   const [editing, setEditing] = useState(false);
   // Snapshot of the form values at the moment the user opened the editor.
@@ -657,17 +667,20 @@ export default function ProjectDetailPage() {
             </button>
           </Link>
 
-          {/* Workspace tabs — only Preview and Publishing are surfaced. */}
+          {/* Workspace tabs — Preview shows the live Repl iframe, Publishing
+              shows the per-CR Publish/Rollback/Mark-Deployed panel. */}
           <ChromeTab
             icon={<Eye className="h-3.5 w-3.5" />}
             label="Preview"
-            active
+            active={workspacePane === "preview"}
+            onClick={() => setWorkspacePane("preview")}
             testId="tab-workspace-preview"
           />
           <ChromeTab
             icon={<Rocket className="h-3.5 w-3.5" />}
             label="Publishing"
-            dismissible
+            active={workspacePane === "publishing"}
+            onClick={() => setWorkspacePane("publishing")}
             testId="tab-workspace-publishing"
           />
           <button
@@ -832,7 +845,8 @@ export default function ProjectDetailPage() {
       )}
 
       {view === "workspace" && (
-        /* Replit-style split: agent on the left, full-height preview on the right.
+        /* Replit-style split: agent on the left, full-height preview or
+           publishing panel on the right depending on the active ChromeTab.
            The divider is draggable; width is persisted per project. */
         <WorkspaceSplit
           storageKey={`md.workspaceSplit.project.${project.id}`}
@@ -840,13 +854,19 @@ export default function ProjectDetailPage() {
             <AgentConversation projectId={project.id} isOwner={isOwner} compact />
           }
           right={
-            <LivePreviewPane
-              previewUrl={null}
-              liveUrl={project.liveUrl}
-              heartbeatToken={isOwner ? project.heartbeatToken : null}
-              onSetDevUrlValue={isOwner ? saveDevUrlInline : undefined}
-              isSavingDevUrl={updateProject.isPending}
-            />
+            workspacePane === "publishing" ? (
+              <div className="h-full overflow-y-auto">
+                <ProjectChangeRequestsPanel projectId={project.id} />
+              </div>
+            ) : (
+              <LivePreviewPane
+                previewUrl={null}
+                liveUrl={project.liveUrl}
+                heartbeatToken={isOwner ? project.heartbeatToken : null}
+                onSetDevUrlValue={isOwner ? saveDevUrlInline : undefined}
+                isSavingDevUrl={updateProject.isPending}
+              />
+            )
           }
         />
       )}
@@ -1564,7 +1584,7 @@ function ChromeTab({
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        className="inline-flex items-center gap-1.5 cursor-default"
+        className="inline-flex items-center gap-1.5 cursor-pointer"
       >
         <span className={active ? "text-primary" : ""}>{icon}</span>
         <span className="truncate">{label}</span>
