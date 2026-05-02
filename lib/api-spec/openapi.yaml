@@ -1089,6 +1089,54 @@ paths:
               schema:
                 $ref: "#/components/schemas/Project"
 
+  /admin/github/repos:
+    get:
+      operationId: listAdminGithubRepos
+      tags: [admin]
+      summary: List GitHub repos accessible to the connected GH account (admin only)
+      description: |
+        Surfaces every repo owned (or co-administered) by the GitHub account
+        connected via the Replit GitHub integration, alongside whether each one
+        has already been imported as a Machinedog project. Used by the admin
+        All Projects page to populate one-click "Import" cards.
+      responses:
+        "200":
+          description: GitHub repos for the connected account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAdminGithubReposResponse"
+
+  /admin/projects/import-github:
+    post:
+      operationId: importGithubProject
+      tags: [admin]
+      summary: Create a Machinedog project from a GitHub repo (admin only)
+      description: |
+        Creates a new project owned by the calling admin's client record, with
+        githubOwner / githubRepo / githubDefaultBranch pre-populated. Admin can
+        then reassign owner or attach collaborators via the existing controls.
+        Returns 409 if a project with that owner/repo already exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportGithubProjectBody"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "409":
+          description: A project for this repo already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /admin/orders:
     get:
       operationId: listAllBuildOrders
@@ -1381,6 +1429,69 @@ components:
         clientId:
           type: integer
       required: [clientId]
+
+    AdminGithubRepo:
+      type: object
+      properties:
+        owner:
+          type: string
+        repo:
+          type: string
+        fullName:
+          type: string
+        defaultBranch:
+          type: string
+        private:
+          type: boolean
+        description:
+          type: ["string", "null"]
+        htmlUrl:
+          type: string
+        updatedAt:
+          type: ["string", "null"]
+        importedProjectId:
+          type: ["integer", "null"]
+          description: |
+            ID of the existing Machinedog project for this repo, or null if
+            not yet imported.
+      required: [owner, repo, fullName, defaultBranch, private, htmlUrl]
+
+    ListAdminGithubReposResponse:
+      type: object
+      properties:
+        connected:
+          type: boolean
+          description: |
+            Whether the Replit GitHub integration is currently authorized.
+            When false, repos[] will be empty and the admin should be told to
+            authorize GitHub in Replit > Integrations.
+        login:
+          type: ["string", "null"]
+          description: GitHub login (e.g. "Machinedog1") of the connected account.
+        repos:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminGithubRepo"
+      required: [connected, repos]
+
+    ImportGithubProjectBody:
+      type: object
+      properties:
+        owner:
+          type: string
+          minLength: 1
+        repo:
+          type: string
+          minLength: 1
+        defaultBranch:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          description: |
+            Optional override. Defaults to the repo name with hyphens replaced
+            by spaces and Title Cased.
+      required: [owner, repo, defaultBranch]
 
     ProjectHeartbeatBody:
       type: object

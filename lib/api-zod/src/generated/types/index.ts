@@ -8,6 +8,7 @@
 
 export * from "./activityItem";
 export * from "./adjustBalanceBody";
+export * from "./adminGithubRepo";
 export * from "./adminStats";
 export * from "./agentThreadItem";
 export * from "./agentThreadResponse";
@@ -45,9 +46,11 @@ export * from "./deleteClientResponse";
 export * from "./deleteClientResponseMode";
 export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./importGithubProjectBody";
 export * from "./inviteClientBody";
 export * from "./inviteProjectMemberBody";
 export * from "./inviteResponse";
+export * from "./listAdminGithubReposResponse";
 export * from "./listAllBuildOrdersParams";
 export * from "./listClientsParams";
 export * from "./listMyPromptsParams";

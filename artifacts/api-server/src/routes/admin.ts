@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { randomBytes } from "node:crypto";
 import { eq, desc, sql, and } from "drizzle-orm";
 import {
   db,
@@ -28,10 +29,18 @@ import {
   ReassignProjectOwnerBody,
   ListAllBuildOrdersQueryParams,
   ListAllBuildOrdersResponse,
+  ListAdminGithubReposResponse,
+  ImportGithubProjectBody,
 } from "@workspace/api-zod";
 import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
 import { generateSecureToken } from "../lib/passwords";
 import { sendInviteEmail } from "../lib/mailer";
+import {
+  getConnectedGithubUser,
+  listConnectedUserRepos,
+  GitHubNotConfiguredError,
+  GitHubApiError,
+} from "../lib/github";
 
 const router: IRouter = Router();
 
@@ -465,6 +474,170 @@ router.patch("/admin/projects/:id/owner", async (req, res): Promise<void> => {
   );
 
   res.json({ ...updated, viewerRole: "owner" });
+});
+
+// Surfaces every GitHub repo the connected GH account can manage, plus
+// whether each one already has a Machinedog project. Powers the "Import from
+// GitHub" panel on the admin All Projects page so admins can pull every
+// repo Tom owns into Machinedog and then reassign clients with the existing
+// per-card controls.
+router.get("/admin/github/repos", async (_req, res): Promise<void> => {
+  // Treat both "not connected" and "auth expired/revoked" (401/403 from GH)
+  // as the same disconnected state so the UI can prompt re-authorization
+  // instead of showing a 500.
+  function asDisconnected() {
+    res.json(
+      ListAdminGithubReposResponse.parse({
+        connected: false,
+        login: null,
+        repos: [],
+      }),
+    );
+  }
+
+  let login: string | null = null;
+  try {
+    const me = await getConnectedGithubUser();
+    login = me.login;
+  } catch (err) {
+    if (err instanceof GitHubNotConfiguredError) {
+      asDisconnected();
+      return;
+    }
+    if (err instanceof GitHubApiError && (err.status === 401 || err.status === 403)) {
+      asDisconnected();
+      return;
+    }
+    throw err;
+  }
+
+  let repos;
+  try {
+    repos = await listConnectedUserRepos();
+  } catch (err) {
+    if (err instanceof GitHubNotConfiguredError) {
+      asDisconnected();
+      return;
+    }
+    if (err instanceof GitHubApiError && (err.status === 401 || err.status === 403)) {
+      asDisconnected();
+      return;
+    }
+    throw err;
+  }
+
+  // Build a lookup of already-imported repos so the UI can render an
+  // "Already imported" badge instead of an Import button.
+  const existing = await db
+    .select({
+      id: projectsTable.id,
+      githubOwner: projectsTable.githubOwner,
+      githubRepo: projectsTable.githubRepo,
+    })
+    .from(projectsTable);
+  const importedKey = new Map<string, number>();
+  for (const r of existing) {
+    if (r.githubOwner && r.githubRepo) {
+      importedKey.set(`${r.githubOwner.toLowerCase()}/${r.githubRepo.toLowerCase()}`, r.id);
+    }
+  }
+
+  res.json(
+    ListAdminGithubReposResponse.parse({
+      connected: true,
+      login,
+      repos: repos.map((r) => ({
+        ...r,
+        importedProjectId:
+          importedKey.get(`${r.owner.toLowerCase()}/${r.repo.toLowerCase()}`) ?? null,
+      })),
+    }),
+  );
+});
+
+// Creates a Machinedog project from a GitHub repo, owned by the calling
+// admin's client record. Admin then uses the existing reassign / invite
+// controls to attach a real client. 409 on duplicate so re-imports are safe.
+router.post("/admin/projects/import-github", async (req, res): Promise<void> => {
+  const body = ImportGithubProjectBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const owner = body.data.owner.trim();
+  const repo = body.data.repo.trim();
+  const defaultBranch = body.data.defaultBranch.trim() || "main";
+
+  // GitHub owner/repo names are case-insensitive — match the same
+  // normalization used on the list side so "Owner/Repo" and "owner/repo"
+  // dedupe against each other.
+  const [existing] = await db
+    .select()
+    .from(projectsTable)
+    .where(
+      and(
+        sql`lower(${projectsTable.githubOwner}) = ${owner.toLowerCase()}`,
+        sql`lower(${projectsTable.githubRepo}) = ${repo.toLowerCase()}`,
+      ),
+    );
+  if (existing) {
+    res
+      .status(409)
+      .json({
+        error: `Project for ${existing.githubOwner}/${existing.githubRepo} already exists (id ${existing.id}).`,
+      });
+    return;
+  }
+
+  const title =
+    body.data.title?.trim() ||
+    repo
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Wrap the insert so a concurrent import of the same repo (which would
+  // race past the read-then-insert dedupe above) trips the
+  // projects_github_owner_repo_unique index and is reported as a clean 409
+  // instead of a 500.
+  let row;
+  try {
+    [row] = await db
+      .insert(projectsTable)
+      .values({
+        clientId: req.dbClient!.id,
+        title,
+        description: `Imported from github.com/${owner}/${repo}`,
+        summary: "",
+        status: "draft",
+        githubOwner: owner,
+        githubRepo: repo,
+        githubDefaultBranch: defaultBranch,
+        heartbeatToken: randomBytes(16).toString("hex"),
+      })
+      .returning();
+  } catch (err: unknown) {
+    const code = (err as { code?: string } | null)?.code;
+    if (code === "23505") {
+      res
+        .status(409)
+        .json({ error: `Project for ${owner}/${repo} already exists.` });
+      return;
+    }
+    throw err;
+  }
+
+  req.log.info(
+    {
+      projectId: row.id,
+      owner,
+      repo,
+      defaultBranch,
+      adminClientId: req.dbClient!.id,
+    },
+    "Admin imported GitHub repo as project",
+  );
+
+  res.status(201).json({ ...row, viewerRole: "owner" });
 });
 
 router.get("/admin/orders", async (req, res): Promise<void> => {

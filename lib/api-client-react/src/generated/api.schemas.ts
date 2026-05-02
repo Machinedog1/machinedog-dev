@@ -187,6 +187,53 @@ export interface ReassignProjectOwnerBody {
   clientId: number;
 }
 
+export interface AdminGithubRepo {
+  owner: string;
+  repo: string;
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+  /** @nullable */
+  description?: string | null;
+  htmlUrl: string;
+  /** @nullable */
+  updatedAt?: string | null;
+  /**
+   * ID of the existing Machinedog project for this repo, or null if
+not yet imported.
+
+   * @nullable
+   */
+  importedProjectId?: number | null;
+}
+
+export interface ListAdminGithubReposResponse {
+  /** Whether the Replit GitHub integration is currently authorized.
+When false, repos[] will be empty and the admin should be told to
+authorize GitHub in Replit > Integrations.
+ */
+  connected: boolean;
+  /**
+   * GitHub login (e.g. "Machinedog1") of the connected account.
+   * @nullable
+   */
+  login?: string | null;
+  repos: AdminGithubRepo[];
+}
+
+export interface ImportGithubProjectBody {
+  /** @minLength 1 */
+  owner: string;
+  /** @minLength 1 */
+  repo: string;
+  /** @minLength 1 */
+  defaultBranch: string;
+  /** Optional override. Defaults to the repo name with hyphens replaced
+by spaces and Title Cased.
+ */
+  title?: string;
+}
+
 export interface ProjectHeartbeatBody {
   /** @minLength 16 */
   token: string;

@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { clientsTable } from "./clients";
@@ -37,7 +38,15 @@ export const projectsTable = pgTable("projects", {
   heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => ({
+  // GitHub owner/repo are case-insensitive — enforce uniqueness on the
+  // normalized lowercase pair so concurrent imports of the same repo can't
+  // both succeed past the dedupe check in the import handler.
+  githubOwnerRepoUnique: uniqueIndex("projects_github_owner_repo_unique").on(
+    sql`lower(${table.githubOwner})`,
+    sql`lower(${table.githubRepo})`,
+  ),
+}));
 
 export const insertProjectSchema = createInsertSchema(projectsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertProject = z.infer<typeof insertProjectSchema>;

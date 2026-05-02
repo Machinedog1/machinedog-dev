@@ -5,7 +5,10 @@ import {
   useListClients,
   useReassignProjectOwner,
   useInviteProjectMember,
+  useListAdminGithubRepos,
+  useImportGithubProject,
   getListAllProjectsQueryKey,
+  getListAdminGithubReposQueryKey,
 } from "@workspace/api-client-react";
 import {
   FolderGit2,
@@ -19,6 +22,9 @@ import {
   UserCog,
   UserPlus,
   Loader2,
+  Download,
+  Lock,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,9 +49,46 @@ export default function AdminProjects() {
   const { toast } = useToast();
   const { data, isLoading } = useListAllProjects();
   const { data: clientsData } = useListClients({ limit: 500, offset: 0 });
+  const { data: ghData, isLoading: ghLoading } = useListAdminGithubRepos();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [inviteEmails, setInviteEmails] = useState<Record<number, string>>({});
   const [invitingIds, setInvitingIds] = useState<Set<number>>(new Set());
+  const [importingKeys, setImportingKeys] = useState<Set<string>>(new Set());
+
+  const importRepo = useImportGithubProject({
+    mutation: {
+      onSuccess: (proj) => {
+        toast({
+          title: "Imported from GitHub",
+          description: `${proj.title} added — assign a client below.`,
+        });
+        qc.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+        qc.invalidateQueries({ queryKey: getListAdminGithubReposQueryKey() });
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Import failed";
+        toast({ title: "Import failed", description: msg, variant: "destructive" });
+      },
+      onSettled: (_d, _e, vars) => {
+        const key = `${vars.data.owner}/${vars.data.repo}`;
+        setImportingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      },
+    },
+  });
+
+  function handleImportRepo(owner: string, repo: string, defaultBranch: string) {
+    const key = `${owner}/${repo}`;
+    setImportingKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    importRepo.mutate({ data: { owner, repo, defaultBranch } });
+  }
 
   const reassign = useReassignProjectOwner({
     mutation: {
@@ -145,6 +188,116 @@ export default function AdminProjects() {
           project in their portal.
         </p>
       </div>
+
+      {/* IMPORT_FROM_GITHUB — pulls every repo the connected GH account can
+          manage, lets admin one-click import each as a Machinedog project. */}
+      <section
+        className="glass rounded-2xl p-5 flex flex-col gap-3"
+        data-testid="admin-github-import-panel"
+      >
+        <header className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <Github className="h-5 w-5 text-primary shrink-0" />
+            <h2 className="font-mono font-bold tracking-tight">
+              IMPORT_FROM_GITHUB
+            </h2>
+            {ghData?.connected && ghData.login ? (
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground glass-subtle px-2 py-0.5 rounded ring-1 ring-border/30">
+                @{ghData.login}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[11px] font-mono text-muted-foreground/80">
+            Every repo the connected GitHub account can administer. Import,
+            then assign a client below.
+          </p>
+        </header>
+
+        {ghLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-16 w-full glass-subtle rounded-lg" />
+            ))}
+          </div>
+        ) : !ghData?.connected ? (
+          <div className="text-xs font-mono text-amber-500/90 glass-subtle rounded-lg p-3 ring-1 ring-amber-500/20">
+            GitHub connector not authorized. Open Replit → Tools → Integrations
+            → GitHub and authorize, then reload this page.
+          </div>
+        ) : ghData.repos.length === 0 ? (
+          <div className="text-xs font-mono text-muted-foreground glass-subtle rounded-lg p-3 ring-1 ring-border/20">
+            NO_REPOS_FOUND for the connected GitHub account.
+          </div>
+        ) : (
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {ghData.repos.map((r) => {
+              const key = `${r.owner}/${r.repo}`;
+              const isImported = !!r.importedProjectId;
+              const isImporting = importingKeys.has(key);
+              return (
+                <li
+                  key={key}
+                  data-testid={`gh-repo-${r.owner}-${r.repo}`}
+                  className="glass-subtle rounded-lg p-3 flex items-center justify-between gap-3 ring-1 ring-border/20"
+                >
+                  <div className="min-w-0 flex flex-col gap-0.5">
+                    <a
+                      href={r.htmlUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-mono font-bold truncate hover:text-primary transition-colors flex items-center gap-1.5"
+                      title={r.fullName}
+                    >
+                      {r.private && (
+                        <Lock
+                          className="h-3 w-3 text-muted-foreground shrink-0"
+                          aria-label="Private repo"
+                        />
+                      )}
+                      <span className="truncate">{r.fullName}</span>
+                    </a>
+                    <div className="text-[10px] font-mono text-muted-foreground/70 flex items-center gap-2">
+                      <span>branch: {r.defaultBranch}</span>
+                      {r.updatedAt && (
+                        <span className="truncate">
+                          updated {format(new Date(r.updatedAt), "MMM d, yy")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {isImported ? (
+                    <span
+                      className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded glass-subtle text-green-500 ring-1 ring-green-500/30 flex items-center gap-1 shrink-0"
+                      data-testid={`gh-repo-imported-${r.owner}-${r.repo}`}
+                    >
+                      <Check className="h-3 w-3" />
+                      Imported
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid={`gh-repo-import-${r.owner}-${r.repo}`}
+                      disabled={isImporting}
+                      onClick={() =>
+                        handleImportRepo(r.owner, r.repo, r.defaultBranch)
+                      }
+                      aria-label={`Import ${r.fullName} as a Machinedog project`}
+                      className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-md bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shrink-0"
+                    >
+                      {isImporting ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3" />
+                      )}
+                      Import
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 overflow-y-auto content-start pb-8">
         {isLoading ? (

@@ -38,9 +38,11 @@ import type {
   DeleteClientResponse,
   ErrorResponse,
   HealthStatus,
+  ImportGithubProjectBody,
   InviteClientBody,
   InviteProjectMemberBody,
   InviteResponse,
+  ListAdminGithubReposResponse,
   ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
@@ -4547,6 +4549,180 @@ export const useReassignProjectOwner = <
   TContext
 > => {
   return useMutation(getReassignProjectOwnerMutationOptions(options));
+};
+
+/**
+ * Surfaces every repo owned (or co-administered) by the GitHub account
+connected via the Replit GitHub integration, alongside whether each one
+has already been imported as a Machinedog project. Used by the admin
+All Projects page to populate one-click "Import" cards.
+
+ * @summary List GitHub repos accessible to the connected GH account (admin only)
+ */
+export const getListAdminGithubReposUrl = () => {
+  return `/api/admin/github/repos`;
+};
+
+export const listAdminGithubRepos = async (
+  options?: RequestInit,
+): Promise<ListAdminGithubReposResponse> => {
+  return customFetch<ListAdminGithubReposResponse>(
+    getListAdminGithubReposUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListAdminGithubReposQueryKey = () => {
+  return [`/api/admin/github/repos`] as const;
+};
+
+export const getListAdminGithubReposQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminGithubRepos>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminGithubRepos>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAdminGithubReposQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAdminGithubRepos>>
+  > = ({ signal }) => listAdminGithubRepos({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminGithubRepos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminGithubReposQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminGithubRepos>>
+>;
+export type ListAdminGithubReposQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List GitHub repos accessible to the connected GH account (admin only)
+ */
+
+export function useListAdminGithubRepos<
+  TData = Awaited<ReturnType<typeof listAdminGithubRepos>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminGithubRepos>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminGithubReposQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Creates a new project owned by the calling admin's client record, with
+githubOwner / githubRepo / githubDefaultBranch pre-populated. Admin can
+then reassign owner or attach collaborators via the existing controls.
+Returns 409 if a project with that owner/repo already exists.
+
+ * @summary Create a Machinedog project from a GitHub repo (admin only)
+ */
+export const getImportGithubProjectUrl = () => {
+  return `/api/admin/projects/import-github`;
+};
+
+export const importGithubProject = async (
+  importGithubProjectBody: ImportGithubProjectBody,
+  options?: RequestInit,
+): Promise<Project> => {
+  return customFetch<Project>(getImportGithubProjectUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(importGithubProjectBody),
+  });
+};
+
+export const getImportGithubProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importGithubProject>>,
+    TError,
+    { data: BodyType<ImportGithubProjectBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importGithubProject>>,
+  TError,
+  { data: BodyType<ImportGithubProjectBody> },
+  TContext
+> => {
+  const mutationKey = ["importGithubProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importGithubProject>>,
+    { data: BodyType<ImportGithubProjectBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importGithubProject(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportGithubProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importGithubProject>>
+>;
+export type ImportGithubProjectMutationBody = BodyType<ImportGithubProjectBody>;
+export type ImportGithubProjectMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a Machinedog project from a GitHub repo (admin only)
+ */
+export const useImportGithubProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importGithubProject>>,
+    TError,
+    { data: BodyType<ImportGithubProjectBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importGithubProject>>,
+  TError,
+  { data: BodyType<ImportGithubProjectBody> },
+  TContext
+> => {
+  return useMutation(getImportGithubProjectMutationOptions(options));
 };
 
 /**

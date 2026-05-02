@@ -118,6 +118,71 @@ async function gh<T = unknown>(
   return (await response.json()) as T;
 }
 
+// Lightweight helpers used by the admin "Import from GitHub" panel — they
+// do not require a project context (they speak to the connected user's
+// account directly).
+
+export interface ConnectedGithubUser {
+  login: string;
+  id: number;
+  name: string | null;
+}
+
+export interface ConnectedGithubRepo {
+  owner: string;
+  repo: string;
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+  description: string | null;
+  htmlUrl: string;
+  updatedAt: string | null;
+}
+
+export async function getConnectedGithubUser(): Promise<ConnectedGithubUser> {
+  const me = await gh<{ login: string; id: number; name: string | null }>(
+    "/user",
+  );
+  return { login: me.login, id: me.id, name: me.name ?? null };
+}
+
+export async function listConnectedUserRepos(): Promise<ConnectedGithubRepo[]> {
+  // Pull every page (up to a sane cap) so admins see all repos they manage,
+  // sorted by most recently updated for the most useful default ordering.
+  const out: ConnectedGithubRepo[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const arr = await gh<
+      Array<{
+        owner: { login: string };
+        name: string;
+        full_name: string;
+        default_branch: string;
+        private: boolean;
+        description: string | null;
+        html_url: string;
+        updated_at: string | null;
+      }>
+    >(
+      `/user/repos?per_page=100&sort=updated&page=${page}&affiliation=owner,collaborator,organization_member`,
+    );
+    if (!Array.isArray(arr) || arr.length === 0) break;
+    for (const r of arr) {
+      out.push({
+        owner: r.owner.login,
+        repo: r.name,
+        fullName: r.full_name,
+        defaultBranch: r.default_branch || "main",
+        private: !!r.private,
+        description: r.description,
+        htmlUrl: r.html_url,
+        updatedAt: r.updated_at,
+      });
+    }
+    if (arr.length < 100) break;
+  }
+  return out;
+}
+
 export async function resolveBranchSha(
   project: GitHubProjectConfig,
   branch?: string,

@@ -1444,6 +1444,65 @@ export const ReassignProjectOwnerResponse = zod.object({
 });
 
 /**
+ * Surfaces every repo owned (or co-administered) by the GitHub account
+connected via the Replit GitHub integration, alongside whether each one
+has already been imported as a Machinedog project. Used by the admin
+All Projects page to populate one-click "Import" cards.
+
+ * @summary List GitHub repos accessible to the connected GH account (admin only)
+ */
+export const ListAdminGithubReposResponse = zod.object({
+  connected: zod
+    .boolean()
+    .describe(
+      "Whether the Replit GitHub integration is currently authorized.\nWhen false, repos[] will be empty and the admin should be told to\nauthorize GitHub in Replit > Integrations.\n",
+    ),
+  login: zod
+    .string()
+    .nullish()
+    .describe('GitHub login (e.g. \"Machinedog1\") of the connected account.'),
+  repos: zod.array(
+    zod.object({
+      owner: zod.string(),
+      repo: zod.string(),
+      fullName: zod.string(),
+      defaultBranch: zod.string(),
+      private: zod.boolean(),
+      description: zod.string().nullish(),
+      htmlUrl: zod.string(),
+      updatedAt: zod.string().nullish(),
+      importedProjectId: zod
+        .number()
+        .nullish()
+        .describe(
+          "ID of the existing Machinedog project for this repo, or null if\nnot yet imported.\n",
+        ),
+    }),
+  ),
+});
+
+/**
+ * Creates a new project owned by the calling admin's client record, with
+githubOwner / githubRepo / githubDefaultBranch pre-populated. Admin can
+then reassign owner or attach collaborators via the existing controls.
+Returns 409 if a project with that owner/repo already exists.
+
+ * @summary Create a Machinedog project from a GitHub repo (admin only)
+ */
+
+export const ImportGithubProjectBody = zod.object({
+  owner: zod.string().min(1),
+  repo: zod.string().min(1),
+  defaultBranch: zod.string().min(1),
+  title: zod
+    .string()
+    .optional()
+    .describe(
+      "Optional override. Defaults to the repo name with hyphens replaced\nby spaces and Title Cased.\n",
+    ),
+});
+
+/**
  * @summary List paid build deposits and retainer subscriptions (admin only)
  */
 export const listAllBuildOrdersQueryLimitDefault = 100;
