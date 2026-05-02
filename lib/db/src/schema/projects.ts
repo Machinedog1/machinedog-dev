@@ -36,6 +36,18 @@ export const projectsTable = pgTable("projects", {
   // When the snippet last reported in. Lets the UI show a freshness indicator
   // ("Dev URL refreshed 30s ago") and detect stale links.
   heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+  // Production-side heartbeat: the same snippet, when running on the deployed
+  // app (where REPLIT_DEV_DOMAIN is unset), POSTs to /projects/prod-heartbeat
+  // on every boot. We use this to auto-flip change requests from
+  // `awaiting_deploy` to `deployed` when a fresh production boot is observed
+  // after the merge commit landed.
+  productionHeartbeatAt: timestamp("production_heartbeat_at", { withTimezone: true }),
+  productionBootedAt: timestamp("production_booted_at", { withTimezone: true }),
+  // Deduplication marker — same boot reports it many times under Autoscale
+  // (every request can spawn the same instance reporting in). Format is
+  // `{bootedAt-epoch-ms}|{releaseMarker}` so a true new boot or a new release
+  // changes the value.
+  productionBootMarker: text("production_boot_marker"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => ({

@@ -56,6 +56,8 @@ import type {
   ProjectList,
   ProjectMember,
   ProjectMemberList,
+  ProjectProdHeartbeatBody,
+  ProjectProdHeartbeatResponse,
   PromptSession,
   PromptSessionList,
   PublicCheckoutBody,
@@ -1053,6 +1055,97 @@ export const useProjectHeartbeat = <
   TContext
 > => {
   return useMutation(getProjectHeartbeatMutationOptions(options));
+};
+
+/**
+ * Public endpoint hit by the same heartbeat snippet running on the deployed (production) app — i.e. when REPLIT_DEV_DOMAIN is unset. Auth is by per-project token in the body. Records the production boot and, when a fresh boot is observed at least the configured grace period after a change request was merged, automatically flips that change request from `awaiting_deploy` to `deployed`.
+ * @summary Auto-report a production boot from a deployed client app
+ */
+export const getProjectProdHeartbeatUrl = () => {
+  return `/api/projects/prod-heartbeat`;
+};
+
+export const projectProdHeartbeat = async (
+  projectProdHeartbeatBody: ProjectProdHeartbeatBody,
+  options?: RequestInit,
+): Promise<ProjectProdHeartbeatResponse> => {
+  return customFetch<ProjectProdHeartbeatResponse>(
+    getProjectProdHeartbeatUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(projectProdHeartbeatBody),
+    },
+  );
+};
+
+export const getProjectProdHeartbeatMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof projectProdHeartbeat>>,
+    TError,
+    { data: BodyType<ProjectProdHeartbeatBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof projectProdHeartbeat>>,
+  TError,
+  { data: BodyType<ProjectProdHeartbeatBody> },
+  TContext
+> => {
+  const mutationKey = ["projectProdHeartbeat"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof projectProdHeartbeat>>,
+    { data: BodyType<ProjectProdHeartbeatBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return projectProdHeartbeat(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProjectProdHeartbeatMutationResult = NonNullable<
+  Awaited<ReturnType<typeof projectProdHeartbeat>>
+>;
+export type ProjectProdHeartbeatMutationBody =
+  BodyType<ProjectProdHeartbeatBody>;
+export type ProjectProdHeartbeatMutationError = ErrorType<void>;
+
+/**
+ * @summary Auto-report a production boot from a deployed client app
+ */
+export const useProjectProdHeartbeat = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof projectProdHeartbeat>>,
+    TError,
+    { data: BodyType<ProjectProdHeartbeatBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof projectProdHeartbeat>>,
+  TError,
+  { data: BodyType<ProjectProdHeartbeatBody> },
+  TContext
+> => {
+  return useMutation(getProjectProdHeartbeatMutationOptions(options));
 };
 
 /**

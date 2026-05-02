@@ -157,21 +157,37 @@ export function LivePreviewPane({
       : "text-sky-300 ring-sky-500/30 bg-sky-500/10";
 
   // The auto-populate snippet — drop this into the customer's app and the
-  // .replit.dev URL flows here on every boot. We compute it inline (instead
-  // of importing from a shared constants file) so the only branding/host
-  // surface area is the running portal's origin.
+  // .replit.dev URL flows here on every boot in the workspace, AND every
+  // production boot reports in so Machinedog can auto-flip merged change
+  // requests to "deployed" without an operator click. Computed inline (no
+  // shared constants file) so the only host surface is the running portal.
   const heartbeatSnippet = useMemo(() => {
     if (!heartbeatToken) return null;
     const apiOrigin =
       typeof window !== "undefined" ? window.location.origin : "";
     return `// machinedog-heartbeat.js — paste at the top of your server entry.
-// Posts your Replit dev URL to Machinedog so the preview auto-populates.
-const u = process.env.REPLIT_DEV_DOMAIN;
-if (u) {
-  fetch("${apiOrigin}/api/projects/heartbeat", {
+// In the workspace: posts your Replit dev URL so the preview auto-populates.
+// In production: posts a fresh-boot ping so merged change requests
+// auto-flip to "deployed" without anyone clicking anything.
+const __mdApi = "${apiOrigin}";
+const __mdToken = "${heartbeatToken}";
+const __mdDev = process.env.REPLIT_DEV_DOMAIN;
+if (__mdDev) {
+  fetch(__mdApi + "/api/projects/heartbeat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token: "${heartbeatToken}", devUrl: \`https://\${u}\` }),
+    body: JSON.stringify({ token: __mdToken, devUrl: "https://" + __mdDev }),
+  }).catch(() => {});
+} else {
+  fetch(__mdApi + "/api/projects/prod-heartbeat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      token: __mdToken,
+      bootedAt: Date.now(),
+      releaseMarker:
+        process.env.REPL_DEPLOYMENT_ID || process.env.REPL_ID || null,
+    }),
   }).catch(() => {});
 }`;
   }, [heartbeatToken]);

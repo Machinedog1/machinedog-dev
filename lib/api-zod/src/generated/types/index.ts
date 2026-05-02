@@ -66,6 +66,8 @@ export * from "./projectMember";
 export * from "./projectMemberList";
 export * from "./projectMemberRole";
 export * from "./projectMemberStatus";
+export * from "./projectProdHeartbeatBody";
+export * from "./projectProdHeartbeatResponse";
 export * from "./projectStatus";
 export * from "./projectViewerRole";
 export * from "./promptSession";

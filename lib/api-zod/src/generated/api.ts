@@ -242,6 +242,26 @@ export const ProjectHeartbeatResponse = zod.object({
 });
 
 /**
+ * Public endpoint hit by the same heartbeat snippet running on the deployed (production) app — i.e. when REPLIT_DEV_DOMAIN is unset. Auth is by per-project token in the body. Records the production boot and, when a fresh boot is observed at least the configured grace period after a change request was merged, automatically flips that change request from `awaiting_deploy` to `deployed`.
+ * @summary Auto-report a production boot from a deployed client app
+ */
+export const projectProdHeartbeatBodyTokenMin = 16;
+
+export const ProjectProdHeartbeatBody = zod.object({
+  token: zod.string().min(projectProdHeartbeatBodyTokenMin),
+  bootedAt: zod.number(),
+  prodUrl: zod.string().nullish(),
+  releaseMarker: zod.string().nullish(),
+});
+
+export const ProjectProdHeartbeatResponse = zod.object({
+  ok: zod.boolean(),
+  projectId: zod.number(),
+  receivedAt: zod.coerce.date(),
+  autoMarkedDeployedChangeRequestId: zod.number().nullish(),
+});
+
+/**
  * @summary Get a project
  */
 export const GetProjectParams = zod.object({

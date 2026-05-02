@@ -256,6 +256,24 @@ export interface RotateHeartbeatTokenResponse {
   heartbeatToken: string;
 }
 
+export interface ProjectProdHeartbeatBody {
+  /** @minLength 16 */
+  token: string;
+  bootedAt: number;
+  /** @nullable */
+  prodUrl?: string | null;
+  /** @nullable */
+  releaseMarker?: string | null;
+}
+
+export interface ProjectProdHeartbeatResponse {
+  ok: boolean;
+  projectId: number;
+  receivedAt: string;
+  /** @nullable */
+  autoMarkedDeployedChangeRequestId?: number | null;
+}
+
 export type UpdateProjectBodyStatus =
   (typeof UpdateProjectBodyStatus)[keyof typeof UpdateProjectBodyStatus];
 

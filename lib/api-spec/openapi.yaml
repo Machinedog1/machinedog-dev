@@ -267,6 +267,37 @@ paths:
         "400":
           description: Invalid body
 
+  /projects/prod-heartbeat:
+    post:
+      operationId: projectProdHeartbeat
+      tags: [projects]
+      summary: Auto-report a production boot from a deployed client app
+      description: >-
+        Public endpoint hit by the same heartbeat snippet running on the
+        deployed (production) app — i.e. when REPLIT_DEV_DOMAIN is unset.
+        Auth is by per-project token in the body. Records the production
+        boot and, when a fresh boot is observed at least the configured
+        grace period after a change request was merged, automatically
+        flips that change request from `awaiting_deploy` to `deployed`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectProdHeartbeatBody"
+      responses:
+        "200":
+          description: Heartbeat accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectProdHeartbeatResponse"
+        "401":
+          description: Unknown or rotated token
+        "400":
+          description: Invalid body
+
   /projects/{id}:
     get:
       operationId: getProject
@@ -1529,6 +1560,47 @@ components:
         heartbeatToken:
           type: string
       required: [heartbeatToken]
+
+    ProjectProdHeartbeatBody:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 16
+        # Server start time on the prod box, in epoch milliseconds
+        # (Date.now() - process.uptime()*1000 is fine). Used together with
+        # releaseMarker to deduplicate Autoscale heartbeats from the same
+        # instance and to compare against the merge timestamp.
+        bootedAt:
+          type: integer
+          format: int64
+        # Optional production URL the snippet is running on (e.g.
+        # https://ctrlfarm.replit.app). When provided and the project has no
+        # productionUrl set, we save it so the operator UI can link to it.
+        prodUrl:
+          type: ["string", "null"]
+        # Optional Replit-injected identifier (REPL_DEPLOYMENT_ID,
+        # SOURCE_VERSION, etc.). Combined with bootedAt to form the
+        # deduplication marker. Truly unique per actual deploy when present.
+        releaseMarker:
+          type: ["string", "null"]
+      required: [token, bootedAt]
+
+    ProjectProdHeartbeatResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        projectId:
+          type: integer
+        receivedAt:
+          type: string
+          format: date-time
+        # Set when this heartbeat caused a change request to auto-flip to
+        # `deployed`. Null when no auto-flip happened (most heartbeats).
+        autoMarkedDeployedChangeRequestId:
+          type: ["integer", "null"]
+      required: [ok, projectId, receivedAt]
 
     UpdateProjectBody:
       type: object

@@ -75,6 +75,7 @@ export const CHANGE_REQUEST_EVENT_KINDS = [
   "publish_requested",
   "pr_merged",
   "deploy_marked",
+  "deploy_auto_detected",
   "rollback_requested",
   "rollback_pr_opened",
   "rolled_back",

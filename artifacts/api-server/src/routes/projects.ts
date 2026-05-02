@@ -8,6 +8,8 @@ import {
   projectFilesTable,
   promptSessionsTable,
   clientsTable,
+  changeRequestsTable,
+  changeRequestEventsTable,
   type Project,
 } from "@workspace/db";
 import {
@@ -40,6 +42,8 @@ import {
   DeleteProjectFileParams,
   ProjectHeartbeatBody,
   ProjectHeartbeatResponse,
+  ProjectProdHeartbeatBody,
+  ProjectProdHeartbeatResponse,
   RotateProjectHeartbeatTokenParams,
   RotateProjectHeartbeatTokenResponse,
 } from "@workspace/api-zod";
@@ -261,6 +265,200 @@ router.post("/projects/heartbeat", async (req, res): Promise<void> => {
     projectId: updated.id,
     liveUrl: updated.liveUrl ?? normalized,
     receivedAt: now,
+  });
+  res.json(payload);
+});
+
+// Public production heartbeat endpoint — no session auth, token-only. Hit by
+// the same snippet running on the deployed app (where REPLIT_DEV_DOMAIN is
+// unset). Records each fresh boot and, when a fresh boot happens far enough
+// after but not too long after a CR's merge, auto-flips that CR's status
+// from `awaiting_deploy` to `deployed` with a `deploy_auto_detected` event.
+//
+// Defenses against the inherent ambiguity of "did this instance boot from
+// the new code, or is it just an Autoscale instance running old code?":
+//   1. **Bounded bootedAt** (BOOT_SKEW_MS): the client-supplied bootedAt must
+//      be within 5 minutes of server clock. Without this, a leaked token
+//      could submit a far-future bootedAt and force any subsequent merge to
+//      auto-deploy.
+//   2. **Post-merge grace** (POST_MERGE_GRACE_MS): boot must be at least 60s
+//      AFTER the merge. Catches the common race of an Autoscale spawn that
+//      happens between merge and the operator's Republish click.
+//   3. **Pre-merge ceiling** (MAX_AGE_AFTER_MERGE_MS): only consider CRs
+//      merged in the last 90 minutes. Beyond that, the operator probably
+//      hasn't redeployed yet; an Autoscale boot of old code shouldn't
+//      retroactively mark deploys older than 90 minutes.
+//   4. **Atomic marker CAS**: claiming a fresh boot marker uses a conditional
+//      UPDATE — only the first concurrent request with the same fresh marker
+//      runs the auto-mark logic, preventing duplicate events.
+//   5. **Status-guarded CR update**: the awaiting→deployed UPDATE re-asserts
+//      `status='awaiting_deploy'` in its WHERE, so two concurrent heartbeats
+//      seeing the same CRs can't both succeed at the flip.
+router.post("/projects/prod-heartbeat", async (req, res): Promise<void> => {
+  const body = ProjectProdHeartbeatBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: { code: "bad_request", message: body.error.message } });
+    return;
+  }
+  const { token, bootedAt: bootedAtMs, prodUrl, releaseMarker } = body.data;
+  const bootedAt = new Date(bootedAtMs);
+  if (Number.isNaN(bootedAt.getTime())) {
+    res.status(400).json({ error: { code: "bad_request", message: "bootedAt must be a valid epoch ms" } });
+    return;
+  }
+
+  // (1) Bounded bootedAt — reject blatant clock spoofing.
+  const BOOT_SKEW_MS = 5 * 60 * 1000;
+  const skew = Math.abs(bootedAtMs - Date.now());
+  if (skew > BOOT_SKEW_MS) {
+    res.status(400).json({
+      error: {
+        code: "bad_request",
+        message: `bootedAt is ${Math.round(skew / 1000)}s from server clock; max allowed skew is ${BOOT_SKEW_MS / 1000}s`,
+      },
+    });
+    return;
+  }
+
+  let normalizedProdUrl: string | null = null;
+  if (prodUrl) {
+    try {
+      const parsed = new URL(prodUrl);
+      if (parsed.protocol !== "https:") {
+        throw new Error("not https");
+      }
+      normalizedProdUrl = `${parsed.protocol}//${parsed.host}`;
+    } catch {
+      res.status(400).json({ error: { code: "bad_request", message: "prodUrl must be a valid https URL" } });
+      return;
+    }
+  }
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.heartbeatToken, token));
+  if (!project) {
+    res.status(401).json({ error: { code: "unauthorized", message: "Unknown token" } });
+    return;
+  }
+
+  const now = new Date();
+  // Round bootedAt to whole seconds — process startup jitter shouldn't
+  // fragment the marker. Pair with the (optional) releaseMarker so that
+  // Replit's per-deploy ID, when present, is the dominant signal.
+  const bootMarker = `${Math.floor(bootedAtMs / 1000)}|${releaseMarker ?? ""}`;
+
+  // Always-update fields (liveness + first-seen prodUrl). These are safe
+  // to overwrite on every heartbeat regardless of dedup outcome.
+  const liveUpdates: Partial<typeof projectsTable.$inferInsert> = {
+    productionHeartbeatAt: now,
+  };
+  if (normalizedProdUrl && !project.productionUrl) {
+    liveUpdates.productionUrl = normalizedProdUrl;
+  }
+  await db.update(projectsTable).set(liveUpdates).where(eq(projectsTable.id, project.id));
+
+  // (4) Atomic marker CAS — only the first request with this fresh marker
+  // wins. Concurrent requests will see 0 rows updated and bail out of the
+  // auto-mark path, even though the marker comparison passed in app code.
+  let wonFreshBootClaim = false;
+  if (bootMarker !== project.productionBootMarker) {
+    const claimed = await db
+      .update(projectsTable)
+      .set({ productionBootedAt: bootedAt, productionBootMarker: bootMarker })
+      .where(
+        and(
+          eq(projectsTable.id, project.id),
+          sql`(${projectsTable.productionBootMarker} IS DISTINCT FROM ${bootMarker})`,
+        ),
+      )
+      .returning({ id: projectsTable.id });
+    wonFreshBootClaim = claimed.length > 0;
+  }
+
+  let autoMarkedCrId: number | null = null;
+
+  if (wonFreshBootClaim) {
+    // (2) Post-merge grace + (3) pre-merge ceiling — bound the eligibility
+    // window so this only considers recently merged CRs.
+    const POST_MERGE_GRACE_MS = 60 * 1000;
+    const MAX_AGE_AFTER_MERGE_MS = 90 * 60 * 1000;
+    const upperCutoff = new Date(bootedAt.getTime() - POST_MERGE_GRACE_MS);
+    const lowerCutoff = new Date(bootedAt.getTime() - MAX_AGE_AFTER_MERGE_MS);
+
+    const candidates = await db
+      .select({ id: changeRequestsTable.id })
+      .from(changeRequestsTable)
+      .where(
+        and(
+          eq(changeRequestsTable.projectId, project.id),
+          eq(changeRequestsTable.status, "awaiting_deploy"),
+          isNotNull(changeRequestsTable.mergedAt),
+          sql`${changeRequestsTable.mergedAt} <= ${upperCutoff.toISOString()}`,
+          sql`${changeRequestsTable.mergedAt} >= ${lowerCutoff.toISOString()}`,
+        ),
+      );
+
+    if (candidates.length > 0) {
+      const ids = candidates.map((c) => c.id);
+      // (5) Status-guarded UPDATE — re-assert awaiting_deploy in WHERE so
+      // a parallel manual mark-deployed call can't be overwritten and we
+      // only emit events for rows we actually transitioned.
+      const transitioned = await db
+        .update(changeRequestsTable)
+        .set({ status: "deployed", deployedAt: now })
+        .where(
+          and(
+            inArray(changeRequestsTable.id, ids),
+            eq(changeRequestsTable.status, "awaiting_deploy"),
+          ),
+        )
+        .returning({ id: changeRequestsTable.id });
+
+      if (transitioned.length > 0) {
+        await db.insert(changeRequestEventsTable).values(
+          transitioned.map((cr) => ({
+            changeRequestId: cr.id,
+            kind: "deploy_auto_detected" as const,
+            message: "Production boot detected after merge — auto-marked deployed.",
+            actorClientId: null,
+            metadata: {
+              bootedAt: bootedAt.toISOString(),
+              releaseMarker: releaseMarker ?? null,
+              prodUrl: normalizedProdUrl,
+            },
+          })),
+        );
+        autoMarkedCrId = transitioned[0].id;
+        logger.info(
+          {
+            projectId: project.id,
+            changeRequestIds: transitioned.map((c) => c.id),
+            bootedAt: bootedAt.toISOString(),
+          },
+          "Auto-marked change requests as deployed via prod heartbeat",
+        );
+      }
+    }
+  }
+
+  logger.info(
+    {
+      projectId: project.id,
+      bootedAt: bootedAt.toISOString(),
+      wonFreshBootClaim,
+      releaseMarker: releaseMarker ?? null,
+      autoMarkedCrId,
+    },
+    "Project prod heartbeat received",
+  );
+
+  const payload = ProjectProdHeartbeatResponse.parse({
+    ok: true,
+    projectId: project.id,
+    receivedAt: now,
+    autoMarkedDeployedChangeRequestId: autoMarkedCrId,
   });
   res.json(payload);
 });
