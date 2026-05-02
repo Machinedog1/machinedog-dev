@@ -133,14 +133,17 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-muted-foreground">LIVE URL</label>
+                <label className="text-xs font-mono font-bold text-muted-foreground">DEV PREVIEW URL</label>
                 <Input
                   value={liveUrl}
                   onChange={(e) => setLiveUrl(e.target.value)}
-                  placeholder="https://beesuite.farm"
+                  placeholder="https://your-app.replit.dev"
                   type="url"
                   className="font-mono"
                 />
+                <p className="text-[10px] font-mono text-muted-foreground/70">
+                  The Replit .replit.dev URL of the project's dev environment. Auto-loads in the preview pane when you open the project.
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-mono font-bold text-muted-foreground">DESCRIPTION</label>

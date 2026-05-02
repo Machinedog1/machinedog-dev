@@ -315,6 +315,21 @@ export default function ProjectDetailPage() {
     setDevUrlOpen(true);
   }
 
+  // Auto-prompt for the Dev URL the first time an owner opens a project that
+  // has no liveUrl set, so the preview pane can auto-populate on subsequent
+  // visits. Gated by sessionStorage per project so we don't re-prompt on every
+  // navigation in the same session.
+  useEffect(() => {
+    if (!project || !isOwner) return;
+    if (project.liveUrl) return;
+    if (typeof window === "undefined") return;
+    const key = `md.devUrlPrompted.project.${project.id}`;
+    if (window.sessionStorage.getItem(key) === "1") return;
+    window.sessionStorage.setItem(key, "1");
+    setDevUrlInput("");
+    setDevUrlOpen(true);
+  }, [project?.id, project?.liveUrl, isOwner]);
+
   function submitDevUrl(opts?: { openAfter?: boolean }) {
     if (!project) return;
     const raw = devUrlInput.trim();
