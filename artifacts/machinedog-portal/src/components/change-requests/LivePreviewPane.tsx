@@ -56,19 +56,36 @@ export function LivePreviewPane({
   previewUrl,
   liveUrl,
   onSetDevUrl,
+  onSetDevUrlValue,
+  isSavingDevUrl,
 }: {
   previewUrl: string | null | undefined;
   liveUrl: string | null | undefined;
   /** Optional callback to open a "set dev URL" dialog when the user clicks
    *  Dev in the env switcher and no URL is configured. */
   onSetDevUrl?: () => void;
+  /** Optional inline-save callback wired to project.liveUrl. When provided,
+   *  the URL pill becomes a real address bar — paste or type a URL, hit
+   *  Enter (or just paste), and it persists to the project + loads in the
+   *  iframe immediately. Keeps the dialog as a fallback for when the user
+   *  clicks the Dev tab while empty. */
+  onSetDevUrlValue?: (url: string) => void;
+  isSavingDevUrl?: boolean;
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [viewport, setViewport] = useState<Viewport>("desktop");
 
+  // Editable address bar — only relevant for the Dev env. We keep a local
+  // draft so typing doesn't immediately re-render every keystroke through
+  // the parent; we commit on Enter, blur (if changed), or paste.
+  const [urlDraft, setUrlDraft] = useState<string>("");
+  const [editingUrl, setEditingUrl] = useState(false);
+
   // Available environments. Dev always renders (so the user can see what's
   // missing and click to set it); PR Preview only appears when a preview URL
-  // is wired up.
+  // is wired up. The preview pane is dev-only — we never silently fall back
+  // to the production site so the viewer is always certain they're looking
+  // at the in-progress build.
   const envs = useMemo(
     () => ({
       dev: isSafeHttpUrl(liveUrl) ? liveUrl : null,
@@ -92,6 +109,36 @@ export function LivePreviewPane({
   }, [envs, selectedEnv]);
 
   const url = envs[selectedEnv];
+
+  // Keep the local draft in sync with the saved URL whenever the user is
+  // *not* actively editing — that way the pill always reflects the latest
+  // server-side value (e.g. heartbeat just landed) without clobbering
+  // mid-paste typing.
+  useEffect(() => {
+    if (!editingUrl) setUrlDraft(liveUrl ?? "");
+  }, [liveUrl, editingUrl]);
+
+  /** Normalize a user-entered URL (https:// prepended, trimmed) and only save
+   *  if it parses as a real http(s) URL and actually changed. */
+  function commitUrlDraft(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      // Treat clearing the field as a no-op (use the dialog to explicitly
+      // unset). Avoids surprise nulls from accidental selection deletes.
+      setUrlDraft(liveUrl ?? "");
+      return;
+    }
+    const withScheme = /^https?:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+    if (!isSafeHttpUrl(withScheme)) {
+      // Bad URL — revert to last saved value.
+      setUrlDraft(liveUrl ?? "");
+      return;
+    }
+    if (withScheme === (liveUrl ?? "")) return; // no change
+    onSetDevUrlValue?.(withScheme);
+  }
 
   const sourceLabel = selectedEnv === "preview" ? "PR PREVIEW" : "DEV";
   const sourceTone =
@@ -171,28 +218,98 @@ export function LivePreviewPane({
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
 
-        {/* URL pill */}
-        <div className="flex-1 min-w-0 flex items-center gap-2 px-2.5 h-7 rounded-md bg-background/60 ring-1 ring-border/30">
-          {url ? (
-            isSecure(url) ? (
-              <Lock className="h-3 w-3 text-emerald-400/80 shrink-0" />
+        {/* URL pill — editable address bar when viewing the Dev env and an
+            inline-save handler is wired up. Paste or type a URL, hit Enter
+            (or just paste), and it persists straight to project.liveUrl and
+            loads in the iframe. PR Preview env stays read-only. */}
+        {selectedEnv === "dev" && onSetDevUrlValue ? (
+          <div className="flex-1 min-w-0 flex items-center gap-2 px-2.5 h-7 rounded-md bg-background/60 ring-1 ring-border/30 focus-within:ring-sky-500/50 transition-shadow">
+            {url ? (
+              isSecure(url) ? (
+                <Lock className="h-3 w-3 text-emerald-400/80 shrink-0" />
+              ) : (
+                <Globe2 className="h-3 w-3 text-muted-foreground shrink-0" />
+              )
             ) : (
-              <Globe2 className="h-3 w-3 text-muted-foreground shrink-0" />
-            )
-          ) : (
-            <Globe2 className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-          )}
-          <span className="font-mono text-[11.5px] text-foreground/90 truncate flex-1">
-            {url ? prettyHost(url) : "no preview url"}
-          </span>
-          {sourceLabel && (
-            <span
-              className={`shrink-0 text-[9.5px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ring-1 ${sourceTone}`}
-            >
-              {sourceLabel}
+              <Globe2 className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+            )}
+            <input
+              type="text"
+              inputMode="url"
+              spellCheck={false}
+              autoComplete="off"
+              value={editingUrl ? urlDraft : url ? prettyHost(url) : urlDraft}
+              placeholder="paste a dev url (https://...replit.dev)"
+              data-testid="input-preview-dev-url"
+              onFocus={() => {
+                setEditingUrl(true);
+                // Show the full URL (with scheme) so paste-over-select works.
+                setUrlDraft(liveUrl ?? "");
+              }}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              onPaste={(e) => {
+                // Take the pasted value verbatim and commit immediately so
+                // the user doesn't have to hit Enter after a paste.
+                const pasted = e.clipboardData.getData("text");
+                if (!pasted) return;
+                e.preventDefault();
+                setUrlDraft(pasted);
+                commitUrlDraft(pasted);
+                setEditingUrl(false);
+                (e.target as HTMLInputElement).blur();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitUrlDraft(urlDraft);
+                  setEditingUrl(false);
+                  (e.target as HTMLInputElement).blur();
+                } else if (e.key === "Escape") {
+                  setUrlDraft(liveUrl ?? "");
+                  setEditingUrl(false);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              onBlur={() => {
+                if (editingUrl && urlDraft.trim() !== (liveUrl ?? "").trim()) {
+                  commitUrlDraft(urlDraft);
+                }
+                setEditingUrl(false);
+              }}
+              disabled={!!isSavingDevUrl}
+              className="flex-1 min-w-0 bg-transparent border-0 outline-none font-mono text-[11.5px] text-foreground/90 placeholder:text-muted-foreground/60 disabled:opacity-50"
+            />
+            {sourceLabel && (
+              <span
+                className={`shrink-0 text-[9.5px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ring-1 ${sourceTone}`}
+              >
+                {sourceLabel}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 min-w-0 flex items-center gap-2 px-2.5 h-7 rounded-md bg-background/60 ring-1 ring-border/30">
+            {url ? (
+              isSecure(url) ? (
+                <Lock className="h-3 w-3 text-emerald-400/80 shrink-0" />
+              ) : (
+                <Globe2 className="h-3 w-3 text-muted-foreground shrink-0" />
+              )
+            ) : (
+              <Globe2 className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+            )}
+            <span className="font-mono text-[11.5px] text-foreground/90 truncate flex-1">
+              {url ? prettyHost(url) : "no preview url"}
             </span>
-          )}
-        </div>
+            {sourceLabel && (
+              <span
+                className={`shrink-0 text-[9.5px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ring-1 ${sourceTone}`}
+              >
+                {sourceLabel}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Viewport selector */}
         <div className="hidden sm:flex items-center gap-0.5 rounded-md ring-1 ring-border/30 bg-background/40 p-0.5 shrink-0">

@@ -331,6 +331,35 @@ export default function ProjectDetailPage() {
     setDevUrlOpen(true);
   }
 
+  // Inline-save called from the editable address bar inside LivePreviewPane.
+  // The component already normalized + validated the URL — we just persist
+  // and show the same success toast as the dialog. Sparse-patch (only liveUrl)
+  // so this is safe to call while the user is editing other fields.
+  function saveDevUrlInline(normalized: string) {
+    if (!project) return;
+    updateProject.mutate(
+      { id: project.id, data: { liveUrl: normalized } },
+      {
+        onSuccess: () => {
+          toast({ title: "Dev URL saved", description: normalized });
+          queryClient.invalidateQueries({
+            queryKey: getGetProjectQueryKey(project.id),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListMyProjectsQueryKey(),
+          });
+        },
+        onError: (err: unknown) => {
+          toast({
+            variant: "destructive",
+            title: "Couldn't save Dev URL",
+            description: errorMessage(err, "Try again."),
+          });
+        },
+      },
+    );
+  }
+
   // Auto-prompt for the Dev URL the first time an owner opens a project that
   // has no liveUrl set, so the preview pane can auto-populate on subsequent
   // visits. Gated by sessionStorage per project so we don't re-prompt on every
@@ -930,6 +959,8 @@ export default function ProjectDetailPage() {
               previewUrl={null}
               liveUrl={project.liveUrl}
               onSetDevUrl={isOwner ? openDevUrlDialog : undefined}
+              onSetDevUrlValue={isOwner ? saveDevUrlInline : undefined}
+              isSavingDevUrl={updateProject.isPending}
             />
           }
         />
