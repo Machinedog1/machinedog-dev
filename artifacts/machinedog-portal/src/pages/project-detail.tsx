@@ -16,8 +16,6 @@ import {
   useDeleteProjectFile,
   useRequestUploadUrl,
   useGetMe,
-  useCreateChangeRequest,
-  useRequestChangePublish,
   useRotateProjectHeartbeatToken,
   getGetProjectQueryKey,
   getListProjectMembersQueryKey,
@@ -143,8 +141,6 @@ export default function ProjectDetailPage() {
   });
 
   const updateProject = useUpdateProject();
-  const createChangeRequest = useCreateChangeRequest();
-  const requestChangePublish = useRequestChangePublish();
   const inviteMember = useInviteProjectMember();
   const removeMember = useRemoveProjectMember();
 
@@ -474,88 +470,6 @@ export default function ProjectDetailPage() {
     );
   }
 
-  // "Publish" — promotes the current Dev site to Production. Backed by the
-  // change-request workflow (T001-T005): we create a change request titled
-  // "Publish Dev → Production", call request-publish (which emails the
-  // operator and marks the CR awaiting_deploy), and immediately update the
-  // project's productionUrl so the Production env tab in the preview pane
-  // points at the just-published target. Operator confirms the live deploy
-  // separately via mark-deployed.
-  const [publishOpen, setPublishOpen] = useState(false);
-  const [publishNotes, setPublishNotes] = useState("");
-
-  function handlePublishClick() {
-    if (!project) return;
-    if (!project.liveUrl) {
-      toast({
-        title: "No Dev URL",
-        description:
-          "Set a Dev URL on the project before publishing — that's the source of truth for the publish.",
-      });
-      handleViewChange("details");
-      setEditing(true);
-      return;
-    }
-    setPublishNotes("");
-    setPublishOpen(true);
-  }
-
-  async function confirmPublish() {
-    if (!project || !project.liveUrl) return;
-    const devUrl = project.liveUrl;
-    const note = publishNotes.trim();
-    const rawRequest =
-      `Publish current Dev to Production.\n\n` +
-      `Dev URL: ${devUrl}\n` +
-      `Current Production URL: ${project.productionUrl ?? "(none)"}\n` +
-      (note ? `\nRelease notes:\n${note}\n` : "");
-
-    try {
-      const created = await createChangeRequest.mutateAsync({
-        id: project.id,
-        data: {
-          title: "Publish Dev → Production",
-          rawRequest,
-        },
-      });
-      const crId = (created as { id: number }).id;
-
-      await requestChangePublish.mutateAsync({ id: crId });
-
-      // Promote Dev URL to Production so the env tab updates immediately.
-      // Operator still has to flip the actual deploy in their hosting UI;
-      // the change request stays in "awaiting_deploy" until they confirm.
-      if (project.productionUrl !== devUrl) {
-        await updateProject.mutateAsync({
-          id: project.id,
-          data: { productionUrl: devUrl },
-        });
-      }
-
-      queryClient.invalidateQueries({
-        queryKey: getGetProjectQueryKey(project.id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: getListMyProjectsQueryKey(),
-      });
-
-      setPublishOpen(false);
-      toast({
-        title: "Publish requested",
-        description:
-          "Production now points at your Dev site. We've notified the operator to confirm the deploy.",
-      });
-    } catch (err) {
-      toast({
-        title: "Publish failed",
-        description:
-          err instanceof Error
-            ? err.message
-            : "Something went wrong creating the publish request.",
-      });
-    }
-  }
-
   // Sync the edit form from the server-side project record. Skipped while the
   // user is actively editing so the 5s background poll (which keeps the dev
   // preview iframe up-to-date with the latest heartbeat) doesn't wipe in-flight
@@ -780,21 +694,6 @@ export default function ProjectDetailPage() {
               Invite
             </button>
           )}
-          <button
-            type="button"
-            onClick={handlePublishClick}
-            data-testid="button-workspace-publish"
-            title={
-              project.liveUrl
-                ? `Publish current Dev (${project.liveUrl}) to Production`
-                : "Set a Dev URL first to enable Publish"
-            }
-            className="inline-flex items-center gap-1 px-2.5 h-7 rounded-md font-mono text-[11px] font-bold shadow-md shadow-primary/20 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white shrink-0"
-          >
-            <Rocket className="h-3.5 w-3.5" />
-            Publish
-          </button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -1005,97 +904,6 @@ export default function ProjectDetailPage() {
                 </>
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Publish Dev → Production confirm dialog. Creates a change request,
-          calls request-publish (notifies operator), and promotes the
-          project's productionUrl so the Production env tab in the preview
-          pane reflects the new target immediately. */}
-      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
-        <DialogContent className="sm:max-w-lg !bg-card !backdrop-blur-none border border-border/60 shadow-2xl">
-          <DialogHeader>
-            <DialogTitle>Publish Dev → Production</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              This promotes your current Dev site to Production and notifies
-              the operator to confirm the deploy. The change is logged so you
-              can roll back if needed.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2 text-sm">
-            <div className="rounded-md ring-1 ring-border/40 bg-muted/30 p-3 space-y-2">
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground w-16 shrink-0">
-                  From Dev
-                </span>
-                <span
-                  className="font-mono text-xs break-all"
-                  data-testid="publish-from-dev"
-                >
-                  {project.liveUrl ?? "(none)"}
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground w-16 shrink-0">
-                  To Prod
-                </span>
-                <span
-                  className="font-mono text-xs break-all text-foreground/80"
-                  data-testid="publish-to-prod"
-                >
-                  {project.productionUrl &&
-                  project.productionUrl !== project.liveUrl
-                    ? `${project.productionUrl} → ${project.liveUrl}`
-                    : project.liveUrl ?? "(none)"}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label
-                htmlFor="publish-notes-input"
-                className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
-              >
-                Release notes (optional)
-              </label>
-              <textarea
-                id="publish-notes-input"
-                data-testid="input-publish-notes"
-                value={publishNotes}
-                onChange={(e) => setPublishNotes(e.target.value)}
-                placeholder="What changed in this release?"
-                rows={3}
-                className="w-full text-sm rounded-md ring-1 ring-border/40 bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <button
-              type="button"
-              onClick={() => setPublishOpen(false)}
-              className="px-3 h-8 rounded-md ring-1 ring-border/40 text-sm font-mono hover:bg-muted/40"
-              data-testid="button-publish-cancel"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={confirmPublish}
-              disabled={
-                createChangeRequest.isPending ||
-                requestChangePublish.isPending ||
-                updateProject.isPending
-              }
-              data-testid="button-publish-confirm"
-              className="inline-flex items-center gap-1 px-3 h-8 rounded-md font-mono text-[12px] font-bold shadow-md shadow-primary/20 bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white disabled:opacity-60"
-            >
-              <Rocket className="h-3.5 w-3.5" />
-              {createChangeRequest.isPending ||
-              requestChangePublish.isPending ||
-              updateProject.isPending
-                ? "Publishing..."
-                : "Publish to Production"}
-            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
