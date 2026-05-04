@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 
-export default function ProjectPage({ params }: any) {
+export default function ProjectPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const [code, setCode] = useState(
-    'console.log("Project ' + params.id + ' loaded")'
+    `console.log("Project ${params.id} loaded")`
   );
+
   const [output, setOutput] = useState("");
 
   async function runCode() {
@@ -22,8 +27,14 @@ export default function ProjectPage({ params }: any) {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#0b0b0b", color: "white" }}>
-      
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        background: "#0b0b0b",
+        color: "white",
+      }}
+    >
       {/* Editor */}
       <div style={{ flex: 2, padding: 20 }}>
         <h2>Project: {params.id}</h2>
@@ -55,11 +66,16 @@ export default function ProjectPage({ params }: any) {
       </div>
 
       {/* Output */}
-      <div style={{ flex: 1, padding: 20, borderLeft: "1px solid #333" }}>
+      <div
+        style={{
+          flex: 1,
+          padding: 20,
+          borderLeft: "1px solid #333",
+        }}
+      >
         <h3>Output</h3>
         <pre>{output}</pre>
       </div>
-
     </div>
   );
 }
