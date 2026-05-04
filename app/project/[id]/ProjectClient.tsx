@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Editor from "@monaco-editor/react";
 
 type FileType = {
   id: string;
@@ -13,7 +14,7 @@ export default function ProjectClient({ id }: { id: string }) {
   const [activeFile, setActiveFile] = useState<FileType | null>(null);
   const [output, setOutput] = useState("");
 
-  // 🔹 LOAD FILES (and auto-create if empty)
+  // LOAD FILES
   useEffect(() => {
     async function loadFiles() {
       const res = await fetch(`/api/files?projectId=${id}`);
@@ -26,9 +27,7 @@ export default function ProjectClient({ id }: { id: string }) {
         // CREATE DEFAULT FILE
         const res = await fetch(`/api/files`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             projectId: id,
             name: "index.js",
@@ -45,16 +44,14 @@ export default function ProjectClient({ id }: { id: string }) {
     if (id) loadFiles();
   }, [id]);
 
-  // 🔹 AUTO SAVE
+  // AUTO SAVE
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!activeFile) return;
 
       fetch(`/api/files`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: id,
           name: activeFile.name,
@@ -105,7 +102,7 @@ export default function ProjectClient({ id }: { id: string }) {
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0b0b0b", color: "white" }}>
       
-      {/* FILE SIDEBAR */}
+      {/* SIDEBAR */}
       <div style={{ width: 220, padding: 10, borderRight: "1px solid #333" }}>
         <h3>Files</h3>
 
@@ -127,42 +124,42 @@ export default function ProjectClient({ id }: { id: string }) {
       </div>
 
       {/* EDITOR */}
-      <div style={{ flex: 2, padding: 20 }}>
-        <h2>Project: {id}</h2>
+      <div style={{ flex: 2 }}>
+        <div style={{ padding: 10, borderBottom: "1px solid #333" }}>
+          <strong>{activeFile?.name}</strong>
+        </div>
 
-        {activeFile && (
-          <>
-            <textarea
-              value={activeFile.content}
-              onChange={(e) =>
-                setActiveFile({
-                  ...activeFile,
-                  content: e.target.value,
-                })
-              }
-              style={{
-                width: "100%",
-                height: "70%",
-                background: "#111",
-                color: "lime",
-                fontFamily: "monospace",
-                padding: 10,
-              }}
-            />
+        <Editor
+          height="80%"
+          theme="vs-dark"
+          defaultLanguage="javascript"
+          value={activeFile?.content || ""}
+          onChange={(value) =>
+            setActiveFile(
+              activeFile
+                ? { ...activeFile, content: value || "" }
+                : null
+            )
+          }
+          options={{
+            fontSize: 14,
+            minimap: { enabled: false },
+            automaticLayout: true,
+          }}
+        />
 
-            <button
-              onClick={runCode}
-              style={{
-                marginTop: 10,
-                background: "limegreen",
-                color: "black",
-                padding: 10,
-              }}
-            >
-              ▶ Run
-            </button>
-          </>
-        )}
+        <div style={{ padding: 10 }}>
+          <button
+            onClick={runCode}
+            style={{
+              background: "limegreen",
+              color: "black",
+              padding: 10,
+            }}
+          >
+            ▶ Run
+          </button>
+        </div>
       </div>
 
       {/* OUTPUT */}
