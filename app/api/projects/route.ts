@@ -5,14 +5,14 @@ const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    const projects = await prisma.project.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-
+    const projects = await prisma.project.findMany();
     return NextResponse.json(projects);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("GET ERROR:", error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -23,13 +23,17 @@ export async function POST(req: Request) {
     const project = await prisma.project.create({
       data: {
         name: body.name,
-        userEmail: "tom@machinedog.com", // temp (we’ll wire auth next)
+        userEmail: "tom@machinedog.com",
       },
     });
 
-    return NextResponse.json(project); // ✅ CRITICAL
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json(project);
+  } catch (error: any) {
+    console.error("POST ERROR:", error);
+
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 }
