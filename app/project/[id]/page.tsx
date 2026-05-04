@@ -1,8 +1,5 @@
-export default function ProjectPage({ params }: any) {
-  return (
-    <div style={{ padding: 20 }}>
-      <h1>Project ID:</h1>
-      <h2>{params.id}</h2>
-    </div>
-  );
+import ProjectClient from "./ProjectClient";
+
+export default function Page({ params }: { params: { id: string } }) {
+  return <ProjectClient id={params.id} />;
 }
