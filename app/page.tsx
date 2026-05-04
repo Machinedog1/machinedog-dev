@@ -1,25 +1,57 @@
 "use client";
 
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 
 export default function Home() {
   const { data: session } = useSession();
 
-  if (session) {
-    return (
-      <main style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
-        <div>
-          <p>Logged in as {session.user?.email}</p>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <main style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
-      <button onClick={() => signIn("github")}>
-        Login with GitHub
-      </button>
+    <main
+      style={{
+        display: "flex",
+        height: "100vh",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <div style={{ textAlign: "center" }}>
+        {session ? (
+          <>
+            <p style={{ marginBottom: "20px" }}>
+              Logged in as <strong>{session.user?.email}</strong>
+            </p>
+
+            <button
+              onClick={() => signOut()}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: "#000",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => signIn("github")}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "#24292e",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Login with GitHub
+          </button>
+        )}
+      </div>
     </main>
   );
 }
