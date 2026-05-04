@@ -10,29 +10,42 @@ export default function ProjectPage() {
 
   const [files, setFiles] = useState<any[]>([]);
   const [activeFile, setActiveFile] = useState<any>(null);
+  const [output, setOutput] = useState<string>("");
 
-  // Load files
   async function loadFiles() {
-    const res = await fetch(`/api/files?projectId=${id}`);
-    const data = await res.json();
+    try {
+      console.log("Loading files for project:", id);
 
-    if (data.length === 0) {
-      const newFile = await fetch("/api/files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: id,
-          name: "index.js",
-          content: `console.log("Project ${id} loaded")`,
-        }),
-      });
+      const res = await fetch(`/api/files?projectId=${id}`);
+      const data = await res.json();
 
-      const created = await newFile.json();
-      setFiles([created]);
-      setActiveFile(created);
-    } else {
-      setFiles(data);
-      setActiveFile(data[0]);
+      console.log("FILES:", data);
+
+      if (!data || data.length === 0) {
+        console.log("No files found → creating default file");
+
+        const newFileRes = await fetch("/api/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: id,
+            name: "index.js",
+            content: `console.log("Project ${id} loaded")`,
+          }),
+        });
+
+        const created = await newFileRes.json();
+
+        console.log("Created file:", created);
+
+        setFiles([created]);
+        setActiveFile(created);
+      } else {
+        setFiles(data);
+        setActiveFile(data[0]);
+      }
+    } catch (err) {
+      console.error("LOAD FILE ERROR:", err);
     }
   }
 
@@ -40,7 +53,23 @@ export default function ProjectPage() {
     if (id) loadFiles();
   }, [id]);
 
-  // Save file
+  function runCode(code: string) {
+    try {
+      let logs: string[] = [];
+
+      const fakeConsole = {
+        log: (...args: any[]) => logs.push(args.join(" ")),
+      };
+
+      const fn = new Function("console", code);
+      fn(fakeConsole);
+
+      setOutput(logs.join("\n") || "No output");
+    } catch (err: any) {
+      setOutput("Error:\n" + err.message);
+    }
+  }
+
   async function saveFile(content: string) {
     if (!activeFile) return;
 
@@ -55,20 +84,23 @@ export default function ProjectPage() {
         content,
       }),
     });
+
+    runCode(content);
   }
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#111", color: "white" }}>
       
-      {/* Top */}
       <div style={{ padding: 12, borderBottom: "1px solid #222" }}>
         Project: {id}
       </div>
 
       <div style={{ flex: 1, display: "flex" }}>
         
-        {/* Files */}
+        {/* File list */}
         <div style={{ width: 250, borderRight: "1px solid #222", padding: 10 }}>
+          {files.length === 0 && <div>No files</div>}
+
           {files.map((f) => (
             <div
               key={f.id}
@@ -86,6 +118,10 @@ export default function ProjectPage() {
 
         {/* Editor */}
         <div style={{ flex: 1 }}>
+          {!activeFile && (
+            <div style={{ padding: 20 }}>Loading editor...</div>
+          )}
+
           {activeFile && (
             <Editor
               height="100%"
@@ -97,9 +133,15 @@ export default function ProjectPage() {
           )}
         </div>
 
-        {/* Preview */}
-        <div style={{ width: 300, borderLeft: "1px solid #222", padding: 10 }}>
-          Preview Panel
+        {/* Output */}
+        <div style={{
+          width: 300,
+          borderLeft: "1px solid #222",
+          padding: 10,
+          background: "#000"
+        }}>
+          <div>🖥 Output</div>
+          <pre>{output}</pre>
         </div>
 
       </div>
