@@ -12,6 +12,7 @@ type FileType = {
 export default function ProjectClient({ id }: { id: string }) {
   const [files, setFiles] = useState<FileType[]>([]);
   const [activeFile, setActiveFile] = useState<FileType | null>(null);
+  const [openTabs, setOpenTabs] = useState<FileType[]>([]);
   const [output, setOutput] = useState("");
 
   // LOAD FILES
@@ -23,8 +24,8 @@ export default function ProjectClient({ id }: { id: string }) {
       if (data.length > 0) {
         setFiles(data);
         setActiveFile(data[0]);
+        setOpenTabs([data[0]]);
       } else {
-        // CREATE DEFAULT FILE
         const res = await fetch(`/api/files`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -38,6 +39,7 @@ export default function ProjectClient({ id }: { id: string }) {
         const newFile = await res.json();
         setFiles([newFile]);
         setActiveFile(newFile);
+        setOpenTabs([newFile]);
       }
     }
 
@@ -62,6 +64,24 @@ export default function ProjectClient({ id }: { id: string }) {
 
     return () => clearTimeout(timeout);
   }, [activeFile, id]);
+
+  function openFile(file: FileType) {
+    setActiveFile(file);
+
+    const exists = openTabs.find((f) => f.id === file.id);
+    if (!exists) {
+      setOpenTabs([...openTabs, file]);
+    }
+  }
+
+  function closeTab(fileId: string) {
+    const newTabs = openTabs.filter((f) => f.id !== fileId);
+    setOpenTabs(newTabs);
+
+    if (activeFile?.id === fileId) {
+      setActiveFile(newTabs[newTabs.length - 1] || null);
+    }
+  }
 
   async function runCode() {
     if (!activeFile) return;
@@ -96,7 +116,7 @@ export default function ProjectClient({ id }: { id: string }) {
 
     const newFile = await res.json();
     setFiles([...files, newFile]);
-    setActiveFile(newFile);
+    openFile(newFile);
   }
 
   return (
@@ -105,13 +125,12 @@ export default function ProjectClient({ id }: { id: string }) {
       {/* SIDEBAR */}
       <div style={{ width: 220, padding: 10, borderRight: "1px solid #333" }}>
         <h3>Files</h3>
-
         <button onClick={createFile}>+ New File</button>
 
         {files.map((file) => (
           <div
             key={file.id}
-            onClick={() => setActiveFile(file)}
+            onClick={() => openFile(file)}
             style={{
               cursor: "pointer",
               padding: 6,
@@ -124,11 +143,38 @@ export default function ProjectClient({ id }: { id: string }) {
       </div>
 
       {/* EDITOR */}
-      <div style={{ flex: 2 }}>
-        <div style={{ padding: 10, borderBottom: "1px solid #333" }}>
-          <strong>{activeFile?.name}</strong>
+      <div style={{ flex: 2, display: "flex", flexDirection: "column" }}>
+        
+        {/* TABS */}
+        <div style={{ display: "flex", background: "#111", borderBottom: "1px solid #333" }}>
+          {openTabs.map((file) => (
+            <div
+              key={file.id}
+              style={{
+                padding: "6px 10px",
+                cursor: "pointer",
+                background: activeFile?.id === file.id ? "#222" : "#111",
+                borderRight: "1px solid #333",
+                display: "flex",
+                alignItems: "center",
+              }}
+              onClick={() => setActiveFile(file)}
+            >
+              {file.name}
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(file.id);
+                }}
+                style={{ marginLeft: 8, color: "#888", cursor: "pointer" }}
+              >
+                ✕
+              </span>
+            </div>
+          ))}
         </div>
 
+        {/* MONACO */}
         <Editor
           height="80%"
           theme="vs-dark"
