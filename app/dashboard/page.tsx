@@ -11,9 +11,6 @@ export default function Dashboard() {
     try {
       const res = await fetch("/api/projects");
       const data = await res.json();
-
-      console.log("API response:", data);
-
       setProjects(data);
     } catch (err) {
       console.error("Error loading projects:", err);
@@ -22,49 +19,19 @@ export default function Dashboard() {
     }
   }
 
-  async function createProject() {
-    const name = prompt("Project name?");
-    if (!name) return;
-
-    await fetch("/api/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name }),
-    });
-
-    loadProjects();
-  }
-
   useEffect(() => {
     loadProjects();
   }, []);
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      
-      {/* Sidebar */}
-      <div style={{
-        width: 250,
-        background: "#0b0b0b",
-        color: "white",
-        padding: 20
-      }}>
-        <h2>MachineDog</h2>
-
-        <button
-          onClick={createProject}
-          style={{
-            background: "green",
-            color: "white",
-            padding: 10,
-            width: "100%",
-            marginTop: 10
-          }}
-        >
-          + New Project
-        </button>
+    <div style={{
+      flex: 1,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }}>
+      <div>
+        <h2>Dashboard</h2>
 
         <div style={{ marginTop: 20 }}>
           {loading
@@ -83,17 +50,6 @@ export default function Dashboard() {
           Logout
         </button>
       </div>
-
-      {/* Main */}
-      <div style={{
-        flex: 1,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }}>
-        <h2>Dashboard</h2>
-      </div>
-
     </div>
   );
 }
