@@ -1,11 +1,11 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import Editor from "@monaco-editor/react";
 
 export default function ProjectPage() {
   const params = useParams();
 
-  // Prevent crash while loading params
   if (!params || !params.id) {
     return <div style={{ color: "white", padding: 20 }}>Loading...</div>;
   }
@@ -49,13 +49,13 @@ export default function ProjectPage() {
         </div>
 
         {/* Editor */}
-        <div
-          style={{
-            flex: 1,
-            padding: 10,
-          }}
-        >
-          <pre>{`console.log("Project ${id} loaded")`}</pre>
+        <div style={{ flex: 1 }}>
+          <Editor
+            height="100%"
+            defaultLanguage="javascript"
+            theme="vs-dark"
+            defaultValue={`console.log("Project ${id} loaded")`}
+          />
         </div>
 
         {/* Preview */}
