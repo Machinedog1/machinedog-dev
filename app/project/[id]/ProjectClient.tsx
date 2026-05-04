@@ -83,20 +83,23 @@ export default function ProjectClient({ id }: { id: string }) {
     }
   }
 
-  async function runCode() {
-    if (!activeFile) return;
+async function runCode() {
+  const res = await fetch("/api/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      projectId: id,
+    }),
+  });
 
-    const res = await fetch("/api/run", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ code: activeFile.content }),
-    });
+  const data = await res.json();
 
-    const data = await res.json();
-    setOutput(data.output || data.error || "No output");
-  }
+  console.log("RUN RESPONSE:", data); // 🔥 DEBUG
+
+  setOutput(data.output || data.error || "No output");
+}
 
   async function createFile() {
     const name = prompt("File name?");
