@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
@@ -21,95 +20,21 @@ export default function Dashboard() {
     }
   }
 
-  async function createProject() {
-    const name = prompt("Project name?");
-    if (!name) return;
-
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name }),
-    });
-
-    const newProject = await res.json();
-
-    // 🚀 Immediately go into the project
-    router.push(`/project/${newProject.id}`);
-  }
-
   useEffect(() => {
     loadProjects();
   }, []);
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      
-      {/* Sidebar */}
-      <div
-        style={{
-          width: 250,
-          background: "#0b0b0b",
-          color: "white",
-          padding: 20,
-        }}
-      >
-        <h2>MachineDog</h2>
-
-        <button
-          onClick={createProject}
-          style={{
-            background: "green",
-            color: "white",
-            padding: 10,
-            width: "100%",
-            marginTop: 10,
-            cursor: "pointer",
-          }}
-        >
-          + New Project
-        </button>
-
-        <div style={{ marginTop: 20 }}>
-          {loading
-            ? "Loading..."
-            : projects.length === 0
-            ? "No projects yet"
-            : projects.map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => router.push(`/project/${p.id}`)}
-                  style={{
-                    padding: "8px 0",
-                    cursor: "pointer",
-                    borderBottom: "1px solid #222",
-                  }}
-                >
-                  {p.name}
-                </div>
-              ))}
-        </div>
-
-        <button
-          onClick={() => signOut()}
-          style={{ marginTop: 20, cursor: "pointer" }}
-        >
-          Logout
-        </button>
-      </div>
-
-      {/* Main */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <h2>Select or create a project</h2>
-      </div>
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+      }}
+    >
+      <h2>Select or create a project</h2>
     </div>
   );
 }
