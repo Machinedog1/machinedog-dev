@@ -8,10 +8,18 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   async function loadProjects() {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    setProjects(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+
+      console.log("API response:", data);
+
+      setProjects(data);
+    } catch (err) {
+      console.error("Error loading projects:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function createProject() {
@@ -20,6 +28,9 @@ export default function Dashboard() {
 
     await fetch("/api/projects", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ name }),
     });
 
@@ -56,9 +67,13 @@ export default function Dashboard() {
         </button>
 
         <div style={{ marginTop: 20 }}>
-          {loading ? "Loading..." : projects.map((p) => (
-            <div key={p.id}>{p.name}</div>
-          ))}
+          {loading
+            ? "Loading..."
+            : projects.length === 0
+              ? "No projects yet"
+              : projects.map((p) => (
+                  <div key={p.id}>{p.name}</div>
+                ))}
         </div>
 
         <button
