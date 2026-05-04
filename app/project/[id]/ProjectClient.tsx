@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function ProjectClient({ id }: { id: string }) {
   const [code, setCode] = useState("");
@@ -22,12 +22,18 @@ export default function ProjectClient({ id }: { id: string }) {
     });
 
     const data = await res.json();
-    setOutput(data.output || data.error);
+    setOutput(data.output || data.error || "No output");
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#0b0b0b", color: "white" }}>
-      
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        background: "#0b0b0b",
+        color: "white",
+      }}
+    >
       <div style={{ flex: 2, padding: 20 }}>
         <h2>Project: {id}</h2>
 
@@ -51,6 +57,7 @@ export default function ProjectClient({ id }: { id: string }) {
             background: "limegreen",
             color: "black",
             padding: 10,
+            cursor: "pointer",
           }}
         >
           ▶ Run
