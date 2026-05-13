@@ -78,17 +78,13 @@ export async function POST(req: NextRequest): Promise<Response> {
 
 
 
-    const text = response.output_text ?? "";
-
-
-
     return NextResponse.json({
 
       ok: true,
 
       model,
 
-      output: text,
+      output: response.output_text ?? "",
 
     });
 
@@ -99,8 +95,6 @@ export async function POST(req: NextRequest): Promise<Response> {
       error instanceof Error ? error.message : "Unknown AI route error";
 
 
-
-    // Missing key should not crash build anymore; only runtime request returns this.
 
     if (message.includes("Missing OPENAI_API_KEY")) {
 
