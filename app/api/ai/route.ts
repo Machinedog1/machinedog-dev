@@ -1,80 +1,123 @@
+import { NextRequest, NextResponse } from "next/server";
+
 import OpenAI from "openai";
 
-import { NextResponse } from "next/server";
+
+
+export const runtime = "nodejs";
 
 
 
-const client = new OpenAI({
+type AiRequestBody = {
 
-  apiKey: process.env.OPENAI_API_KEY,
+  prompt?: string;
 
-});
+  model?: string;
+
+};
 
 
 
-export async function POST(req: Request) {
+function getOpenAIClient(): OpenAI {
+
+  const apiKey = process.env.OPENAI_API_KEY;
+
+
+
+  if (!apiKey) {
+
+    throw new Error("Missing OPENAI_API_KEY");
+
+  }
+
+
+
+  return new OpenAI({ apiKey });
+
+}
+
+
+
+export async function POST(req: NextRequest): Promise<Response> {
 
   try {
 
-    const body = await req.json();
+    const body = (await req.json()) as AiRequestBody;
+
+    const prompt = (body.prompt ?? "").trim();
+
+    const model = (body.model ?? "gpt-4o-mini").trim();
 
 
 
-    const completion = await client.chat.completions.create({
+    if (!prompt) {
 
-      model: "gpt-4.1-mini",
+      return NextResponse.json(
 
-      messages: [
+        { ok: false, error: "prompt is required" },
 
-        {
+        { status: 400 }
 
-          role: "system",
+      );
 
-          content:
+    }
 
-            "You are Machinedog AI, a powerful coding assistant inside a cloud IDE.",
 
-        },
 
-        {
+    const client = getOpenAIClient();
 
-          role: "user",
 
-          content: body.message,
 
-        },
+    const response = await client.responses.create({
 
-      ],
+      model,
+
+      input: prompt,
 
     });
+
+
+
+    const text = response.output_text ?? "";
 
 
 
     return NextResponse.json({
 
-      reply: completion.choices[0].message.content,
+      ok: true,
+
+      model,
+
+      output: text,
 
     });
 
-  } catch (err) {
+  } catch (error: unknown) {
 
-    console.error(err);
+    const message =
+
+      error instanceof Error ? error.message : "Unknown AI route error";
 
 
 
-    return NextResponse.json(
+    // Missing key should not crash build anymore; only runtime request returns this.
 
-      {
+    if (message.includes("Missing OPENAI_API_KEY")) {
 
-        error: "AI request failed",
+      return NextResponse.json(
 
-      },
+        { ok: false, error: "AI is not configured on this environment." },
 
-      { status: 500 }
+        { status: 500 }
 
-    );
+      );
+
+    }
+
+
+
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
 
   }
 
 }
-
