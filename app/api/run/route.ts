@@ -1,75 +1,171 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
+import { exec } from "node:child_process";
 
-export async function POST(req: Request) {
+import { promisify } from "node:util";
+
+
+
+const execAsync = promisify(exec);
+
+
+
+export const runtime = "nodejs";
+
+
+
+type RunRequestBody = {
+
+  command?: string;
+
+  cwd?: string;
+
+  timeoutMs?: number;
+
+};
+
+
+
+function normalizeError(error: unknown): string {
+
+  if (error instanceof Error) return error.message;
+
+  return "Unknown error";
+
+}
+
+
+
+function isSafeCommand(command: string): boolean {
+
+  const allowedPrefixes = [
+
+    "npm ",
+
+    "node ",
+
+    "npx ",
+
+    "pnpm ",
+
+    "yarn ",
+
+    "ls",
+
+    "pwd",
+
+    "cat ",
+
+    "echo ",
+
+  ];
+
+
+
+  return allowedPrefixes.some(
+
+    (prefix) => command === prefix.trim() || command.startsWith(prefix)
+
+  );
+
+}
+
+
+
+export async function POST(req: NextRequest): Promise<Response> {
+
   try {
-    const body = await req.json();
-    console.log("RUN BODY:", body);
 
-    const { projectId } = body;
+    const body = (await req.json()) as RunRequestBody;
 
-    if (!projectId) {
-      return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
-    }
 
-    const files = await prisma.file.findMany({
-      where: { projectId },
-    });
 
-    console.log("FILES:", files);
+    const command = (body.command ?? "").trim();
 
-    if (!files.length) {
-      return NextResponse.json({ error: "No files found" });
-    }
+    const cwd = (body.cwd ?? process.cwd()).trim();
 
-    const fileMap: Record<string, string> = {};
+    const timeoutMs = Number.isFinite(body.timeoutMs)
 
-    files.forEach((f) => {
-      fileMap[f.name] = f.content;
-    });
+      ? Number(body.timeoutMs)
 
-    let output = "";
+      : 30_000;
 
-    const fakeConsole = {
-      log: (...args: any[]) => {
-        output += args.join(" ") + "\n";
-      },
-    };
 
-    function customRequire(filename: string) {
-      const code = fileMap[filename];
 
-      if (!code) {
-        throw new Error(`File not found: ${filename}`);
-      }
+    if (!command) {
 
-      const module = { exports: {} };
+      return NextResponse.json(
 
-      const func = new Function(
-        "require",
-        "module",
-        "exports",
-        "console",
-        code
+        { ok: false, error: "Missing command" },
+
+        { status: 400 }
+
       );
 
-      func(customRequire, module, module.exports, fakeConsole);
-
-      return module.exports;
     }
 
-    if (!fileMap["index.js"]) {
-      return NextResponse.json({ error: "index.js not found" });
+
+
+    if (!isSafeCommand(command)) {
+
+      return NextResponse.json(
+
+        { ok: false, error: "Command not allowed" },
+
+        { status: 403 }
+
+      );
+
     }
 
-    customRequire("index.js");
 
-    return NextResponse.json({ output });
 
-  } catch (err: any) {
-    console.error("RUN ERROR:", err);
-    return NextResponse.json({ error: err.message });
+    const { stdout, stderr } = await execAsync(command, {
+
+      cwd,
+
+      timeout: timeoutMs,
+
+      maxBuffer: 1024 * 1024 * 4,
+
+      env: process.env,
+
+    });
+
+
+
+    return NextResponse.json({
+
+      ok: true,
+
+      command,
+
+      cwd,
+
+      stdout: stdout ?? "",
+
+      stderr: stderr ?? "",
+
+      exitCode: 0,
+
+    });
+
+  } catch (error: unknown) {
+
+    return NextResponse.json(
+
+      {
+
+        ok: false,
+
+        error: normalizeError(error),
+
+      },
+
+      { status: 500 }
+
+    );
+
   }
+
 }

@@ -10,6 +10,10 @@ import { signOut } from "next-auth/react";
 
 
 
+import WebTerminal from "@/components/Terminal";
+
+
+
 export default function DashboardLayout({
 
   children,
@@ -106,7 +110,7 @@ export default function DashboardLayout({
 
     } catch (err) {
 
-      console.error("Create project failed:", err);
+      console.error("Create project error:", err);
 
     }
 
@@ -132,7 +136,7 @@ export default function DashboardLayout({
 
         height: "100vh",
 
-        background: "#0d0d0d",
+        background: "#111",
 
         color: "white",
 
@@ -140,19 +144,19 @@ export default function DashboardLayout({
 
     >
 
-      {/* SIDEBAR */}
-
       <div
 
         style={{
 
-          width: 250,
+          width: "250px",
 
-          borderRight: "1px solid #222",
+          background: "#000",
 
-          padding: 20,
+          padding: "20px",
 
           overflowY: "auto",
+
+          borderRight: "1px solid #222",
 
         }}
 
@@ -168,19 +172,21 @@ export default function DashboardLayout({
 
           style={{
 
-            width: "100%",
+            marginTop: 10,
 
             padding: 10,
 
-            marginTop: 10,
+            width: "100%",
 
-            background: "#111",
+            background: "#00ff00",
 
-            color: "white",
+            color: "#000",
 
-            border: "1px solid #333",
+            border: "none",
 
             cursor: "pointer",
+
+            fontWeight: "bold",
 
           }}
 
@@ -192,57 +198,21 @@ export default function DashboardLayout({
 
 
 
-        <div style={{ marginTop: 20 }}>
-
-          {projects.map((p) => (
-
-            <div
-
-              key={p.id}
-
-              onClick={() => router.push(`/project/${p.id}`)}
-
-              style={{
-
-                padding: 10,
-
-                marginTop: 10,
-
-                background: "#151515",
-
-                border: "1px solid #222",
-
-                cursor: "pointer",
-
-              }}
-
-            >
-
-              {p.name}
-
-            </div>
-
-          ))}
-
-        </div>
-
-
-
         <button
 
           onClick={() => signOut()}
 
           style={{
 
-            width: "100%",
+            marginTop: 10,
 
             padding: 10,
 
-            marginTop: 20,
+            width: "100%",
 
-            background: "#550000",
+            background: "#222",
 
-            color: "white",
+            color: "#fff",
 
             border: "none",
 
@@ -256,17 +226,53 @@ export default function DashboardLayout({
 
         </button>
 
+
+
+        <div style={{ marginTop: 20 }}>
+
+          {projects.map((p) => (
+
+            <div
+
+              key={p.id}
+
+              style={{
+
+                cursor: "pointer",
+
+                marginTop: 10,
+
+                padding: 10,
+
+                background: "#111",
+
+                border: "1px solid #222",
+
+              }}
+
+              onClick={() => router.push(`/project/${p.id}`)}
+
+            >
+
+              {p.name}
+
+            </div>
+
+          ))}
+
+        </div>
+
       </div>
 
 
-
-      {/* MAIN */}
 
       <div
 
         style={{
 
           flex: 1,
+
+          padding: 20,
 
           overflow: "auto",
 
@@ -275,6 +281,14 @@ export default function DashboardLayout({
       >
 
         {children}
+
+
+
+        <div style={{ marginTop: 20 }}>
+
+          <WebTerminal />
+
+        </div>
 
       </div>
 
