@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 
 import OpenAI from "openai";
@@ -22,15 +23,7 @@ function getOpenAIClient(): OpenAI {
 
   const apiKey = process.env.OPENAI_API_KEY;
 
-
-
-  if (!apiKey) {
-
-    throw new Error("Missing OPENAI_API_KEY");
-
-  }
-
-
+  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
   return new OpenAI({ apiKey });
 
@@ -52,13 +45,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     if (!prompt) {
 
-      return NextResponse.json(
-
-        { ok: false, error: "prompt is required" },
-
-        { status: 400 }
-
-      );
+      return NextResponse.json({ ok: false, error: "prompt is required" }, { status: 400 });
 
     }
 
@@ -66,15 +53,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     const client = getOpenAIClient();
 
-
-
-    const response = await client.responses.create({
-
-      model,
-
-      input: prompt,
-
-    });
+    const response = await client.responses.create({ model, input: prompt });
 
 
 
@@ -90,9 +69,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   } catch (error: unknown) {
 
-    const message =
-
-      error instanceof Error ? error.message : "Unknown AI route error";
+    const message = error instanceof Error ? error.message : "Unknown AI route error";
 
 
 
@@ -115,3 +92,4 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
 }
+
