@@ -847,6 +847,17 @@ export default function ProjectDetailPage() {
                 Details
               </button>
             </div>
+            <Link href={`/projects/${project.id}/workspace`}>
+              <button
+                type="button"
+                data-testid="button-open-workspace"
+                title="Open the in-browser code workspace (Phase 3)"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider ring-1 ring-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
+                <LayoutPanelLeft className="h-3.5 w-3.5" />
+                Open Workspace
+              </button>
+            </Link>
           </div>
           <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
             {project.viewerRole === "owner" ? "Owner" : "Collaborator"}

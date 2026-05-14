@@ -29,6 +29,18 @@ export class GitHubNotConfiguredError extends Error {
   }
 }
 
+export class GitHubConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly branch: string,
+    public readonly expectedSha: string,
+    public readonly actualSha: string,
+  ) {
+    super(message);
+    this.name = "GitHubConflictError";
+  }
+}
+
 export class GitHubApiError extends Error {
   constructor(
     message: string,
@@ -183,6 +195,90 @@ export async function listConnectedUserRepos(): Promise<ConnectedGithubRepo[]> {
   return out;
 }
 
+export interface FetchedFile {
+  path: string;
+  contents: string;
+  sha: string;
+  size: number;
+}
+
+/**
+ * Fetch every text file at the tip of `branch` (or the default branch).
+ * Returns paths + utf8 contents. Skips entries larger than `maxBytes`
+ * (default 1 MiB) and any blob whose decoded contents are not valid utf8.
+ */
+export async function fetchBranchTreeFiles(
+  project: GitHubProjectConfig,
+  branch?: string,
+  opts: { maxBytes?: number } = {},
+): Promise<{ branch: string; commitSha: string; files: FetchedFile[] }> {
+  const { owner, repo, defaultBranch } = requireRepo(project);
+  const target = branch ?? defaultBranch;
+  const maxBytes = opts.maxBytes ?? 1_048_576;
+  const headSha = await resolveBranchSha(project, target);
+  const commit = await gh<{ tree: { sha: string } }>(
+    `/repos/${owner}/${repo}/git/commits/${headSha}`,
+  );
+  const tree = await gh<{
+    tree: Array<{ path: string; type: string; sha: string; size?: number }>;
+    truncated?: boolean;
+  }>(`/repos/${owner}/${repo}/git/trees/${commit.tree.sha}?recursive=1`);
+  const blobs = tree.tree.filter(
+    (n) => n.type === "blob" && (n.size ?? 0) <= maxBytes,
+  );
+  const files: FetchedFile[] = [];
+  for (const node of blobs) {
+    try {
+      const blob = await gh<{ content: string; encoding: string; size: number }>(
+        `/repos/${owner}/${repo}/git/blobs/${node.sha}`,
+      );
+      const buf =
+        blob.encoding === "base64"
+          ? Buffer.from(blob.content, "base64")
+          : Buffer.from(blob.content, "utf8");
+      // Skip binaries (heuristic: NUL byte in first 8 KiB)
+      const probe = buf.subarray(0, 8192);
+      if (probe.includes(0)) continue;
+      files.push({
+        path: node.path,
+        contents: buf.toString("utf8"),
+        sha: node.sha,
+        size: buf.byteLength,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, path: node.path },
+        "fetchBranchTreeFiles: skipping unreadable blob",
+      );
+    }
+  }
+  return { branch: target, commitSha: headSha, files };
+}
+
+/**
+ * List every blob path at the tip of `branch` (lightweight: no blob bodies).
+ * Used to compute deletion diffs for the workspace commit endpoint.
+ */
+export async function listBranchTreePaths(
+  project: GitHubProjectConfig,
+  branch?: string,
+): Promise<{ branch: string; commitSha: string; paths: string[] }> {
+  const { owner, repo, defaultBranch } = requireRepo(project);
+  const target = branch ?? defaultBranch;
+  const headSha = await resolveBranchSha(project, target);
+  const commit = await gh<{ tree: { sha: string } }>(
+    `/repos/${owner}/${repo}/git/commits/${headSha}`,
+  );
+  const tree = await gh<{
+    tree: Array<{ path: string; type: string }>;
+  }>(`/repos/${owner}/${repo}/git/trees/${commit.tree.sha}?recursive=1`);
+  return {
+    branch: target,
+    commitSha: headSha,
+    paths: tree.tree.filter((n) => n.type === "blob").map((n) => n.path),
+  };
+}
+
 export async function resolveBranchSha(
   project: GitHubProjectConfig,
   branch?: string,
@@ -236,10 +332,38 @@ export async function pushBranchWithFiles(
   baseSha: string,
   files: PushFile[],
   commitMessage: string,
+  opts: { force?: boolean; deletions?: string[] } = {},
 ): Promise<{ branch: string; commitSha: string }> {
   const { owner, repo } = requireRepo(project);
-  if (files.length === 0) {
-    throw new Error("pushBranchWithFiles called with no files");
+  const deletions = opts.deletions ?? [];
+  if (files.length === 0 && deletions.length === 0) {
+    throw new Error("pushBranchWithFiles called with no files or deletions");
+  }
+  const force = opts.force ?? true;
+  // Conflict pre-check: when callers opt out of force, refuse to push if the
+  // remote branch has advanced past `baseSha`. GitHub's PATCH /git/refs
+  // would also reject non-fast-forward updates, but we want a structured
+  // error with the actual sha so the UI can surface a meaningful conflict.
+  if (!force) {
+    try {
+      const ref = await gh<{ object: { sha: string } }>(
+        `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`,
+      );
+      if (ref.object.sha !== baseSha) {
+        throw new GitHubConflictError(
+          `Branch ${branch} has advanced since you last fetched it. Pull and retry.`,
+          branch,
+          baseSha,
+          ref.object.sha,
+        );
+      }
+    } catch (err) {
+      if (err instanceof GitHubConflictError) throw err;
+      // 404 = branch doesn't exist yet; that's fine, we'll create it below.
+      if (!(err instanceof GitHubApiError && err.status === 404)) {
+        throw err;
+      }
+    }
   }
 
   // Upload every file as a blob.
@@ -261,18 +385,29 @@ export async function pushBranchWithFiles(
     `/repos/${owner}/${repo}/git/commits/${baseSha}`,
   );
 
+  // Tree update: blobs become add/update entries; deletions are represented
+  // by entries with sha=null (GitHub interprets as removal from base_tree).
+  const treeEntries: Array<Record<string, unknown>> = [
+    ...blobs.map((b) => ({
+      path: b.path,
+      mode: "100644",
+      type: "blob",
+      sha: b.sha,
+    })),
+    ...deletions.map((path) => ({
+      path,
+      mode: "100644",
+      type: "blob",
+      sha: null,
+    })),
+  ];
   const tree = await gh<{ sha: string }>(
     `/repos/${owner}/${repo}/git/trees`,
     {
       method: "POST",
       body: {
         base_tree: baseCommit.tree.sha,
-        tree: blobs.map((b) => ({
-          path: b.path,
-          mode: "100644",
-          type: "blob",
-          sha: b.sha,
-        })),
+        tree: treeEntries,
       },
     },
   );
@@ -299,11 +434,25 @@ export async function pushBranchWithFiles(
     });
   } catch (err) {
     if (err instanceof GitHubApiError && err.status === 422) {
-      // Ref exists — fast-forward update.
-      await gh(refPath, {
-        method: "PATCH",
-        body: { sha: commit.sha, force: true },
-      });
+      // Ref exists — update it. `force` controls whether non-fast-forward
+      // updates are allowed; non-force pushes will be rejected with 422 if
+      // the remote moved between our pre-check and this PATCH.
+      try {
+        await gh(refPath, {
+          method: "PATCH",
+          body: { sha: commit.sha, force },
+        });
+      } catch (err2) {
+        if (!force && err2 instanceof GitHubApiError && err2.status === 422) {
+          throw new GitHubConflictError(
+            `Branch ${branch} was updated concurrently. Pull and retry.`,
+            branch,
+            baseSha,
+            "unknown",
+          );
+        }
+        throw err2;
+      }
     } else {
       throw err;
     }

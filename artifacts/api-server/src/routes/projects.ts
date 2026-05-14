@@ -57,6 +57,15 @@ import { runClaudePrompt } from "../lib/anthropic";
 import { computeChargedTokens } from "../lib/billing";
 import { deduct as deductTokens, getBalance as getTokenBalance } from "../lib/token-service";
 import { importGithubAsProject } from "../lib/github-import";
+import {
+  resolveBranchSha,
+  pushBranchWithFiles,
+  fetchBranchTreeFiles,
+  listBranchTreePaths,
+  GitHubApiError,
+  GitHubConflictError,
+  GitHubNotConfiguredError,
+} from "../lib/github";
 import { generateSecureToken } from "../lib/passwords";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -1393,6 +1402,886 @@ router.delete(
     }
     await db.delete(projectFilesTable).where(eq(projectFilesTable.id, file.id));
     res.status(204).end();
+  },
+);
+
+// ─── Workspace (Phase 3): file content read/write/rename + GitHub commit ──
+//
+// These endpoints back the in-browser workspace at
+// /projects/:id/workspace. They reuse the existing project_files table —
+// `name` doubles as the relative path (e.g. "src/foo.tsx"), `objectPath`
+// points at the GCS object holding the bytes. Tenancy is enforced via
+// getViewableProject on every call.
+
+// Workspace edits live on a per-project workspace branch (NOT the default
+// branch). On first push we branch off the default; subsequent pushes
+// fast-forward the workspace branch with conflict detection. Change-request
+// flows continue to use their own feature branches via the existing pipeline.
+function activeBranchFor(project: {
+  id: number;
+  githubDefaultBranch: string;
+}): string {
+  return `machinedog/workspace-${project.id}`;
+}
+
+// Resolve the base sha to push from: prefer the current tip of the workspace
+// branch (so we fast-forward); fall back to the default branch tip on first
+// push (when the workspace branch does not yet exist).
+async function resolveWorkspaceBaseSha(
+  projectCfg: {
+    githubOwner: string;
+    githubRepo: string;
+    githubDefaultBranch: string;
+  },
+  workspaceBranch: string,
+): Promise<{ baseSha: string; branchExists: boolean }> {
+  try {
+    const sha = await resolveBranchSha(projectCfg, workspaceBranch);
+    return { baseSha: sha, branchExists: true };
+  } catch (err) {
+    if (err instanceof GitHubApiError && err.status === 404) {
+      const sha = await resolveBranchSha(projectCfg);
+      return { baseSha: sha, branchExists: false };
+    }
+    throw err;
+  }
+}
+
+async function readFileText(objectPath: string): Promise<string> {
+  const storage = new ObjectStorageService();
+  const file = await storage.getObjectEntityFile(objectPath);
+  const [buf] = await file.download();
+  return buf.toString("utf8");
+}
+
+// GET /projects/:id/files/:fileId/content — returns the raw text body for
+// the given file. JSON envelope to keep error handling consistent with the
+// rest of the API.
+router.get(
+  "/projects/:id/files/:fileId/content",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const fileId = Number(req.params.fileId);
+    if (!Number.isFinite(projectId) || !Number.isFinite(fileId)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [file] = await db
+      .select()
+      .from(projectFilesTable)
+      .where(
+        and(
+          eq(projectFilesTable.id, fileId),
+          eq(projectFilesTable.projectId, projectId),
+        ),
+      );
+    if (!file) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    try {
+      const content = await readFileText(file.objectPath);
+      res.json({
+        id: file.id,
+        name: file.name,
+        contentType: file.contentType,
+        sizeBytes: file.sizeBytes,
+        content,
+      });
+    } catch (err) {
+      logger.error({ err, fileId }, "Failed to read file content");
+      res.status(500).json({ error: "Failed to read file" });
+    }
+  },
+);
+
+// PUT /projects/:id/files/:fileId/content — overwrite a file's text body.
+// Per Phase 3 spec: writes to project_files AND best-effort commits the
+// single file to the project's active branch on GitHub via
+// pushBranchWithFiles. The HTTP response always reports both: the DB
+// write is authoritative; GitHub status is conveyed via `commit` /
+// `commitWarning`.
+router.put(
+  "/projects/:id/files/:fileId/content",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const fileId = Number(req.params.fileId);
+    const content = typeof req.body?.content === "string" ? req.body.content : null;
+    const message =
+      typeof req.body?.message === "string" && req.body.message.trim()
+        ? req.body.message.trim()
+        : "Workspace save";
+    if (!Number.isFinite(projectId) || !Number.isFinite(fileId) || content == null) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [file] = await db
+      .select()
+      .from(projectFilesTable)
+      .where(
+        and(
+          eq(projectFilesTable.id, fileId),
+          eq(projectFilesTable.projectId, projectId),
+        ),
+      );
+    if (!file) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    try {
+      const storage = new ObjectStorageService();
+      const objectPath = await storage.uploadInlineObject({
+        contents: content,
+        contentType: file.contentType || "text/plain",
+      });
+      const sizeBytes = Buffer.byteLength(content, "utf8");
+      const [updated] = await db
+        .update(projectFilesTable)
+        .set({ objectPath, sizeBytes })
+        .where(eq(projectFilesTable.id, file.id))
+        .returning();
+
+      // Best-effort GitHub commit. We never fail the save if GitHub is
+      // unconfigured or temporarily unreachable — the response surfaces
+      // the warning so the UI can prompt the user to retry / configure.
+      let commit: { branch: string; commitSha: string } | null = null;
+      let commitWarning: string | null = null;
+      // Callers that intend to follow up with /files/commit (e.g. the
+      // workspace's Commit/Push action saving dirty buffers first) can
+      // pass ?commit=false to skip the per-file GitHub push and avoid
+      // the noisy double-commit pattern.
+      const skipCommit = req.query.commit === "false";
+      if (!skipCommit && project.githubOwner && project.githubRepo) {
+        try {
+          const projectCfg = {
+            githubOwner: project.githubOwner,
+            githubRepo: project.githubRepo,
+            githubDefaultBranch: project.githubDefaultBranch,
+          };
+          const branch = activeBranchFor(project);
+          const { baseSha, branchExists } = await resolveWorkspaceBaseSha(
+            projectCfg,
+            branch,
+          );
+          const pushed = await pushBranchWithFiles(
+            projectCfg,
+            branch,
+            baseSha,
+            [{ path: updated.name, contents: content }],
+            `[Machinedog workspace] ${message}: ${updated.name}`,
+            { force: branchExists ? false : true },
+          );
+          commit = { branch: pushed.branch, commitSha: pushed.commitSha };
+        } catch (err) {
+          if (err instanceof GitHubConflictError) {
+            commitWarning = `${err.message} (expected ${err.expectedSha.slice(0, 7)}, remote ${err.actualSha.slice(0, 7)})`;
+          } else {
+            commitWarning =
+              err instanceof Error ? err.message : "GitHub commit failed";
+          }
+          logger.warn(
+            { err, fileId, projectId },
+            "Workspace save: GitHub commit skipped",
+          );
+        }
+      } else {
+        commitWarning = "GitHub repo not configured on this project.";
+      }
+
+      res.json({
+        id: updated.id,
+        name: updated.name,
+        sizeBytes: updated.sizeBytes,
+        objectPath: updated.objectPath,
+        commit,
+        commitWarning,
+      });
+    } catch (err) {
+      logger.error({ err, fileId }, "Failed to write file content");
+      res.status(500).json({ error: "Failed to write file" });
+    }
+  },
+);
+
+// POST /projects/:id/files/inline — create a new file (or folder marker)
+// with inline content. Body: { name, content?, contentType? }. Folders are
+// represented as a `.gitkeep` row (path = "<folder>/.gitkeep"). 409 if a
+// row at that path already exists for this project.
+router.post(
+  "/projects/:id/files/inline",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const content = typeof req.body?.content === "string" ? req.body.content : "";
+    const contentType =
+      typeof req.body?.contentType === "string" && req.body.contentType.trim()
+        ? req.body.contentType.trim()
+        : "text/plain";
+    if (!Number.isFinite(projectId) || !name || name.length > 500) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    if (name.includes("..") || name.startsWith("/")) {
+      res.status(400).json({ error: "Invalid path" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [existing] = await db
+      .select()
+      .from(projectFilesTable)
+      .where(
+        and(
+          eq(projectFilesTable.projectId, projectId),
+          eq(projectFilesTable.name, name),
+        ),
+      );
+    if (existing) {
+      res.status(409).json({ error: "A file at that path already exists." });
+      return;
+    }
+    try {
+      const storage = new ObjectStorageService();
+      const objectPath = await storage.uploadInlineObject({ contents: content, contentType });
+      const [row] = await db
+        .insert(projectFilesTable)
+        .values({
+          projectId,
+          uploadedByClientId: req.dbClient!.id,
+          name,
+          contentType,
+          sizeBytes: Buffer.byteLength(content, "utf8"),
+          objectPath,
+        })
+        .returning();
+      res.status(201).json(row);
+    } catch (err) {
+      logger.error({ err }, "Failed to create inline file");
+      res.status(500).json({ error: "Failed to create file" });
+    }
+  },
+);
+
+// POST /projects/:id/files/folder — folder operations (delete | rename).
+// Body: { op: "delete", path } | { op: "rename", path, newPath }.
+// Acts on every file whose name starts with `${path}/` (DB only — the
+// next /files/commit will push the resulting tree to GitHub, including
+// deletions).
+router.post(
+  "/projects/:id/files/folder",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const op = String(req.body?.op || "");
+    const path = String(req.body?.path || "").replace(/\/+$/, "");
+    if (
+      !Number.isFinite(projectId) ||
+      !path ||
+      path.includes("..") ||
+      path.startsWith("/")
+    ) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const prefix = `${path}/`;
+    const rows = await db
+      .select()
+      .from(projectFilesTable)
+      .where(eq(projectFilesTable.projectId, projectId));
+    const inFolder = rows.filter(
+      (r) => r.name === `${path}/.gitkeep` || r.name.startsWith(prefix),
+    );
+    if (op === "delete") {
+      if (!inFolder.length) {
+        res.status(404).json({ error: "Folder is empty or does not exist" });
+        return;
+      }
+      await db
+        .delete(projectFilesTable)
+        .where(
+          and(
+            eq(projectFilesTable.projectId, projectId),
+            inArray(
+              projectFilesTable.id,
+              inFolder.map((r) => r.id),
+            ),
+          ),
+        );
+      res.json({ ok: true, deleted: inFolder.length });
+      return;
+    }
+    if (op === "rename") {
+      const newPath = String(req.body?.newPath || "").replace(/\/+$/, "");
+      if (!newPath || newPath.includes("..") || newPath.startsWith("/")) {
+        res.status(400).json({ error: "Invalid newPath" });
+        return;
+      }
+      if (!inFolder.length) {
+        res.status(404).json({ error: "Folder is empty or does not exist" });
+        return;
+      }
+      const renames = inFolder.map((r) => ({
+        id: r.id,
+        newName: r.name === `${path}/.gitkeep`
+          ? `${newPath}/.gitkeep`
+          : `${newPath}/${r.name.slice(prefix.length)}`,
+      }));
+      // Conflict check: ensure none of the new paths already exist.
+      const taken = new Set(
+        rows.filter((r) => !inFolder.find((f) => f.id === r.id)).map((r) => r.name),
+      );
+      const collision = renames.find((r) => taken.has(r.newName));
+      if (collision) {
+        res.status(409).json({
+          error: `A file already exists at ${collision.newName}`,
+        });
+        return;
+      }
+      for (const r of renames) {
+        await db
+          .update(projectFilesTable)
+          .set({ name: r.newName })
+          .where(eq(projectFilesTable.id, r.id));
+      }
+      res.json({ ok: true, renamed: renames.length });
+      return;
+    }
+    res.status(400).json({ error: "Unknown op" });
+  },
+);
+
+// PATCH /projects/:id/files/:fileId — rename (update `name`).
+router.patch(
+  "/projects/:id/files/:fileId",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const fileId = Number(req.params.fileId);
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    if (!Number.isFinite(projectId) || !Number.isFinite(fileId) || !name) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    if (name.includes("..") || name.startsWith("/") || name.length > 500) {
+      res.status(400).json({ error: "Invalid path" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [file] = await db
+      .select()
+      .from(projectFilesTable)
+      .where(
+        and(
+          eq(projectFilesTable.id, fileId),
+          eq(projectFilesTable.projectId, projectId),
+        ),
+      );
+    if (!file) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (name === file.name) {
+      res.json(file);
+      return;
+    }
+    const [collide] = await db
+      .select({ id: projectFilesTable.id })
+      .from(projectFilesTable)
+      .where(
+        and(
+          eq(projectFilesTable.projectId, projectId),
+          eq(projectFilesTable.name, name),
+        ),
+      );
+    if (collide) {
+      res.status(409).json({ error: "A file at that path already exists." });
+      return;
+    }
+    const [updated] = await db
+      .update(projectFilesTable)
+      .set({ name })
+      .where(eq(projectFilesTable.id, file.id))
+      .returning();
+    res.json(updated);
+  },
+);
+
+// POST /projects/:id/files/commit — push the project's current file tree
+// (or a subset of fileIds) to a workspace branch on GitHub via the
+// existing pushBranchWithFiles helper. Returns the branch + commit sha,
+// or a structured error if the project is not GitHub-configured.
+router.post(
+  "/projects/:id/files/commit",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const message =
+      typeof req.body?.message === "string" && req.body.message.trim()
+        ? req.body.message.trim()
+        : "Workspace edit";
+    const fileIds: number[] = Array.isArray(req.body?.fileIds)
+      ? req.body.fileIds.filter((n: unknown) => Number.isFinite(n)).map(Number)
+      : [];
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (!project.githubOwner || !project.githubRepo) {
+      res.status(400).json({
+        error:
+          "GitHub repo not configured on this project. Configure githubOwner/githubRepo to commit.",
+        code: "github_not_configured",
+      });
+      return;
+    }
+
+    const allRows = await db
+      .select()
+      .from(projectFilesTable)
+      .where(eq(projectFilesTable.projectId, projectId));
+    const selected = fileIds.length
+      ? allRows.filter((r) => fileIds.includes(r.id))
+      : allRows;
+    // Skip .gitkeep markers from being pushed as content; they only
+    // exist to keep empty folders visible in the workspace UI.
+    const pushable = selected.filter((r) => !r.name.endsWith("/.gitkeep"));
+
+    let pushFiles;
+    try {
+      pushFiles = await Promise.all(
+        pushable.map(async (row) => ({
+          path: row.name,
+          contents: await readFileText(row.objectPath),
+        })),
+      );
+    } catch (err) {
+      logger.error({ err, projectId }, "Failed to assemble files for commit");
+      res.status(500).json({ error: "Failed to read files for commit" });
+      return;
+    }
+
+    const projectCfg = {
+      githubOwner: project.githubOwner,
+      githubRepo: project.githubRepo,
+      githubDefaultBranch: project.githubDefaultBranch,
+    };
+    const branch = activeBranchFor(project);
+    try {
+      const { baseSha, branchExists } = await resolveWorkspaceBaseSha(
+        projectCfg,
+        branch,
+      );
+
+      // Compute deletions: any path on the workspace branch that no longer
+      // exists in project_files. Only run when committing the full tree
+      // (no fileIds filter); partial commits explicitly never delete.
+      let deletions: string[] = [];
+      if (branchExists && fileIds.length === 0) {
+        try {
+          const remote = await listBranchTreePaths(projectCfg, branch);
+          const dbPaths = new Set(allRows.map((r) => r.name));
+          deletions = remote.paths.filter((p) => !dbPaths.has(p));
+        } catch (err) {
+          logger.warn(
+            { err, projectId, branch },
+            "Workspace commit: failed to compute deletions, skipping",
+          );
+        }
+      }
+
+      if (pushFiles.length === 0 && deletions.length === 0) {
+        res.status(400).json({ error: "No files to commit" });
+        return;
+      }
+
+      const commit = await pushBranchWithFiles(
+        projectCfg,
+        branch,
+        baseSha,
+        pushFiles,
+        `[Machinedog workspace] ${message}`,
+        { force: branchExists ? false : true, deletions },
+      );
+      res.json({
+        ok: true,
+        branch: commit.branch,
+        commitSha: commit.commitSha,
+        fileCount: pushFiles.length,
+        deletionCount: deletions.length,
+      });
+    } catch (err) {
+      if (err instanceof GitHubNotConfiguredError) {
+        res.status(400).json({
+          error: err.message,
+          code: "github_not_authorized",
+        });
+        return;
+      }
+      if (err instanceof GitHubConflictError) {
+        res.status(409).json({
+          error: err.message,
+          code: "github_branch_conflict",
+          branch: err.branch,
+          expectedSha: err.expectedSha,
+          actualSha: err.actualSha,
+        });
+        return;
+      }
+      const status =
+        err instanceof GitHubApiError ? err.status : 500;
+      const message =
+        err instanceof Error ? err.message : "GitHub commit failed";
+      logger.error({ err, projectId }, "Workspace commit failed");
+      res
+        .status(status >= 400 && status < 600 ? status : 500)
+        .json({ error: message, code: "github_commit_failed" });
+    }
+  },
+);
+
+// GET /projects/:id/events — recent change_request_events across all of
+// the project's change requests, newest first. Powers the workspace logs
+// pane (Phase 3).
+router.get(
+  "/projects/:id/events",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    const limit = Math.min(
+      Math.max(Number(req.query.limit) || 100, 1),
+      500,
+    );
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const crIds = (
+      await db
+        .select({ id: changeRequestsTable.id })
+        .from(changeRequestsTable)
+        .where(eq(changeRequestsTable.projectId, projectId))
+    ).map((r) => r.id);
+    if (crIds.length === 0) {
+      res.json({ data: [] });
+      return;
+    }
+    const rows = await db
+      .select({
+        id: changeRequestEventsTable.id,
+        changeRequestId: changeRequestEventsTable.changeRequestId,
+        changeRequestTitle: changeRequestsTable.title,
+        kind: changeRequestEventsTable.kind,
+        message: changeRequestEventsTable.message,
+        metadata: changeRequestEventsTable.metadata,
+        createdAt: changeRequestEventsTable.createdAt,
+      })
+      .from(changeRequestEventsTable)
+      .leftJoin(
+        changeRequestsTable,
+        eq(changeRequestsTable.id, changeRequestEventsTable.changeRequestId),
+      )
+      .where(inArray(changeRequestEventsTable.changeRequestId, crIds))
+      .orderBy(desc(changeRequestEventsTable.createdAt))
+      .limit(limit);
+    // Aliased shape consumed by the workspace logs panel:
+    //   eventType  ← kind
+    //   payload    ← { message, ...metadata }
+    const data = rows.map((r) => ({
+      id: r.id,
+      changeRequestId: r.changeRequestId,
+      changeRequestTitle: r.changeRequestTitle ?? null,
+      eventType: r.kind,
+      kind: r.kind,
+      message: r.message,
+      payload: {
+        message: r.message,
+        ...(r.metadata && typeof r.metadata === "object" ? r.metadata : {}),
+      },
+      createdAt: r.createdAt,
+    }));
+    res.json({ data });
+  },
+);
+
+// GET /projects/:id/preview-url — returns the most recent non-null
+// previewUrl from the project's change_requests, falling back to the
+// project's liveUrl. Used by the workspace preview pane.
+router.get(
+  "/projects/:id/preview-url",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [latestCr] = await db
+      .select({
+        id: changeRequestsTable.id,
+        previewUrl: changeRequestsTable.previewUrl,
+      })
+      .from(changeRequestsTable)
+      .where(
+        and(
+          eq(changeRequestsTable.projectId, projectId),
+          isNotNull(changeRequestsTable.previewUrl),
+        ),
+      )
+      .orderBy(desc(changeRequestsTable.updatedAt))
+      .limit(1);
+    res.json({
+      previewUrl: latestCr?.previewUrl ?? null,
+      liveUrl: project.liveUrl ?? null,
+      changeRequestId: latestCr?.id ?? null,
+    });
+  },
+);
+
+// GET /projects/:id/files/pull — fetch latest HEAD sha of the default
+// branch. Read-only "Pull" indicator for the workspace top bar so the
+// user knows the workspace branch is behind.
+router.get(
+  "/projects/:id/files/pull-status",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (!project.githubOwner || !project.githubRepo) {
+      res.json({ configured: false });
+      return;
+    }
+    try {
+      const sha = await resolveBranchSha({
+        githubOwner: project.githubOwner,
+        githubRepo: project.githubRepo,
+        githubDefaultBranch: project.githubDefaultBranch,
+      });
+      res.json({
+        configured: true,
+        defaultBranch: project.githubDefaultBranch,
+        sha,
+      });
+    } catch (err) {
+      const status = err instanceof GitHubApiError ? err.status : 500;
+      res.status(status >= 400 && status < 600 ? status : 500).json({
+        error: err instanceof Error ? err.message : "GitHub pull failed",
+      });
+    }
+  },
+);
+
+// POST /projects/:id/files/pull — fetch the default branch tree from
+// GitHub and sync it into project_files: upserts text blobs (≤ 1 MiB)
+// by name. Existing rows whose contents match are left alone; missing
+// rows are created. Files removed from the branch are NOT deleted from
+// project_files (preserves uploads + lets the user keep workspace-only
+// drafts) — Phase 4 will surface a deletions-detected diff banner.
+router.post(
+  "/projects/:id/files/pull",
+  requireAuth,
+  loadOrCreateClient,
+  requireActiveClient,
+  async (req, res): Promise<void> => {
+    const projectId = Number(req.params.id);
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const project = await getViewableProject(
+      projectId,
+      req.dbClient!.id,
+      req.dbClient!.email,
+    );
+    if (!project) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (!project.githubOwner || !project.githubRepo) {
+      res.status(400).json({
+        error:
+          "GitHub repo not configured on this project. Configure githubOwner/githubRepo to pull.",
+        code: "github_not_configured",
+      });
+      return;
+    }
+    try {
+      const projectCfg = {
+        githubOwner: project.githubOwner,
+        githubRepo: project.githubRepo,
+        githubDefaultBranch: project.githubDefaultBranch,
+      };
+      const result = await fetchBranchTreeFiles(projectCfg);
+      const existing = await db
+        .select()
+        .from(projectFilesTable)
+        .where(eq(projectFilesTable.projectId, projectId));
+      const byName = new Map(existing.map((f) => [f.name, f]));
+      const storage = new ObjectStorageService();
+      let created = 0;
+      let updated = 0;
+      let unchanged = 0;
+      for (const f of result.files) {
+        const prior = byName.get(f.path);
+        if (prior) {
+          let priorContent = "";
+          try {
+            priorContent = await readFileText(prior.objectPath);
+          } catch {
+            priorContent = "";
+          }
+          if (priorContent === f.contents) {
+            unchanged += 1;
+            continue;
+          }
+          const objectPath = await storage.uploadInlineObject({
+            contents: f.contents,
+            contentType: prior.contentType || "text/plain",
+          });
+          await db
+            .update(projectFilesTable)
+            .set({
+              objectPath,
+              sizeBytes: Buffer.byteLength(f.contents, "utf8"),
+            })
+            .where(eq(projectFilesTable.id, prior.id));
+          updated += 1;
+        } else {
+          const objectPath = await storage.uploadInlineObject({
+            contents: f.contents,
+            contentType: "text/plain",
+          });
+          await db.insert(projectFilesTable).values({
+            projectId,
+            uploadedByClientId: req.dbClient!.id,
+            name: f.path,
+            contentType: "text/plain",
+            sizeBytes: Buffer.byteLength(f.contents, "utf8"),
+            objectPath,
+          });
+          created += 1;
+        }
+      }
+      res.json({
+        ok: true,
+        branch: result.branch,
+        sha: result.commitSha,
+        files: { fetched: result.files.length, created, updated, unchanged },
+      });
+    } catch (err) {
+      if (err instanceof GitHubNotConfiguredError) {
+        res.status(400).json({
+          error: err.message,
+          code: "github_not_configured",
+        });
+        return;
+      }
+      const status = err instanceof GitHubApiError ? err.status : 500;
+      res.status(status >= 400 && status < 600 ? status : 500).json({
+        error: err instanceof Error ? err.message : "GitHub pull failed",
+      });
+    }
   },
 );
 
