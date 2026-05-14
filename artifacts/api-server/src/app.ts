@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import stripeWebhookRouter from "./routes/stripe-webhook";
+import clerkWebhookRouter from "./routes/clerk-webhook";
 import { logger } from "./lib/logger";
 import { loadSessionAndClient } from "./lib/auth";
 import { loadClerkAndOrganization } from "./lib/clerk";
@@ -32,6 +33,8 @@ app.use(
 
 // Stripe webhook needs the raw body — must mount before json parsers
 app.use("/api/stripe/webhook", stripeWebhookRouter);
+// Clerk webhook also needs the raw body for svix signature verification
+app.use("/api", clerkWebhookRouter);
 
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json({ limit: "2mb" }));

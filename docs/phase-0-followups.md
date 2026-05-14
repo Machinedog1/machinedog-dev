@@ -83,14 +83,42 @@ Phase 1 fills these in:
 - Move `portal_subscription_id`, `portal_subscription_status`,
   `portal_current_period_end` likewise.
 
-## 6. Webhook handling
+## 6. Webhook handling — DONE (Task #30)
 
-Add `POST /api/clerk/webhook` that:
+`POST /api/clerk/webhook` is now live in
+`artifacts/api-server/src/routes/clerk-webhook.ts` and mounted before the
+json parser so svix can verify the raw body. It handles:
 
-- On `organization.created` — upsert `organizations` row.
-- On `organizationMembership.created` — upsert `organization_members` row.
-- On `user.created` / `user.updated` — sync email + clerkUserId.
-- On `organization.deleted` — soft-delete the org.
+- `user.created` / `user.updated` — match primary email to a pending
+  `organization_members` row (clerk_user_id IS NULL) and stamp the row
+  with the Clerk user id + flip status to active.
+- `organization.created` / `organization.updated` — upsert by clerk_org_id.
+- `organization.deleted` — soft-clear clerk_org_id (legacy FKs preserved).
+- `organizationMembership.created/updated/deleted` — maintain
+  `organization_members` rows keyed on (organization_id, clerk_user_id).
+
+Returns 503 when `CLERK_WEBHOOK_SECRET` is unset so misconfiguration
+fails loudly instead of swallowing events. Returns 500 on handler
+exceptions so Clerk retries via svix backoff (handlers are idempotent).
+
+The companion script `scripts/src/invite-clients-to-clerk.ts` walks
+every active membership with `clerk_user_id IS NULL` and creates a
+Clerk invitation (Backend SDK `clerkClient.invitations.createInvitation`,
+`ignoreExisting:true` for idempotency, `notify:true` so Clerk sends the
+email). `--dry-run` prints the plan without contacting Clerk. Tom's
+admin role is preserved by Phase 0's backfill — once he accepts the
+invite, the webhook stamps his clerk_user_id while keeping `role=admin`.
+
+### Operator runbook (one-time)
+
+1. Set `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, and
+   `CLERK_WEBHOOK_SECRET` (the last is the signing secret from
+   Clerk Dashboard → Webhooks → Add Endpoint pointing at
+   `https://<host>/api/clerk/webhook`).
+2. `pnpm tsx scripts/src/invite-clients-to-clerk.ts --dry-run` to preview.
+3. `pnpm tsx scripts/src/invite-clients-to-clerk.ts` to send invites.
+4. Verify in DB after each customer signs in:
+   `select email, role, status, clerk_user_id from organization_members;`
 
 ## 7. CI
 
