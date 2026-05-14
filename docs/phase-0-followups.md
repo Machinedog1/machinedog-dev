@@ -115,8 +115,10 @@ invite, the webhook stamps his clerk_user_id while keeping `role=admin`.
    `CLERK_WEBHOOK_SECRET` (the last is the signing secret from
    Clerk Dashboard → Webhooks → Add Endpoint pointing at
    `https://<host>/api/clerk/webhook`).
-2. `pnpm tsx scripts/src/invite-clients-to-clerk.ts --dry-run` to preview.
-3. `pnpm tsx scripts/src/invite-clients-to-clerk.ts` to send invites.
+2. `pnpm --filter @workspace/scripts run invite-clients-to-clerk -- --dry-run`
+   to preview the targeted memberships.
+3. `pnpm --filter @workspace/scripts run invite-clients-to-clerk` to send the
+   invitations through Clerk.
 4. Verify in DB after each customer signs in:
    `select email, role, status, clerk_user_id from organization_members;`
 
