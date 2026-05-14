@@ -1,0 +1,1272 @@
+You are helping me complete Machinedog.dev.
+
+Machinedog.dev is a general-purpose browser-based AI coding SaaS platform for all clients, not just healthcare. Healthcare/HIPAA is a premium protected tier, not the default product.
+
+The platform should allow anyone to:
+
+1. Sign up.
+2. Authenticate through Clerk.
+3. Create or join an organization/client account.
+4. Choose a subscription plan.
+5. Buy or receive usage tokens.
+6. Create a project.
+7. Import a GitHub repository.
+8. Open a secure browser-based coding workspace.
+9. Use an AI coding console.
+10. Edit files.
+11. Save changes.
+12. Commit changes back to GitHub.
+13. Preview the app.
+14. Publish the app.
+15. Manage secrets securely.
+16. View usage, billing, project history, and audit logs.
+
+The current project was started inside Replit and already has a Machinedog.dev-style interface with a dark premium SaaS look, sidebar navigation, console, preview area, publish/history areas, tokens, clients, projects, orders, and admin-style sections. Preserve the existing visual direction and improve it into a serious SaaS MVP.
+
+IMPORTANT PRODUCT POSITIONING:
+
+Machinedog.dev is for all clients.
+
+Healthcare/HIPAA support is an optional higher-tier feature. Do not design the entire app as healthcare-only.
+
+Use this general model:
+
+Standard clients:
+- Clerk authentication
+- Stripe subscription
+- Token usage
+- GitHub import
+- Secure project workspace
+- AI coding assistant
+- Preview and publish
+- Secrets manager
+- Audit/history logs
+
+Healthcare clients:
+- Same as standard clients
+- Plus BAA status
+- MFA required
+- PHI mode locked until approved
+- Stronger audit logging
+- HIPAA deployment required
+- AWS HIPAA-ready deployment path
+- No PHI allowed in the Replit MVP
+
+CRITICAL COMPLIANCE RULE:
+
+This Replit MVP must be HIPAA-aware but must NOT process, store, request, transmit, or log real PHI/ePHI.
+
+Use clear warnings anywhere healthcare mode appears:
+
+“Do not enter PHI in this MVP. HIPAA production deployment requires signed BAAs, approved infrastructure, access controls, audit logging, encryption, policies, and risk analysis.”
+
+Use the wording:
+- “HIPAA-ready starter template”
+- “HIPAA-ready deployment path”
+- “Healthcare plan”
+- “PHI mode locked”
+
+Do NOT use the wording:
+- “Automatically HIPAA compliant”
+- “HIPAA certified”
+- “Safe to enter patient data now”
+- “Store PHI in Replit”
+
+MAIN OBJECTIVE:
+
+Turn the existing Machinedog.dev project into a working multi-tenant SaaS MVP where clients can sign up, pay, use tokens, create/import projects, work in a browser coding environment, use an AI console, manage secrets, preview apps, and prepare to publish.
+
+TECHNICAL ASSUMPTIONS:
+
+- Keep the current stack unless there is a strong reason to change it.
+- Use TypeScript wherever possible.
+- Preserve the current design language: dark, premium, AI/cyber, Machinedog.dev branding, glass-style panels, compact SaaS dashboard, professional developer-tool feel.
+- Do not destroy the existing UI.
+- Improve and complete it.
+- Use Clerk for authentication.
+- Use Clerk Organizations for client/company accounts.
+- Use Stripe for subscriptions and token purchases.
+- Use GitHub App-style architecture for production repo access, even if the MVP uses placeholders.
+- Use a real database model where practical.
+- Add mock/demo data where real external services are not configured yet.
+- Add strong empty states, loading states, error states, and toast notifications.
+- Add .env.example entries for every required environment variable.
+- Do not hard-code secrets.
+- Do not expose secret values after saving.
+- Build in logical batches.
+- Inspect the existing codebase before changing files.
+- Explain the implementation plan before making changes.
+- Keep the app buildable at every major step.
+
+CORE PRODUCT ENTITIES:
+
+Create or update models/types for:
+
+User
+Organization
+OrganizationMember
+Role
+SubscriptionPlan
+Subscription
+TokenLedger
+Order
+Project
+ProjectWorkspace
+ProjectFile
+ProjectSecret
+GitHubConnection
+GitHubRepository
+AIConversation
+AIMessage
+AIProposedChange
+BuildJob
+Deployment
+Template
+AuditEvent
+ComplianceProfile
+
+TENANT MODEL:
+
+Each Clerk Organization represents a client/company/tenant.
+
+Each project belongs to one organization.
+
+Each organization may have multiple users.
+
+Each user may belong to multiple organizations.
+
+Each project eventually gets its own isolated coding environment. In the MVP, the workspace can be simulated, database-backed, or local-project-backed, but the data model and UI must be designed for real isolated workspaces later.
+
+Roles:
+
+Owner
+Admin
+Developer
+Viewer
+Billing Admin
+
+Permission expectations:
+
+Owner:
+- Full access
+- Manage billing
+- Manage users
+- Manage projects
+- Manage secrets
+- Publish
+
+Admin:
+- Manage projects
+- Manage users except owner
+- Manage secrets
+- Publish
+
+Developer:
+- Edit code
+- Use AI
+- Run builds
+- Commit changes
+- View secrets status but not reveal values
+
+Viewer:
+- View projects
+- View preview
+- View history
+- No edit/publish/secrets write
+
+Billing Admin:
+- Manage subscription
+- Buy tokens
+- View invoices/orders
+- No code access unless separately assigned
+
+AUTHENTICATION:
+
+Implement Clerk as the primary auth layer.
+
+Add support for:
+
+- Sign up
+- Sign in
+- Sign out
+- User profile
+- Organization creation
+- Organization switching
+- Organization membership
+- Role-aware navigation
+- Route protection
+
+Required environment variables:
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY
+NEXT_PUBLIC_CLERK_SIGN_IN_URL
+NEXT_PUBLIC_CLERK_SIGN_UP_URL
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL
+
+If Clerk keys are missing, use a clear developer/demo fallback so the app can still run in Replit for development. The fallback must be clearly marked as development-only.
+
+BILLING AND TOKENS:
+
+Use Stripe for subscriptions and token purchases.
+
+Plans:
+
+Starter
+Pro
+Business
+Healthcare
+Enterprise
+
+Starter:
+- 1 user
+- limited projects
+- monthly included tokens
+- GitHub import
+- browser editor
+- AI console
+- basic preview/publish
+- no PHI
+
+Pro:
+- more projects
+- more tokens
+- team access
+- GitHub integration
+- secrets manager
+- staging/production
+- custom domains placeholder
+- no PHI
+
+Business:
+- multiple organizations/teams
+- audit logs
+- higher token limits
+- advanced publishing
+- priority builds
+- no PHI unless upgraded
+
+Healthcare:
+- BAA required
+- MFA required
+- PHI mode locked until approved
+- HIPAA deployment required
+- AWS HIPAA-ready deployment path
+- healthcare templates
+- enhanced audit logging
+
+Enterprise:
+- dedicated infrastructure placeholder
+- SSO/SAML placeholder
+- customer-managed keys placeholder
+- SIEM export placeholder
+- custom BAA placeholder
+- custom support
+
+Create token system:
+
+TokenLedger fields:
+- id
+- organizationId
+- userId
+- projectId optional
+- type: purchase, monthly_grant, ai_usage, build_usage, deployment_usage, admin_adjustment, refund
+- amount
+- balanceAfter
+- description
+- metadata JSON
+- createdAt
+
+Token charges:
+- AI prompt
+- AI proposed file changes
+- build job
+- deployment
+- premium template use
+
+Add UI:
+- current token balance
+- buy tokens button
+- token usage table
+- orders page
+- subscription page
+- billing settings
+- admin token adjustment
+
+Stripe environment variables:
+
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+STRIPE_PRICE_ID_STARTER
+STRIPE_PRICE_ID_PRO
+STRIPE_PRICE_ID_BUSINESS
+STRIPE_PRICE_ID_HEALTHCARE
+STRIPE_PRICE_ID_ENTERPRISE
+STRIPE_PRICE_ID_TOKEN_PACK_SMALL
+STRIPE_PRICE_ID_TOKEN_PACK_MEDIUM
+STRIPE_PRICE_ID_TOKEN_PACK_LARGE
+
+If Stripe keys are missing, build a mocked checkout flow for development only.
+
+PROJECTS:
+
+Create a real project system.
+
+Project fields:
+- id
+- organizationId
+- name
+- slug
+- description
+- projectType: web_app, mobile_app, api, internal_tool, healthcare_template, other
+- framework: nextjs, react, vite, express, expo, node, other
+- status: draft, active, building, published, archived
+- gitProvider: none, github
+- gitRepoUrl
+- gitRepoOwner
+- gitRepoName
+- defaultBranch
+- activeBranch
+- stagingUrl
+- productionUrl
+- previewUrl
+- healthcareMode
+- phiAllowed default false
+- baaStatus: not_required, required, pending, signed
+- workspaceProvider: mvp_database, replit, docker, coder, aws_ecs, other
+- workspaceId
+- workspaceStatus: not_created, creating, running, stopped, error
+- workspaceUrl
+- containerId
+- resourceLimits JSON
+- lastStartedAt
+- lastStoppedAt
+- createdBy
+- createdAt
+- updatedAt
+
+Build UI:
+
+- My Projects page
+- All Projects admin page
+- Create Project modal
+- Project detail page
+- Project settings page
+- Project status badge
+- Archive project action
+- Delete project action with confirmation
+- Healthcare warning when healthcareMode is enabled
+
+PROJECT WORKSPACE:
+
+Each project should have a browser-based workspace.
+
+Workspace layout:
+
+Left panel:
+- File tree
+- New file
+- New folder placeholder
+- Rename file
+- Delete file
+- Search files placeholder
+
+Center panel:
+- Code editor
+- Monaco editor preferred
+- Syntax highlighting by extension
+- Dirty state indicator
+- Save button
+- Unsaved changes warning
+
+Right panel:
+- Live preview iframe
+- Empty state if no preview URL
+- Refresh preview button
+- Open in new tab button
+- Last build status
+
+Bottom panel:
+- Terminal/build logs
+- AI task logs
+- Deployment logs
+- Errors
+
+Top bar:
+- Save
+- Run
+- AI Plan
+- Commit
+- Pull
+- Push
+- Publish
+- Secrets
+- History
+- Settings
+
+For MVP, project files may be stored in the database.
+
+ProjectFile fields:
+- id
+- projectId
+- path
+- fileName
+- extension
+- content
+- language
+- size
+- isDeleted
+- createdAt
+- updatedAt
+- lastEditedBy
+
+Add starter files for new projects based on selected template/framework.
+
+AI CODING CONSOLE:
+
+Upgrade the AI console into a serious coding assistant interface.
+
+Features:
+- Prompt input
+- Plan Mode / Build Mode toggle
+- Power mode toggle
+- Current project context
+- Selected file context
+- AI conversation history
+- AI response
+- Proposed file changes
+- Diff viewer
+- Accept changes button
+- Reject changes button
+- Save accepted changes to ProjectFile
+- Deduct tokens for AI usage
+- Log every AI action to AuditEvent and ProjectHistory
+
+AIConversation fields:
+- id
+- organizationId
+- projectId
+- userId
+- title
+- mode: plan, build, debug, explain
+- createdAt
+- updatedAt
+
+AIMessage fields:
+- id
+- conversationId
+- role: user, assistant, system, tool
+- content
+- tokenCost
+- blockedForPhi boolean
+- createdAt
+
+AIProposedChange fields:
+- id
+- conversationId
+- projectId
+- filePath
+- action: create, update, delete, rename
+- beforeContent
+- afterContent
+- status: pending, accepted, rejected
+- createdAt
+- acceptedAt
+- acceptedBy
+
+AI provider behavior:
+- If OPENAI_API_KEY exists, use it through a clean service wrapper.
+- If not, provide mock AI responses for Replit development.
+- Never send obvious PHI to the AI.
+- Add a simple PHI guard.
+
+Required environment variables:
+
+OPENAI_API_KEY
+ANTHROPIC_API_KEY optional
+AI_PROVIDER optional
+
+PHI GUARD:
+
+Add basic detection to block obvious PHI-like content when PHI mode is disabled.
+
+Detect patterns such as:
+- SSN-like patterns
+- DOB labels
+- date of birth labels
+- patient name labels
+- medical record number labels
+- MRN labels
+- diagnosis labels
+- insurance member ID labels
+- claim number labels
+
+If detected:
+- block submission
+- show warning
+- do not send to AI
+- create AuditEvent with action: phi_blocked
+- do not store the blocked content in logs beyond safe metadata
+
+Warning text:
+
+“This looks like it may contain protected health information. PHI is disabled for this project. Do not enter patient data unless your organization has completed the Healthcare plan, BAA, and approved HIPAA deployment setup.”
+
+GITHUB INTEGRATION:
+
+Build GitHub import/export UI and backend structure.
+
+Production architecture should be GitHub App-based.
+
+Do not design around long-term personal access tokens as the final model.
+
+MVP may include placeholder/manual token support for development, but the UI and data model should clearly point to GitHub App installation.
+
+GitHubConnection fields:
+- id
+- organizationId
+- provider: github
+- githubInstallationId
+- githubAccountLogin
+- githubAccountType
+- permissions JSON
+- connectedBy
+- connectedAt
+- status: active, revoked, error
+
+GitHubRepository fields:
+- id
+- organizationId
+- projectId
+- repoOwner
+- repoName
+- repoUrl
+- defaultBranch
+- activeBranch
+- lastPulledAt
+- lastPushedAt
+- lastCommitSha
+- status
+
+GitHub UI:
+- Connect GitHub
+- Install Machinedog.dev GitHub App placeholder
+- Select repo
+- Import repo
+- Pull latest
+- Create branch
+- Commit changes
+- Push changes
+- Open pull request placeholder
+- Disconnect repo
+
+Security notes in UI:
+- “Production GitHub access should use the Machinedog.dev GitHub App with repo-scoped permissions and short-lived installation tokens.”
+- “Do not paste long-lived personal tokens unless you are in development mode.”
+
+Required environment variables:
+
+GITHUB_APP_ID
+GITHUB_APP_PRIVATE_KEY
+GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET
+GITHUB_WEBHOOK_SECRET
+GITHUB_TOKEN optional for MVP development only
+
+PROJECT SECRETS:
+
+Build Project Secrets UI.
+
+ProjectSecret fields:
+- id
+- organizationId
+- projectId
+- name
+- environment: development, staging, production
+- encryptedValue or masked placeholder
+- valuePreview masked only
+- createdBy
+- updatedBy
+- createdAt
+- updatedAt
+- lastUsedAt optional
+- version optional
+
+Rules:
+- Never display plaintext secret after saving.
+- Show masked value like ********.
+- Allow create/update/delete.
+- Allow rotate secret action.
+- Log every create/update/delete/rotate to AuditEvent.
+- Add warning: “Do not store PHI in secrets.”
+- Add TODO comments for AWS Secrets Manager integration.
+
+For MVP:
+- Implement encryption helper if simple and safe.
+- Otherwise use a clear MVP placeholder and document that production secrets move to AWS Secrets Manager.
+
+PUBLISH PANE:
+
+Create a real Publish pane UI.
+
+Deployment fields:
+- id
+- organizationId
+- projectId
+- environment: preview, staging, production
+- status: queued, building, deploying, live, failed, rolled_back
+- buildJobId
+- url
+- domain
+- commitSha
+- logs
+- createdBy
+- createdAt
+- completedAt
+
+BuildJob fields:
+- id
+- organizationId
+- projectId
+- status: queued, installing, building, succeeded, failed, canceled
+- command
+- logs
+- startedAt
+- completedAt
+- tokenCost
+- createdBy
+
+Publish UI:
+- Environment selector: Preview, Staging, Production
+- Build command
+- Start command
+- Environment variables/secrets status
+- Build logs
+- Deployment logs
+- Deployment status
+- Staging URL
+- Production URL
+- Rollback placeholder
+- Custom domain placeholder
+- Deployment history table
+
+For MVP:
+- Simulate deployment stages if real deployment is not available yet.
+- The UI should feel complete and ready for external deployment wiring.
+- Deduct tokens for build/deployment simulation.
+- Add AuditEvent for publish/build/deploy actions.
+
+PREVIEW PANE:
+
+Improve preview behavior:
+- iframe preview if preview URL exists
+- empty state if no preview URL exists
+- refresh button
+- open in new tab
+- last build status
+- build logs link
+- error state
+
+TEMPLATES:
+
+Create Template Center.
+
+Template fields:
+- id
+- name
+- slug
+- category
+- description
+- framework
+- projectType
+- isHealthcare
+- tokenCost
+- starterFiles JSON
+- complianceNotes
+- createdAt
+
+Templates:
+
+General:
+- SaaS Starter
+- Landing Page Starter
+- API Starter
+- Admin Dashboard Starter
+- E-commerce Starter
+- Mobile App Starter
+- Internal Tool Starter
+
+Healthcare:
+- HIPAA-ready Patient Intake Starter
+- Secure Appointment Request Portal
+- Referral Tracking Dashboard
+- Prior Authorization Workflow
+- Provider Admin Dashboard
+- Healthcare CRM Starter
+
+Every healthcare template must show:
+
+“This is a HIPAA-ready starter template only. Compliance requires proper deployment, signed BAAs, access controls, audit logging, encryption, policies, and risk analysis.”
+
+Create project from template:
+- Choose organization
+- Choose template
+- Set project name
+- Create starter files
+- Deduct token cost if applicable
+- Log AuditEvent
+
+ADMIN DASHBOARD:
+
+Finish the admin dashboard.
+
+Admin metrics:
+- total users
+- total organizations
+- active subscriptions
+- monthly recurring revenue placeholder
+- token revenue placeholder
+- total token usage
+- total projects
+- active projects
+- published projects
+- GitHub imports
+- build jobs
+- deployments
+- healthcare projects
+- BAA pending count
+- PHI mode enabled count
+- recent audit events
+- recent orders
+
+Admin pages:
+- Organizations
+- Users
+- Projects
+- Orders
+- Tokens
+- GitHub Connections
+- Build Jobs
+- Deployments
+- Audit Logs
+- Healthcare/Compliance
+- Settings
+
+AUDIT LOGS AND PROJECT HISTORY:
+
+Create AuditEvent.
+
+AuditEvent fields:
+- id
+- organizationId
+- projectId optional
+- actorUserId
+- actorEmail
+- action
+- resourceType
+- resourceId
+- ipAddress placeholder
+- userAgent placeholder
+- metadata JSON
+- createdAt
+
+Actions to log:
+- user_signed_in
+- organization_created
+- member_invited
+- project_created
+- project_updated
+- project_archived
+- file_created
+- file_updated
+- file_deleted
+- ai_prompt_submitted
+- ai_change_accepted
+- ai_change_rejected
+- phi_blocked
+- secret_created
+- secret_updated
+- secret_deleted
+- github_connected
+- repo_imported
+- repo_pulled
+- repo_pushed
+- build_started
+- build_failed
+- build_succeeded
+- deployment_started
+- deployment_live
+- deployment_failed
+- tokens_purchased
+- tokens_used
+- subscription_changed
+- healthcare_mode_requested
+- baa_status_updated
+
+ProjectHistory fields:
+- id
+- projectId
+- eventType
+- title
+- description
+- filesChanged JSON
+- aiConversationId optional
+- buildJobId optional
+- deploymentId optional
+- gitCommitSha optional
+- createdBy
+- createdAt
+
+Build UI:
+- project history tab
+- admin audit log page
+- filters by organization, project, user, action, date
+
+COMPLIANCE PAGE:
+
+Create Compliance page for each organization and project.
+
+ComplianceProfile fields:
+- organizationId
+- planType
+- healthcareEnabled
+- baaStatus
+- phiAllowed
+- mfaRequired
+- auditRequired
+- hipaaDeploymentRequired
+- awsHipaaEnvironmentStatus
+- riskAnalysisStatus
+- incidentResponseStatus
+- backupPolicyStatus
+- dataRetentionPolicyStatus
+- lastReviewedAt
+
+UI checklist:
+- BAA status
+- PHI mode
+- MFA status
+- Audit logging
+- Encryption status
+- Secrets manager status
+- Backup status
+- Data retention
+- Incident response
+- AWS HIPAA deployment status
+- AI provider BAA status
+
+For standard clients, show:
+“Compliance features are available on Business, Healthcare, and Enterprise plans.”
+
+For healthcare clients, show:
+“PHI mode remains locked until BAA and HIPAA deployment setup are approved.”
+
+SETTINGS:
+
+Add settings pages:
+
+Profile
+Organization
+Members
+Roles
+Billing
+Tokens
+GitHub
+AI Providers
+Security
+Compliance
+API Keys
+Workspace Settings
+Publishing Settings
+
+CLIENT SIGNUP FLOW:
+
+Create onboarding flow:
+
+Step 1:
+- Create account / sign in with Clerk
+
+Step 2:
+- Create organization/company
+- Company name
+- Website
+- Industry
+- Client type: general, software, business, healthcare, other
+
+Step 3:
+- Choose plan
+- Starter, Pro, Business, Healthcare, Enterprise
+
+Step 4:
+- Token balance initialized
+- Monthly tokens granted based on plan
+
+Step 5:
+- Create first project
+- Blank project
+- Import GitHub repo
+- Start from template
+
+Step 6:
+- Open workspace
+
+WORKSPACE ISOLATION DESIGN:
+
+Even though this is an MVP, add the architecture fields and UI language needed for secure coding environments.
+
+Each project should show workspace status:
+
+- Not created
+- Creating
+- Running
+- Stopped
+- Error
+
+Workspace provider options:
+- MVP Database Workspace
+- Docker Workspace
+- Coder Workspace
+- AWS ECS Workspace
+- Enterprise Dedicated Workspace
+
+Add a visible note in workspace settings:
+
+“This MVP uses a database-backed workspace for development. Production workspaces will run in isolated containers or dedicated cloud environments.”
+
+Future secure workspace design:
+- One workspace per project
+- Isolated runtime
+- Resource limits
+- No cross-tenant access
+- Secrets injected per environment
+- Logs scoped by organization/project
+- Workspace start/stop
+- Idle shutdown
+- GitHub branch isolation
+
+SECURITY REQUIREMENTS:
+
+- Never expose secret values after save.
+- Never log secret values.
+- Never send PHI-like content to AI when PHI mode is disabled.
+- Every important action writes AuditEvent.
+- Project data must be organization-scoped.
+- UI should not show projects from other organizations.
+- Admin routes should be protected.
+- Add basic server-side checks where applicable.
+- Add clear TODO notes for production hardening.
+
+DOCUMENTATION TO ADD:
+
+Create/update:
+
+README.md
+.env.example
+ROADMAP.md
+SECURITY_NOTES.md
+HIPAA_NOTES.md
+PHASE_2_MIGRATION_PLAN.md
+AWS_HIPAA_PHASE_3_PLAN.md
+
+README.md should explain:
+- what Machinedog.dev is
+- setup
+- environment variables
+- running locally/Replit
+- Clerk setup
+- Stripe setup
+- GitHub setup
+- AI setup
+- MVP limitations
+- no PHI in Replit MVP
+
+SECURITY_NOTES.md should explain:
+- tenant isolation assumptions
+- secrets handling
+- audit logs
+- GitHub App recommendation
+- workspace isolation roadmap
+
+HIPAA_NOTES.md should explain:
+- healthcare is a protected tier
+- MVP does not handle PHI
+- BAA required
+- AWS HIPAA-ready environment required
+- AI provider BAA required if PHI touches AI
+
+PHASE_2_MIGRATION_PLAN.md should explain:
+- move production runtime off Replit
+- move database to managed Postgres
+- move secrets to AWS Secrets Manager
+- move files/artifacts to S3
+- introduce Docker/Coder workspaces
+- introduce GitHub App
+- introduce deployment runner
+
+AWS_HIPAA_PHASE_3_PLAN.md should explain:
+- AWS BAA
+- HIPAA-eligible services
+- ECS/EKS/Fargate
+- RDS
+- S3
+- KMS
+- Secrets Manager
+- CloudTrail
+- CloudWatch
+- GuardDuty
+- WAF
+- backups
+- audit exports
+- healthcare org gating
+- PHI mode approval
+
+DEVELOPMENT QUALITY:
+
+Add:
+- TypeScript types
+- Validation where practical
+- Reusable components
+- Clean service layer
+- Error handling
+- Loading states
+- Empty states
+- Toast notifications
+- Seed/demo data
+- Comments only where helpful
+- No massive unstructured files if avoidable
+
+Do not overcomplicate the first build. Prioritize a working SaaS MVP with the correct architecture.
+
+ROUTES / PAGES TO CREATE OR COMPLETE:
+
+Public:
+- /
+- /pricing
+- /templates
+- /sign-in
+- /sign-up
+
+App:
+- /app
+- /app/onboarding
+- /app/dashboard
+- /app/projects
+- /app/projects/new
+- /app/projects/[projectId]
+- /app/projects/[projectId]/workspace
+- /app/projects/[projectId]/settings
+- /app/projects/[projectId]/secrets
+- /app/projects/[projectId]/publish
+- /app/projects/[projectId]/history
+- /app/templates
+- /app/tokens
+- /app/billing
+- /app/github
+- /app/settings
+- /app/compliance
+
+Admin:
+- /admin
+- /admin/organizations
+- /admin/users
+- /admin/projects
+- /admin/orders
+- /admin/tokens
+- /admin/github
+- /admin/builds
+- /admin/deployments
+- /admin/audit
+- /admin/compliance
+- /admin/settings
+
+COMPONENTS TO CREATE OR COMPLETE:
+
+- AppShell
+- Sidebar
+- TopNav
+- OrganizationSwitcher
+- PlanBadge
+- TokenBalance
+- ProjectCard
+- ProjectStatusBadge
+- WorkspaceStatusBadge
+- FileTree
+- CodeEditor
+- AIConsole
+- ProposedChangesPanel
+- PreviewPane
+- BuildLogsPanel
+- PublishPanel
+- SecretsTable
+- GitHubConnectPanel
+- AuditLogTable
+- ProjectHistoryTimeline
+- TemplateCard
+- ComplianceChecklist
+- BillingPlanCard
+- TokenUsageTable
+- EmptyState
+- LoadingState
+- ErrorState
+
+SERVICE LAYERS:
+
+Create clean service wrappers:
+
+authService
+organizationService
+billingService
+tokenService
+projectService
+workspaceService
+fileService
+aiService
+githubService
+secretService
+buildService
+deploymentService
+auditService
+complianceService
+templateService
+
+ENVIRONMENT VARIABLES:
+
+Add .env.example with:
+
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/app/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/app/onboarding
+
+# Stripe
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_ID_STARTER=
+STRIPE_PRICE_ID_PRO=
+STRIPE_PRICE_ID_BUSINESS=
+STRIPE_PRICE_ID_HEALTHCARE=
+STRIPE_PRICE_ID_ENTERPRISE=
+STRIPE_PRICE_ID_TOKEN_PACK_SMALL=
+STRIPE_PRICE_ID_TOKEN_PACK_MEDIUM=
+STRIPE_PRICE_ID_TOKEN_PACK_LARGE=
+
+# AI
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+AI_PROVIDER=openai
+
+# GitHub App
+GITHUB_APP_ID=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_WEBHOOK_SECRET=
+GITHUB_TOKEN=
+
+# Database
+DATABASE_URL=
+
+# App
+NEXT_PUBLIC_APP_URL=
+APP_ENV=development
+ENCRYPTION_KEY=
+ADMIN_EMAIL=
+
+# Future AWS
+AWS_REGION=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_SECRETS_MANAGER_PREFIX=
+AWS_S3_BUCKET=
+AWS_KMS_KEY_ID=
+
+ACCEPTANCE CRITERIA:
+
+The Replit MVP is complete when:
+
+1. The existing Machinedog.dev UI is preserved and improved.
+2. A user can sign up/sign in with Clerk or use clearly marked demo auth if Clerk is not configured.
+3. A user can create an organization/client account.
+4. A user can choose a plan.
+5. A user receives or buys tokens through a mocked or real Stripe flow.
+6. A user can create a project.
+7. A user can create a project from a template.
+8. A user can open a project workspace.
+9. The workspace has a file tree, code editor, AI console, preview pane, logs panel, secrets pane, publish pane, and history tab.
+10. A user can create/edit/save project files.
+11. A user can submit an AI prompt and receive either a real or mock response.
+12. The AI can propose file changes.
+13. The user can accept or reject proposed changes.
+14. Accepted changes update project files.
+15. Token usage is deducted and logged.
+16. A user can add project secrets and see only masked values.
+17. A user can connect/import a GitHub repo through the UI or placeholder flow.
+18. A user can simulate or run a build.
+19. A user can simulate or run a publish flow.
+20. A user can view project history.
+21. Admin can view organizations, users, projects, orders, tokens, GitHub connections, builds, deployments, and audit logs.
+22. Healthcare mode exists but is gated.
+23. PHI entry is blocked when detected and PHI mode is disabled.
+24. The app makes clear that Replit MVP is not for PHI.
+25. Documentation files are created.
+26. .env.example is complete.
+27. The app builds successfully.
+28. No TypeScript errors remain.
+29. No existing major page is broken.
+30. The MVP is ready to demo to potential clients.
+
+IMPLEMENTATION PROCESS:
+
+First, inspect the current codebase.
+
+Then produce a step-by-step implementation plan with phases/batches.
+
+Do not start making major changes until the plan is produced.
+
+After the plan is approved, implement in batches:
+
+Batch 1:
+- data models/types
+- env example
+- core layout cleanup
+- demo seed data
+
+Batch 2:
+- Clerk auth/org structure
+- onboarding
+- plans/tokens
+
+Batch 3:
+- projects and templates
+
+Batch 4:
+- workspace UI with file tree/editor/preview/logs
+
+Batch 5:
+- AI console and proposed changes
+
+Batch 6:
+- secrets manager and audit logs
+
+Batch 7:
+- GitHub integration placeholders
+
+Batch 8:
+- publish/build panes
+
+Batch 9:
+- admin dashboard
+
+Batch 10:
+- healthcare/compliance gating
+
+Batch 11:
+- documentation, cleanup, tests/build fixes
+
+Be careful, preserve the current design, and make this feel like a real SaaS product that can later be moved to external secure workspaces and AWS HIPAA-ready infrastructure.

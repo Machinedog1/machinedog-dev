@@ -1,0 +1,127 @@
+Add AI provider and model routing support.
+
+Machinedog.dev should not hardcode one AI model. Build a provider/model registry so the admin can enable or disable models by plan, cost, and compliance tier.
+
+Create model categories:
+
+1. Auto
+- System chooses the best model based on task type, project size, plan, and token balance.
+
+2. Fast
+- For summaries, UI copy, small fixes, simple explanations, and low-cost tasks.
+
+3. Coding
+- Default for code generation, debugging, file edits, tests, and normal project work.
+
+4. Architect
+- For expensive high-value tasks like large refactors, schema migrations, security reviews, repo-wide planning, and deployment architecture.
+
+5. Long Context
+- For large GitHub repo imports, route audits, dependency scans, documentation review, and full-codebase analysis.
+
+6. Healthcare Safe
+- Locked by default.
+- Only available when organization plan is Healthcare or Enterprise, BAA status is signed, HIPAA deployment status is approved, and PHI mode is enabled.
+
+Create these tables or config objects:
+
+AIProvider:
+- id
+- name: openai, anthropic, google, mistral, aws_bedrock, local
+- enabled
+- apiKeyEnvName
+- supportsStreaming
+- supportsTools
+- supportsVision
+- supportsLongContext
+- supportsHealthcare
+- requiresBaaForPhi
+- createdAt
+- updatedAt
+
+AIModel:
+- id
+- providerId
+- displayName
+- modelKey
+- category: auto, fast, coding, architect, long_context, healthcare_safe
+- enabled
+- defaultForCategory
+- inputTokenCost
+- outputTokenCost
+- contextWindow
+- supportsTools
+- supportsJson
+- supportsVision
+- supportsStreaming
+- supportsCodeEditing
+- supportsPhi
+- requiresHealthcarePlan
+- requiresSignedBaa
+- createdAt
+- updatedAt
+
+AIUsage:
+- id
+- organizationId
+- projectId
+- userId
+- provider
+- modelKey
+- category
+- inputTokens
+- outputTokens
+- tokenCost
+- blockedForPhi
+- createdAt
+
+Default model categories:
+
+Fast:
+- configurable low-cost model slot
+
+Coding:
+- Claude Sonnet slot
+- OpenAI coding model slot
+
+Architect:
+- Claude Opus slot
+- OpenAI reasoning/codex model slot
+
+Long Context:
+- Gemini Pro slot
+- OpenAI long-context slot
+- Claude long-context slot
+
+Healthcare Safe:
+- AWS Bedrock model slot
+- OpenAI BAA-approved slot
+- Anthropic BAA-approved slot
+
+Build UI:
+
+Admin / AI Models:
+- Enable/disable provider
+- Enable/disable model
+- Set default model per category
+- Set token cost multiplier
+- Mark model as healthcare allowed
+- Mark model as requiring BAA
+- Test model connection
+- View usage by provider/model
+
+Project Workspace:
+- AI mode selector:
+  Auto
+  Fast
+  Coding
+  Architect
+  Long Context
+  Healthcare Safe
+
+Rules:
+- Standard clients can use Auto, Fast, Coding, Architect, and Long Context depending on plan.
+- Healthcare Safe is locked unless Healthcare/Enterprise plan, signed BAA, HIPAA deployment approved, and PHI mode enabled.
+- If PHI guard detects possible PHI and Healthcare Safe is not approved, block the request.
+- Do not send blocked content to the model.
+- Log AI usage and PHI blocks to AuditEvent.
