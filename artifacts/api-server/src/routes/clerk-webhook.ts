@@ -201,8 +201,11 @@ async function handleMembershipCreated(
     if (stamped.length > 0) return;
   }
 
-  // No matching pending row → insert a brand-new membership. The unique
-  // index on (organization_id, clerk_user_id) handles webhook re-delivery.
+  // No matching pending row → upsert by (organization_id, clerk_user_id).
+  // On conflict (re-delivery or membershipUpdated event), refresh role /
+  // email / status so Clerk stays the source of truth post-cutover. We do
+  // NOT touch acceptedAt on the conflict path so the original accept time
+  // is preserved.
   await db
     .insert(organizationMembersTable)
     .values({
@@ -213,11 +216,16 @@ async function handleMembershipCreated(
       status: "active",
       acceptedAt: new Date(),
     })
-    .onConflictDoNothing({
+    .onConflictDoUpdate({
       target: [
         organizationMembersTable.organizationId,
         organizationMembersTable.clerkUserId,
       ],
+      set: {
+        role,
+        email,
+        status: "active",
+      },
     });
 }
 

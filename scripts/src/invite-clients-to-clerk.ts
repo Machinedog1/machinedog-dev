@@ -88,7 +88,6 @@ async function main() {
   }
 
   let sent = 0;
-  let skipped = 0;
   let failed = 0;
 
   for (const row of rows) {
@@ -124,7 +123,7 @@ async function main() {
   }
 
   console.log(
-    `[invite-clients] DONE — sent=${sent} skipped=${skipped} failed=${failed}` +
+    `[invite-clients] DONE — sent=${sent} failed=${failed}` +
       (dryRun ? " (dry-run)" : ""),
   );
   await db.$client.end();
