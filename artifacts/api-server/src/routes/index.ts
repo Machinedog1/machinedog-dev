@@ -14,6 +14,8 @@ import leadsRouter from "./leads";
 import checkoutRouter from "./checkout";
 import storageRouter from "./storage";
 import billingRouter from "./billing";
+import aiRouter from "./ai";
+import adminAiRouter from "./admin-ai";
 
 const router: IRouter = Router();
 
@@ -32,5 +34,7 @@ router.use(leadsRouter);
 router.use(checkoutRouter);
 router.use(storageRouter);
 router.use(billingRouter);
+router.use(aiRouter);
+router.use(adminAiRouter);
 
 export default router;

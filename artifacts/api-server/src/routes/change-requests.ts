@@ -222,13 +222,51 @@ async function updateChangeRequest(
  * request unchanged) when the project lacks GitHub config or the connector
  * is not authorized — appends an explanatory event in those cases.
  */
-async function pushPatchToGitHub(
+/**
+ * Op-aware patch entry. The canonical CR pipeline historically wrote plain
+ * `{path, contents}` rows (treated as create/update). The AI Console now also
+ * emits delete and rename via this same persistence layer, so pushPatchToGitHub
+ * accepts either shape.
+ */
+export type PatchFileEntry =
+  | { path: string; contents: string }
+  | { op: "create" | "update"; path: string; contents: string }
+  | { op: "delete"; path: string }
+  | {
+      op: "rename";
+      path: string;
+      newPath: string;
+      contents?: string;
+      previousContents?: string;
+    };
+
+export async function pushPatchToGitHub(
   cr: ChangeRequest,
   project: Project,
   actorOrganizationId: number | null,
 ): Promise<ChangeRequest> {
-  const files = (cr.patchFiles as Array<{ path: string; contents: string }> | null) ?? [];
-  if (!files.length) {
+  const raw = (cr.patchFiles as PatchFileEntry[] | null) ?? [];
+  if (!raw.length) {
+    return cr;
+  }
+  // Translate op-aware entries into the (files, deletions) pair that
+  // pushBranchWithFiles consumes. Legacy `{path, contents}` rows behave
+  // exactly as before (create/update).
+  const files: Array<{ path: string; contents: string }> = [];
+  const deletions: string[] = [];
+  for (const entry of raw) {
+    const op = "op" in entry ? entry.op : "update";
+    if (op === "create" || op === "update") {
+      files.push({ path: entry.path, contents: (entry as { contents: string }).contents });
+    } else if (op === "delete") {
+      deletions.push(entry.path);
+    } else if (op === "rename") {
+      const r = entry as { path: string; newPath: string; contents?: string; previousContents?: string };
+      deletions.push(r.path);
+      files.push({ path: r.newPath, contents: r.contents ?? r.previousContents ?? "" });
+    }
+  }
+  if (!files.length && !deletions.length) {
     return cr;
   }
   if (!project.githubOwner || !project.githubRepo) {
@@ -263,6 +301,7 @@ async function pushPatchToGitHub(
       baseSha,
       files,
       cr.patchSummary || `Machinedog change request #${cr.id}: ${cr.title}`,
+      { deletions },
     );
     await appendEvent(cr.id, "branch_pushed", `Pushed branch ${branchName}.`, actorOrganizationId, {
       branch: branchName,

@@ -15,3 +15,7 @@ export * from "./change-requests";
 export * from "./subscriptions";
 export * from "./token-ledger";
 export * from "./audit-events";
+export * from "./ai-providers";
+export * from "./ai-models";
+export * from "./ai-usage";
+export * from "./ai-conversations";

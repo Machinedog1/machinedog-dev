@@ -69,6 +69,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/admin/clients", label: "Clients", icon: ShieldAlert },
     { href: "/admin/projects", label: "All Projects", icon: ShieldAlert },
     { href: "/admin/orders", label: "Orders", icon: ShieldAlert },
+    { href: "/admin/ai-models", label: "AI Models", icon: ShieldAlert },
   ];
 
   const initial = me?.email ? me.email.charAt(0).toUpperCase() : "?";

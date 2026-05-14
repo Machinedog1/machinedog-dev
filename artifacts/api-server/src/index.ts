@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { bootstrapAdmin } from "./lib/bootstrap-admin";
 import { seedTemplates } from "./lib/seed-templates";
+import { seedAiRegistry } from "./lib/seed-ai-registry";
 import { isStripeConfigured, isDemoBillingAllowed } from "./lib/billing-service";
 
 const rawPort = process.env["PORT"];
@@ -47,5 +48,8 @@ app.listen(port, (err) => {
   });
   seedTemplates().catch((err) => {
     logger.error({ err }, "seedTemplates threw");
+  });
+  seedAiRegistry().catch((err) => {
+    logger.error({ err }, "seedAiRegistry threw");
   });
 });

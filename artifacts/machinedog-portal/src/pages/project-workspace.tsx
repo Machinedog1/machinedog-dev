@@ -49,6 +49,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { AiConsoleDialog } from "@/components/AiConsolePanel";
 
 // ---- Path helpers ---------------------------------------------------------
 
@@ -1075,13 +1076,11 @@ export default function ProjectWorkspacePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Phase stubs */}
-      <StubDialog
+      {/* AI Console (Phase 4) */}
+      <AiConsoleDialog
         open={aiPlanOpen}
         onOpenChange={setAiPlanOpen}
-        title="AI Plan"
-        phase="Phase 4"
-        description="The AI console — plan, propose, and apply multi-file changes — lands in Phase 4."
+        projectId={projectId}
       />
       <StubDialog
         open={secretsOpen}

@@ -29,6 +29,7 @@ import AdminDashboard from "@/pages/admin/index";
 import AdminClients from "@/pages/admin/clients";
 import AdminProjects from "@/pages/admin/projects";
 import AdminOrders from "@/pages/admin/orders";
+import AdminAiModelsPage from "@/pages/admin/ai-models";
 import SettingsPage from "@/pages/settings";
 
 import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
@@ -186,6 +187,9 @@ function AuthedRoutes() {
       </Route>
       <Route path="/admin/projects">
         <AuthGuard><AdminGuard><AdminProjects /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/ai-models">
+        <AuthGuard><AdminGuard><AdminAiModelsPage /></AdminGuard></AuthGuard>
       </Route>
       <Route path="/admin/orders">
         <AuthGuard><AdminGuard><AdminOrders /></AdminGuard></AuthGuard>

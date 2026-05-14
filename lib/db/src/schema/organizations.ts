@@ -25,6 +25,15 @@ export const organizationsTable = pgTable(
     })
       .notNull()
       .default("not_required"),
+    // HIPAA deployment posture: tracks whether this org's infrastructure has
+    // been operator-approved for HIPAA workloads. Independent from the BAA
+    // (which is paperwork) — both must be in place to unlock healthcare-safe
+    // AI lanes.
+    hipaaDeploymentStatus: text("hipaa_deployment_status", {
+      enum: ["not_required", "required", "pending", "approved", "revoked"],
+    })
+      .notNull()
+      .default("not_required"),
     stripeCustomerId: text("stripe_customer_id"),
     // Token wallet — moved from legacy clients table.
     tokenBalance: integer("token_balance").notNull().default(0),
