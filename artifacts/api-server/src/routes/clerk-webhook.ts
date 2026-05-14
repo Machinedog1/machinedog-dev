@@ -171,11 +171,12 @@ async function handleMembershipCreated(
     return;
   }
 
-  // Map Clerk roles. We deliberately do NOT promote anyone to "admin" from a
-  // membership webhook unless Clerk explicitly says so — the role decision
-  // for Phase 0 admins (e.g. Tom) lives in the legacy backfill row and must
-  // be preserved by the email-stamp branch below.
-  const role = m.role === "admin" ? "admin" : "developer";
+  // Map Clerk roles to our internal enum. Clerk emits namespaced role
+  // strings (`org:admin`, `org:member`, `admin`, ...) — normalize the
+  // suffix and only treat the explicit admin role as admin. Everything
+  // else (members, billing, undefined) defaults to developer for Phase 0.
+  const clerkRoleSuffix = (m.role ?? "").toLowerCase().split(":").pop() ?? "";
+  const role = clerkRoleSuffix === "admin" ? "admin" : "developer";
 
   // First, try to stamp an existing legacy row that was invited under the
   // same email but hasn't been linked yet. This preserves the role assigned
@@ -202,10 +203,16 @@ async function handleMembershipCreated(
   }
 
   // No matching pending row → upsert by (organization_id, clerk_user_id).
-  // On conflict (re-delivery or membershipUpdated event), refresh role /
-  // email / status so Clerk stays the source of truth post-cutover. We do
-  // NOT touch acceptedAt on the conflict path so the original accept time
-  // is preserved.
+  // On conflict (re-delivery or membershipUpdated event):
+  //   - Always refresh email + status so Clerk stays the source of truth.
+  //   - NEVER downgrade an existing privileged role (admin / owner /
+  //     billing_admin) from a membership.updated event. We only allow the
+  //     conflict path to PROMOTE to admin, never demote. This is the
+  //     guard that keeps Tom (and any other backfilled admin/owner) from
+  //     getting silently downgraded if Clerk re-emits a generic member
+  //     event for the same row.
+  //   - acceptedAt is preserved on conflict so the original accept time
+  //     stays intact.
   await db
     .insert(organizationMembersTable)
     .values({
@@ -222,7 +229,12 @@ async function handleMembershipCreated(
         organizationMembersTable.clerkUserId,
       ],
       set: {
-        role,
+        role: sql`CASE
+          WHEN ${role} = 'admin' THEN 'admin'
+          WHEN ${organizationMembersTable.role} IN ('admin', 'owner', 'billing_admin')
+            THEN ${organizationMembersTable.role}
+          ELSE ${role}
+        END`,
         email,
         status: "active",
       },
