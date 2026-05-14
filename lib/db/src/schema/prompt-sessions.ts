@@ -1,15 +1,12 @@
 import { pgTable, serial, integer, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { clientsTable } from "./clients";
 import { projectsTable } from "./projects";
 import { organizationsTable } from "./organizations";
 
 export const promptSessionsTable = pgTable("prompt_sessions", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").notNull().references(() => clientsTable.id),
-  // Phase 0 foundation: nullable organization scope (mirrors clientId).
-  organizationId: integer("organization_id").references(() => organizationsTable.id),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id),
   projectId: integer("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   prompt: text("prompt").notNull(),
   output: text("output").notNull().default(""),

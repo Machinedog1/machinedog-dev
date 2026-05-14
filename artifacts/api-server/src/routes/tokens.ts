@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
-import { db, tokenPurchasesTable, clientsTable } from "@workspace/db";
+import { db, tokenPurchasesTable, organizationsTable } from "@workspace/db";
 import {
   ListTokenBundlesResponse,
   ListMyTokenPurchasesResponse,
@@ -29,7 +29,7 @@ router.get("/tokens/purchases", requireAuth, loadOrCreateClient, requireActiveCl
   const rows = await db
     .select()
     .from(tokenPurchasesTable)
-    .where(eq(tokenPurchasesTable.clientId, req.dbClient!.id))
+    .where(eq(tokenPurchasesTable.organizationId, req.dbClient!.id))
     .orderBy(desc(tokenPurchasesTable.createdAt));
   res.json(ListMyTokenPurchasesResponse.parse({ data: rows }));
 });
@@ -82,7 +82,7 @@ router.post("/tokens/checkout", requireAuth, loadOrCreateClient, requireActiveCl
 
   // Pre-record a pending purchase so the user sees it in history immediately
   await db.insert(tokenPurchasesTable).values({
-    clientId: req.dbClient!.id,
+    organizationId: req.dbClient!.id,
     bundleKey: bundle.key,
     tokensAdded: bundle.tokens,
     amountCents: Math.round(bundle.priceUsd * 100),

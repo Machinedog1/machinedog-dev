@@ -1,11 +1,11 @@
 import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { clientsTable } from "./clients";
+import { organizationsTable } from "./organizations";
 
 export const consultingBookingsTable = pgTable("consulting_bookings", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").notNull().references(() => clientsTable.id),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id),
   packageKey: text("package_key").notNull(),
   hoursTotal: integer("hours_total").notNull(),
   hoursUsed: integer("hours_used").notNull().default(0),

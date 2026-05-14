@@ -30,7 +30,7 @@ router.get("/consulting/bookings", requireAuth, loadOrCreateClient, requireActiv
   const rows = await db
     .select()
     .from(consultingBookingsTable)
-    .where(eq(consultingBookingsTable.clientId, req.dbClient!.id))
+    .where(eq(consultingBookingsTable.organizationId, req.dbClient!.id))
     .orderBy(desc(consultingBookingsTable.createdAt));
   res.json(ListMyConsultingBookingsResponse.parse({ data: rows }));
 });
@@ -82,7 +82,7 @@ router.post("/consulting/checkout", requireAuth, loadOrCreateClient, requireActi
   });
 
   await db.insert(consultingBookingsTable).values({
-    clientId: req.dbClient!.id,
+    organizationId: req.dbClient!.id,
     packageKey: pkg.key,
     hoursTotal: pkg.hours,
     amountCents: Math.round(pkg.priceUsd * 100),

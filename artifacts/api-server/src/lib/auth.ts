@@ -1,48 +1,22 @@
+/**
+ * Auth guards for routes. After the clients-table cutover, all auth flows
+ * through `loadClerkAndOrganization` which populates `req.organization`,
+ * `req.organizationMember`, and a `req.dbClient` compat shim. The legacy
+ * cookie-session path (loadSessionAndClient + lib/sessions.ts) is gone.
+ *
+ * The exported guards keep their pre-cutover names so route code does not
+ * need to change. They all check the compat shim populated by the Clerk
+ * middleware in app.ts.
+ */
+
 import { type Request, type Response, type NextFunction } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, clientsTable, projectMembersTable } from "@workspace/db";
-import { getSessionById, readSessionIdFromRequest, touchSession } from "./sessions";
-// Side-effect import: registers `req.dbClient` and `req.session` typings on
-// express-serve-static-core's Request interface. Do not remove.
+import { db, projectMembersTable, organizationMembersTable } from "@workspace/db";
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
-
-export async function loadSessionAndClient(
-  req: Request,
-  _res: Response,
-  next: NextFunction,
-): Promise<void> {
-  const sessionId = readSessionIdFromRequest(req);
-  if (!sessionId) {
-    next();
-    return;
-  }
-  const session = await getSessionById(sessionId);
-  if (!session) {
-    next();
-    return;
-  }
-  const [client] = await db
-    .select()
-    .from(clientsTable)
-    .where(eq(clientsTable.id, session.clientId));
-  if (!client) {
-    next();
-    return;
-  }
-  req.session = session;
-  req.dbClient = client;
-  // Touch session asynchronously — don't block the request
-  touchSession(session).catch(() => {});
-  // Pick up any pending project memberships in case the user accepted invites between requests
-  if (client.status === "active") {
-    attachPendingProjectMemberships(client.id, client.email).catch(() => {});
-  }
-  next();
-}
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   if (!req.dbClient) {
@@ -52,12 +26,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
-/**
- * Backward-compatibility no-op. The new global middleware
- * `loadSessionAndClient` already loads `req.dbClient` from the session, so
- * existing route guards `requireAuth, loadOrCreateClient, requireActiveClient`
- * continue to work unchanged.
- */
+/** No-op kept for backward compatibility. Org resolution happens in app.ts. */
 export function loadOrCreateClient(_req: Request, _res: Response, next: NextFunction): void {
   next();
 }
@@ -87,21 +56,32 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 }
 
 /**
- * When a client accepts a project-member invite (or signs in with an email
- * that has pending project invites), automatically attach them to the project.
+ * When a project member invite has been pending for an email that now matches
+ * the signed-in member, attach their organization to the membership row.
+ * Called from project routes after a successful sign-in flow.
  */
 export async function attachPendingProjectMemberships(
-  clientId: number,
+  organizationId: number,
   email: string,
 ): Promise<void> {
   const lowered = email.toLowerCase();
   await db
     .update(projectMembersTable)
-    .set({ clientId, status: "active", acceptedAt: new Date() })
+    .set({ organizationId, status: "active", acceptedAt: new Date() })
     .where(
       and(
         eq(projectMembersTable.email, lowered),
         eq(projectMembersTable.status, "pending"),
+      ),
+    );
+  // Same for org-level pending memberships invited under this email.
+  await db
+    .update(organizationMembersTable)
+    .set({ status: "active", acceptedAt: new Date() })
+    .where(
+      and(
+        eq(organizationMembersTable.email, lowered),
+        eq(organizationMembersTable.status, "pending"),
       ),
     );
 }

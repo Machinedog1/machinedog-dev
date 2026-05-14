@@ -145,7 +145,7 @@ router.post(
         interval: parsed.data.interval as BillingInterval,
         successUrl: `${origin}/billing?status=success&plan=${plan.key}`,
         cancelUrl: `${origin}/billing?status=cancelled`,
-        actorClientId: req.dbClient!.id,
+        actorOrganizationId: req.dbClient!.id,
       });
       res.json({ url: result.url, mock: result.mock });
     } catch (err) {
@@ -184,7 +184,7 @@ router.post(
         packKey: parsed.data.packKey,
         successUrl: `${origin}/tokens?status=success&pack=${pack.key}`,
         cancelUrl: `${origin}/tokens?status=cancelled`,
-        actorClientId: req.dbClient!.id,
+        actorOrganizationId: req.dbClient!.id,
       });
       res.json({ url: result.url, mock: result.mock });
     } catch (err) {

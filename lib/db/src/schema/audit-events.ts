@@ -2,24 +2,16 @@ import { pgTable, serial, text, integer, timestamp, jsonb, index } from "drizzle
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
-import { clientsTable } from "./clients";
 
-/**
- * Phase 1: forward-compatible audit events table. Phase 5 will add the full
- * audit UI on top of this. Every billing/token mutation writes a row here.
- */
 export const auditEventsTable = pgTable(
   "audit_events",
   {
     id: serial("id").primaryKey(),
     organizationId: integer("organization_id").references(() => organizationsTable.id),
-    actorClientId: integer("actor_client_id").references(() => clientsTable.id),
+    actorOrganizationId: integer("actor_organization_id").references(() => organizationsTable.id),
     actorEmail: text("actor_email"),
-    // category groups events for the UI ("billing", "tokens", "auth", "project", "admin", ...)
     category: text("category").notNull(),
-    // action describes what happened ("subscription.created", "tokens.deducted", ...)
     action: text("action").notNull(),
-    // free-form target reference, e.g. stripe sub id, project id, etc.
     targetType: text("target_type"),
     targetId: text("target_id"),
     metadata: jsonb("metadata"),

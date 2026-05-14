@@ -6,7 +6,7 @@ import {
   projectMembersTable,
   changeRequestsTable,
   changeRequestEventsTable,
-  clientsTable,
+  organizationsTable,
   type Project,
   type ChangeRequest,
   type ChangeRequestEvent,
@@ -75,7 +75,7 @@ async function loadViewableProject(
     .from(projectsTable)
     .where(eq(projectsTable.id, projectId));
   if (!project) return null;
-  if (project.clientId === clientId) {
+  if (project.organizationId === clientId) {
     return { project, role: "owner" };
   }
   const [member] = await db
@@ -86,7 +86,7 @@ async function loadViewableProject(
         eq(projectMembersTable.projectId, projectId),
         eq(projectMembersTable.status, "active"),
         or(
-          eq(projectMembersTable.clientId, clientId),
+          eq(projectMembersTable.organizationId, clientId),
           eq(projectMembersTable.email, clientEmail.toLowerCase()),
         ),
       ),
@@ -124,9 +124,9 @@ async function lookupEmails(
   const unique = Array.from(new Set(clientIds.filter((id) => Number.isFinite(id))));
   if (unique.length === 0) return new Map();
   const rows = await db
-    .select({ id: clientsTable.id, email: clientsTable.email })
-    .from(clientsTable)
-    .where(inArray(clientsTable.id, unique));
+    .select({ id: organizationsTable.id, email: organizationsTable.primaryEmail })
+    .from(organizationsTable)
+    .where(inArray(organizationsTable.id, unique));
   return new Map(rows.map((r) => [r.id, r.email]));
 }
 
@@ -137,8 +137,8 @@ function serializeChangeRequest(
   return {
     id: cr.id,
     projectId: cr.projectId,
-    requesterClientId: cr.requesterClientId,
-    requesterEmail: emails.get(cr.requesterClientId) ?? null,
+    organizationId: cr.organizationId,
+    requesterEmail: emails.get(cr.organizationId) ?? null,
     status: cr.status,
     title: cr.title,
     rawRequest: cr.rawRequest,
@@ -164,7 +164,7 @@ function serializeChangeRequest(
 interface SerializedChangeRequest {
   id: number;
   projectId: number;
-  requesterClientId: number;
+  organizationId: number;
   requesterEmail: string | null;
   status: ChangeRequestStatus;
   title: string;
@@ -191,14 +191,14 @@ async function appendEvent(
   changeRequestId: number,
   kind: ChangeRequestEventKind,
   message: string,
-  actorClientId: number | null,
+  actorOrganizationId: number | null,
   metadata: Record<string, unknown> | null = null,
 ): Promise<void> {
   await db.insert(changeRequestEventsTable).values({
     changeRequestId,
     kind,
     message,
-    actorClientId: actorClientId ?? null,
+    actorOrganizationId: actorOrganizationId ?? null,
     metadata: metadata ?? null,
   });
 }
@@ -225,7 +225,7 @@ async function updateChangeRequest(
 async function pushPatchToGitHub(
   cr: ChangeRequest,
   project: Project,
-  actorClientId: number | null,
+  actorOrganizationId: number | null,
 ): Promise<ChangeRequest> {
   const files = (cr.patchFiles as Array<{ path: string; contents: string }> | null) ?? [];
   if (!files.length) {
@@ -236,7 +236,7 @@ async function pushPatchToGitHub(
       cr.id,
       "comment",
       "GitHub repo not configured on this project — patch saved locally only.",
-      actorClientId,
+      actorOrganizationId,
     );
     return cr;
   }
@@ -251,7 +251,7 @@ async function pushPatchToGitHub(
     const baseSha = await resolveBranchSha(projectCfg);
     const tagName = buildSnapshotTag(cr.id);
     await createSnapshotTag(projectCfg, baseSha, tagName);
-    await appendEvent(cr.id, "snapshot_created", `Snapshot tag ${tagName} created.`, actorClientId, {
+    await appendEvent(cr.id, "snapshot_created", `Snapshot tag ${tagName} created.`, actorOrganizationId, {
       tag: tagName,
       sha: baseSha,
     });
@@ -264,7 +264,7 @@ async function pushPatchToGitHub(
       files,
       cr.patchSummary || `Machinedog change request #${cr.id}: ${cr.title}`,
     );
-    await appendEvent(cr.id, "branch_pushed", `Pushed branch ${branchName}.`, actorClientId, {
+    await appendEvent(cr.id, "branch_pushed", `Pushed branch ${branchName}.`, actorOrganizationId, {
       branch: branchName,
     });
 
@@ -282,7 +282,7 @@ async function pushPatchToGitHub(
       `[Machinedog] ${cr.title}`,
       prBody,
     );
-    await appendEvent(cr.id, "pr_opened", `Opened PR #${pr.prNumber}.`, actorClientId, {
+    await appendEvent(cr.id, "pr_opened", `Opened PR #${pr.prNumber}.`, actorOrganizationId, {
       prNumber: pr.prNumber,
       prUrl: pr.prUrl,
     });
@@ -308,7 +308,7 @@ async function pushPatchToGitHub(
         cr.id,
         "comment",
         `GitHub not authorized — ${err.message}`,
-        actorClientId,
+        actorOrganizationId,
       );
       return cr;
     }
@@ -318,7 +318,7 @@ async function pushPatchToGitHub(
       cr.id,
       "error",
       `GitHub push failed: ${message}`,
-      actorClientId,
+      actorOrganizationId,
     );
     // Don't flip the whole request to failed — the patch is still saved
     // locally and the operator can retry. Keep status at `patched`.
@@ -372,7 +372,7 @@ router.get(
       .from(changeRequestsTable)
       .where(eq(changeRequestsTable.projectId, access.project.id))
       .orderBy(desc(changeRequestsTable.createdAt));
-    const emails = await lookupEmails(rows.map((r) => r.requesterClientId));
+    const emails = await lookupEmails(rows.map((r) => r.organizationId));
     res.json({ data: rows.map((r) => serializeChangeRequest(r, emails)) });
   },
 );
@@ -414,7 +414,7 @@ router.post(
       .insert(changeRequestsTable)
       .values({
         projectId: access.project.id,
-        requesterClientId: client.id,
+        organizationId: client.id,
         status: "draft",
         title: (body.data.title?.trim() || fallbackTitle).slice(0, 200),
         rawRequest: body.data.rawRequest,
@@ -452,9 +452,9 @@ router.get(
       .orderBy(changeRequestEventsTable.createdAt);
 
     const actorIds = events
-      .map((e) => e.actorClientId)
+      .map((e) => e.actorOrganizationId)
       .filter((id): id is number => typeof id === "number");
-    const emails = await lookupEmails([loaded.cr.requesterClientId, ...actorIds]);
+    const emails = await lookupEmails([loaded.cr.organizationId, ...actorIds]);
 
     const project = loaded.ctx.project;
     res.json({
@@ -464,8 +464,8 @@ router.get(
         changeRequestId: e.changeRequestId,
         kind: e.kind,
         message: e.message,
-        actorClientId: e.actorClientId,
-        actorEmail: e.actorClientId ? emails.get(e.actorClientId) ?? null : null,
+        actorOrganizationId: e.actorOrganizationId,
+        actorEmail: e.actorOrganizationId ? emails.get(e.actorOrganizationId) ?? null : null,
         metadata: (e.metadata as Record<string, unknown> | null) ?? null,
         createdAt: e.createdAt,
       })),
@@ -543,7 +543,7 @@ router.post(
       fileCount: spec.files.length,
     });
 
-    const emails = await lookupEmails([updated.requesterClientId]);
+    const emails = await lookupEmails([updated.organizationId]);
     res.json(serializeChangeRequest(updated, emails));
   },
 );
@@ -616,7 +616,7 @@ router.post(
 
     // Try to push to GitHub. No-ops gracefully when github not configured.
     const pushed = await pushPatchToGitHub(patched, loaded.ctx.project, client.id);
-    const emails = await lookupEmails([pushed.requesterClientId]);
+    const emails = await lookupEmails([pushed.organizationId]);
     res.json(serializeChangeRequest(pushed, emails));
   },
 );
@@ -704,7 +704,7 @@ router.post(
           client.id,
         );
         // Keep CR at pr_open so the client (or operator) can retry.
-        const emailsForFail = await lookupEmails([cr.requesterClientId]);
+        const emailsForFail = await lookupEmails([cr.organizationId]);
         res.status(409).json({
           error: {
             code: "merge_failed",
@@ -754,7 +754,7 @@ router.post(
       );
     }
 
-    const emails = await lookupEmails([updated.requesterClientId]);
+    const emails = await lookupEmails([updated.organizationId]);
     res.json(serializeChangeRequest(updated, emails));
   },
 );
@@ -788,7 +788,7 @@ router.post(
       deployedAt: new Date(),
     });
     await appendEvent(cr.id, "deploy_marked", "Marked as deployed in production.", client.id);
-    const emails = await lookupEmails([updated.requesterClientId]);
+    const emails = await lookupEmails([updated.organizationId]);
     res.json(serializeChangeRequest(updated, emails));
   },
 );
@@ -963,7 +963,7 @@ router.post(
       .insert(changeRequestsTable)
       .values({
         projectId: access.project.id,
-        requesterClientId: client.id,
+        organizationId: client.id,
         status: "draft",
         title: (body.data.title?.trim() || fallbackTitle).slice(0, 200),
         rawRequest: body.data.rawRequest,
@@ -1024,9 +1024,9 @@ router.get(
       : [];
 
     const actorIds = events
-      .map((e) => e.actorClientId)
+      .map((e) => e.actorOrganizationId)
       .filter((id): id is number => typeof id === "number");
-    const allClientIds = [...crs.map((c) => c.requesterClientId), ...actorIds];
+    const allClientIds = [...crs.map((c) => c.organizationId), ...actorIds];
     const emails = await lookupEmails(allClientIds);
 
     const eventsByCr = new Map<number, ChangeRequestEvent[]>();
@@ -1055,8 +1055,8 @@ router.get(
           changeRequestId: e.changeRequestId,
           kind: e.kind,
           message: e.message,
-          actorClientId: e.actorClientId,
-          actorEmail: e.actorClientId ? emails.get(e.actorClientId) ?? null : null,
+          actorOrganizationId: e.actorOrganizationId,
+          actorEmail: e.actorOrganizationId ? emails.get(e.actorOrganizationId) ?? null : null,
           metadata: (e.metadata as Record<string, unknown> | null) ?? null,
           createdAt: e.createdAt,
         })),
@@ -1150,7 +1150,7 @@ router.post(
           client.id,
         );
         // Keep prior status — don't lie that it's rolled back.
-        const emailsForFail = await lookupEmails([cr.requesterClientId]);
+        const emailsForFail = await lookupEmails([cr.organizationId]);
         res.status(502).json({
           error: {
             code: "revert_failed",
@@ -1176,7 +1176,7 @@ router.post(
       );
     }
 
-    const emails = await lookupEmails([updated.requesterClientId]);
+    const emails = await lookupEmails([updated.organizationId]);
     res.json(serializeChangeRequest(updated, emails));
   },
 );

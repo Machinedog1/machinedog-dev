@@ -2,7 +2,6 @@ import { pgTable, serial, integer, text, timestamp, uniqueIndex } from "drizzle-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
-import { clientsTable } from "./clients";
 import { organizationsTable } from "./organizations";
 
 export const projectMembersTable = pgTable(
@@ -13,8 +12,6 @@ export const projectMembersTable = pgTable(
       .notNull()
       .references(() => projectsTable.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
-    clientId: integer("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
-    // Phase 0 foundation: nullable organization scope (mirrors project.organizationId).
     organizationId: integer("organization_id").references(() => organizationsTable.id),
     role: text("role", { enum: ["owner", "collaborator"] })
       .notNull()
@@ -22,7 +19,6 @@ export const projectMembersTable = pgTable(
     status: text("status", { enum: ["pending", "active", "removed"] })
       .notNull()
       .default("pending"),
-    invitedByClientId: integer("invited_by_client_id").references(() => clientsTable.id),
     invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   },

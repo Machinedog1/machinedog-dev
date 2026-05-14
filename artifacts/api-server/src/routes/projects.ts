@@ -7,13 +7,12 @@ import {
   projectCommentsTable,
   projectFilesTable,
   promptSessionsTable,
-  clientsTable,
+  organizationsTable,
   changeRequestsTable,
   changeRequestEventsTable,
   templatesTable,
   type Project,
 } from "@workspace/db";
-import { resolveOrganizationForClient } from "@workspace/db";
 import {
   ListMyProjectsResponse,
   CreateProjectBody,
@@ -106,7 +105,7 @@ async function getViewableProject(
     .where(eq(projectsTable.id, projectId));
   if (!project) return null;
 
-  if (project.clientId === clientId) {
+  if (project.organizationId === clientId) {
     return withOwnerRole(project);
   }
 
@@ -118,7 +117,7 @@ async function getViewableProject(
         eq(projectMembersTable.projectId, projectId),
         eq(projectMembersTable.status, "active"),
         or(
-          eq(projectMembersTable.clientId, clientId),
+          eq(projectMembersTable.organizationId, clientId),
           eq(projectMembersTable.email, clientEmail.toLowerCase()),
         ),
       ),
@@ -139,7 +138,7 @@ router.get(
     const owned = await db
       .select()
       .from(projectsTable)
-      .where(eq(projectsTable.clientId, client.id))
+      .where(eq(projectsTable.organizationId, client.id))
       .orderBy(desc(projectsTable.updatedAt));
 
     const memberships = await db
@@ -149,7 +148,7 @@ router.get(
         and(
           eq(projectMembersTable.status, "active"),
           or(
-            eq(projectMembersTable.clientId, client.id),
+            eq(projectMembersTable.organizationId, client.id),
             eq(projectMembersTable.email, client.email.toLowerCase()),
           ),
         ),
@@ -164,7 +163,7 @@ router.get(
             .where(
               and(
                 inArray(projectsTable.id, sharedIds),
-                ne(projectsTable.clientId, client.id),
+                ne(projectsTable.organizationId, client.id),
               ),
             )
             .orderBy(desc(projectsTable.updatedAt))
@@ -228,7 +227,7 @@ router.post(
       }
       // Healthcare templates are gated by org plan tier — surface a clear
       // upgrade-required error rather than silently allowing creation.
-      const resolved = await resolveOrganizationForClient(req.dbClient!.id);
+      const resolved = req.organization ? { organization: req.organization } : null;
       if (template.isHealthcare) {
         const tier = resolved?.organization.planType ?? null;
         if (tier !== "healthcare" && tier !== "enterprise") {
@@ -274,7 +273,7 @@ router.post(
       // endpoint share dedupe semantics, normalization, and the unique-
       // index race handling.
       const outcome = await importGithubAsProject({
-        clientId: req.dbClient!.id,
+        organizationId: req.dbClient!.id,
         owner: githubOwner,
         repo: githubRepo,
         defaultBranch: githubDefaultBranch,
@@ -295,7 +294,7 @@ router.post(
       [row] = await db
         .insert(projectsTable)
         .values({
-          clientId: req.dbClient!.id,
+          organizationId: req.dbClient!.id,
           title: data.title,
           description: data.description,
           summary: data.summary ?? "",
@@ -352,7 +351,7 @@ router.post(
             });
             return {
               projectId: row.id,
-              uploadedByClientId: req.dbClient!.id,
+              uploadedByOrganizationId: req.dbClient!.id,
               name: f.path,
               contentType: f.contentType ?? "text/plain",
               sizeBytes: Buffer.byteLength(f.contents, "utf8"),
@@ -380,14 +379,14 @@ router.post(
     // today; premium-template introduction (Phase 4) will harden the path.
     if (template && (template.tokenCost ?? 0) > 0) {
       try {
-        const resolved = await resolveOrganizationForClient(req.dbClient!.id);
+        const resolved = req.organization ? { organization: req.organization } : null;
         if (resolved) {
           await deductTokens(
             resolved.organization.id,
             template.tokenCost,
             "template",
             {
-              userId: req.dbClient!.id,
+              actorOrganizationId: req.dbClient!.id,
               projectId: row.id,
               description: `Template "${template.slug}" creation: -${template.tokenCost}`,
               metadata: { templateSlug: template.slug, templateName: template.name },
@@ -636,7 +635,7 @@ router.post("/projects/prod-heartbeat", async (req, res): Promise<void> => {
             changeRequestId: cr.id,
             kind: "deploy_auto_detected" as const,
             message: "Production boot detected after merge — auto-marked deployed.",
-            actorClientId: null,
+            actorOrganizationId: null,
             metadata: {
               bootedAt: bootedAt.toISOString(),
               releaseMarker: releaseMarker ?? null,
@@ -785,7 +784,7 @@ router.patch(
             : null,
         }),
       })
-      .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.clientId, req.dbClient!.id)))
+      .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.dbClient!.id)))
       .returning();
     if (!row) {
       res.status(404).json({ error: "Not found" });
@@ -799,7 +798,7 @@ async function ensureOwner(projectId: number, clientId: number): Promise<Project
   const [project] = await db
     .select()
     .from(projectsTable)
-    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.clientId, clientId)));
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.organizationId, clientId)));
   return project ?? null;
 }
 
@@ -887,8 +886,8 @@ router.post(
 
     const [existingClient] = await db
       .select()
-      .from(clientsTable)
-      .where(eq(clientsTable.email, email));
+      .from(organizationsTable)
+      .where(eq(organizationsTable.primaryEmail, email));
 
     const [existingMember] = await db
       .select()
@@ -906,17 +905,16 @@ router.post(
         .json({ error: "This account is suspended and cannot be invited." });
       return;
     }
-    const isClientActive =
-      existingClient?.status === "active" && !!existingClient.passwordHash;
+    const isClientActive = existingClient?.status === "active";
     let row;
     if (existingMember) {
       [row] = await db
         .update(projectMembersTable)
         .set({
           status: isClientActive ? "active" : "pending",
-          clientId: isClientActive
+          organizationId: isClientActive
             ? existingClient!.id
-            : (existingMember.clientId ?? null),
+            : (existingMember.organizationId ?? null),
           acceptedAt: isClientActive ? new Date() : existingMember.acceptedAt,
         })
         .where(eq(projectMembersTable.id, existingMember.id))
@@ -927,57 +925,24 @@ router.post(
         .values({
           projectId: project.id,
           email,
-          clientId: isClientActive ? existingClient!.id : null,
+          organizationId: isClientActive ? existingClient!.id : null,
           role: "collaborator",
           status: isClientActive ? "active" : "pending",
-          invitedByClientId: req.dbClient!.id,
           acceptedAt: isClientActive ? new Date() : undefined,
         })
         .returning();
     }
 
-    // Make sure a client row exists for this email and, when the invitee
-    // can't sign in yet, mint a fresh invite token so the email can take
-    // them straight to /accept-invite. Active accounts already have a
-    // password and don't need a token.
-    let inviteToken: string | null = null;
-    const needsToken =
-      !existingClient || existingClient.status !== "active" || !existingClient.passwordHash;
-
-    if (!existingClient) {
-      const newToken = generateSecureToken(32);
-      const expiresAt = new Date(Date.now() + PROJECT_INVITE_TTL_MS);
-      await db
-        .insert(clientsTable)
-        .values({
-          userId: `pending:${email}`,
-          email,
-          status: "invited",
-          inviteToken: newToken,
-          inviteTokenExpiresAt: expiresAt,
-        })
-        .onConflictDoUpdate({
-          target: clientsTable.email,
-          set: { inviteToken: newToken, inviteTokenExpiresAt: expiresAt },
-        });
-      inviteToken = newToken;
-    } else if (needsToken) {
-      const newToken = generateSecureToken(32);
-      const expiresAt = new Date(Date.now() + PROJECT_INVITE_TTL_MS);
-      await db
-        .update(clientsTable)
-        .set({ inviteToken: newToken, inviteTokenExpiresAt: expiresAt })
-        .where(eq(clientsTable.id, existingClient.id));
-      inviteToken = newToken;
-    }
-
+    // With Clerk, account creation/invitation is handled by Clerk itself.
+    // We just notify the invitee — when they sign in via Clerk, the
+    // membership row gets linked by email match in activatePendingMemberships.
     try {
       await sendProjectInviteEmail({
         to: email,
         projectTitle: project.title,
         invitedByEmail: req.dbClient!.email,
         alreadyHasAccount: Boolean(existingClient && existingClient.status === "active"),
-        inviteToken,
+        inviteToken: null,
       });
     } catch (err) {
       logger.warn({ err }, "Failed to send project invite email");
@@ -1051,13 +1016,13 @@ router.get(
       .select({
         id: projectCommentsTable.id,
         projectId: projectCommentsTable.projectId,
-        clientId: projectCommentsTable.clientId,
-        clientEmail: clientsTable.email,
+        clientId: projectCommentsTable.organizationId,
+        clientEmail: organizationsTable.primaryEmail,
         body: projectCommentsTable.body,
         createdAt: projectCommentsTable.createdAt,
       })
       .from(projectCommentsTable)
-      .leftJoin(clientsTable, eq(clientsTable.id, projectCommentsTable.clientId))
+      .leftJoin(organizationsTable, eq(organizationsTable.id, projectCommentsTable.organizationId))
       .where(eq(projectCommentsTable.projectId, project.id))
       .orderBy(asc(projectCommentsTable.createdAt));
     res.json(
@@ -1102,14 +1067,14 @@ router.post(
       .insert(projectCommentsTable)
       .values({
         projectId: project.id,
-        clientId: req.dbClient!.id,
+        organizationId: req.dbClient!.id,
         body: trimmed,
       })
       .returning();
     res.status(201).json({
       id: row.id,
       projectId: row.projectId,
-      clientId: row.clientId,
+      clientId: row.organizationId,
       clientEmail: req.dbClient!.email,
       body: row.body,
       createdAt: row.createdAt,
@@ -1150,7 +1115,7 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isAuthor = comment.clientId === req.dbClient!.id;
+    const isAuthor = comment.organizationId === req.dbClient!.id;
     const isOwner = project.viewerRole === "owner";
     if (!isAuthor && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
@@ -1238,17 +1203,17 @@ router.post(
 
     const tokensUsed = computeChargedTokens(result.totalTokens, client.tokenBalance);
     await db
-      .update(clientsTable)
+      .update(organizationsTable)
       .set({
-        tokenBalance: sql`GREATEST(${clientsTable.tokenBalance} - ${tokensUsed}, 0)`,
-        totalTokensUsed: sql`${clientsTable.totalTokensUsed} + ${tokensUsed}`,
+        tokenBalance: sql`GREATEST(${organizationsTable.tokenBalance} - ${tokensUsed}, 0)`,
+        totalTokensUsed: sql`${organizationsTable.totalTokensUsed} + ${tokensUsed}`,
       })
-      .where(eq(clientsTable.id, client.id));
+      .where(eq(organizationsTable.id, client.id));
 
     const [session] = await db
       .insert(promptSessionsTable)
       .values({
-        clientId: client.id,
+        organizationId: client.id,
         projectId: project.id,
         prompt: body.data.prompt,
         output: result.output,
@@ -1287,8 +1252,8 @@ router.get(
       .select({
         id: projectFilesTable.id,
         projectId: projectFilesTable.projectId,
-        uploadedByClientId: projectFilesTable.uploadedByClientId,
-        uploadedByEmail: clientsTable.email,
+        uploadedByOrganizationId: projectFilesTable.uploadedByOrganizationId,
+        uploadedByEmail: organizationsTable.primaryEmail,
         name: projectFilesTable.name,
         contentType: projectFilesTable.contentType,
         sizeBytes: projectFilesTable.sizeBytes,
@@ -1296,7 +1261,7 @@ router.get(
         createdAt: projectFilesTable.createdAt,
       })
       .from(projectFilesTable)
-      .leftJoin(clientsTable, eq(clientsTable.id, projectFilesTable.uploadedByClientId))
+      .leftJoin(organizationsTable, eq(organizationsTable.id, projectFilesTable.uploadedByOrganizationId))
       .where(eq(projectFilesTable.projectId, project.id))
       .orderBy(desc(projectFilesTable.createdAt));
     res.json(
@@ -1340,7 +1305,7 @@ router.post(
       .insert(projectFilesTable)
       .values({
         projectId: project.id,
-        uploadedByClientId: req.dbClient!.id,
+        uploadedByOrganizationId: req.dbClient!.id,
         name: body.data.name,
         contentType: body.data.contentType,
         sizeBytes: body.data.sizeBytes,
@@ -1350,7 +1315,7 @@ router.post(
     res.status(201).json({
       id: row.id,
       projectId: row.projectId,
-      uploadedByClientId: row.uploadedByClientId,
+      uploadedByOrganizationId: row.uploadedByOrganizationId,
       uploadedByEmail: req.dbClient!.email,
       name: row.name,
       contentType: row.contentType,
@@ -1394,7 +1359,7 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isUploader = file.uploadedByClientId === req.dbClient!.id;
+    const isUploader = file.uploadedByOrganizationId === req.dbClient!.id;
     const isOwner = project.viewerRole === "owner";
     if (!isUploader && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
@@ -1681,7 +1646,7 @@ router.post(
         .insert(projectFilesTable)
         .values({
           projectId,
-          uploadedByClientId: req.dbClient!.id,
+          uploadedByOrganizationId: req.dbClient!.id,
           name,
           contentType,
           sizeBytes: Buffer.byteLength(content, "utf8"),
@@ -2217,7 +2182,9 @@ router.post(
         .select()
         .from(projectFilesTable)
         .where(eq(projectFilesTable.projectId, projectId));
-      const byName = new Map(existing.map((f) => [f.name, f]));
+      const byName = new Map<string, typeof existing[number]>(
+        existing.map((f) => [f.name, f]),
+      );
       const storage = new ObjectStorageService();
       let created = 0;
       let updated = 0;
@@ -2254,7 +2221,7 @@ router.post(
           });
           await db.insert(projectFilesTable).values({
             projectId,
-            uploadedByClientId: req.dbClient!.id,
+            uploadedByOrganizationId: req.dbClient!.id,
             name: f.path,
             contentType: "text/plain",
             sizeBytes: Buffer.byteLength(f.contents, "utf8"),
@@ -2293,7 +2260,7 @@ export async function activatePendingMemberships(
   const lowered = email.toLowerCase();
   await db
     .update(projectMembersTable)
-    .set({ clientId, status: "active", acceptedAt: new Date() })
+    .set({ organizationId: clientId, status: "active", acceptedAt: new Date() })
     .where(
       and(
         eq(projectMembersTable.email, lowered),
@@ -2301,10 +2268,10 @@ export async function activatePendingMemberships(
       ),
     );
 
-  // Also link any rows that were created before clientId was known
+  // Also link any rows that were created before organizationId was known
   await db
     .update(projectMembersTable)
-    .set({ clientId })
+    .set({ organizationId: clientId })
     .where(
       and(
         eq(projectMembersTable.email, lowered),

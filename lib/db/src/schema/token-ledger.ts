@@ -2,15 +2,8 @@ import { pgTable, serial, text, integer, timestamp, jsonb, index } from "drizzle
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
-import { clientsTable } from "./clients";
 import { projectsTable } from "./projects";
 
-/**
- * Phase 1: append-only token ledger. Every grant, purchase, deduction, or
- * admin adjustment writes a row with `balanceAfter` so the org's balance is
- * always reconstructable. Idempotent on `stripeEventId` for Stripe-driven
- * events (unique constraint).
- */
 export const tokenLedgerTable = pgTable(
   "token_ledger",
   {
@@ -18,8 +11,6 @@ export const tokenLedgerTable = pgTable(
     organizationId: integer("organization_id")
       .notNull()
       .references(() => organizationsTable.id),
-    // Optional actor (the user who triggered the deduction, if any).
-    userId: integer("user_id").references(() => clientsTable.id),
     projectId: integer("project_id").references(() => projectsTable.id),
     type: text("type", {
       enum: [
@@ -35,7 +26,6 @@ export const tokenLedgerTable = pgTable(
         "refund",
       ],
     }).notNull(),
-    // Positive for credits, negative for deductions.
     amount: integer("amount").notNull(),
     balanceAfter: integer("balance_after").notNull(),
     description: text("description"),

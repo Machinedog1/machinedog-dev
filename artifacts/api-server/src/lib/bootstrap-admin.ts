@@ -1,65 +1,62 @@
-import { db, clientsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
-import { hashPassword } from "./passwords";
+import { db, organizationsTable, organizationMembersTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { logger } from "./logger";
 
 /**
- * One-shot admin bootstrap. Runs at API server startup. If both
- * BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD are present, ensures a
- * client row exists for that email with admin=true and the given password.
+ * One-shot admin bootstrap. If BOOTSTRAP_ADMIN_EMAIL is set, ensures an
+ * `organizations` row exists for that admin user with an `organization_members`
+ * row marked role=admin so the email can be promoted to admin via Clerk
+ * webhook on first sign-in. Idempotent.
  *
- * Idempotent — safe to run on every boot. Useful for first-deploy admin
- * provisioning into an empty production database.
+ * Note: passwords are no longer used (Clerk owns identity). We just provision
+ * the org + admin membership shell so the user can sign in.
  */
 export async function bootstrapAdmin(): Promise<void> {
   const rawEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
-  const rawPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-
-  if (!rawEmail || !rawPassword) {
-    return;
-  }
+  if (!rawEmail) return;
 
   const email = rawEmail.trim().toLowerCase();
   if (!email.includes("@")) {
     logger.warn({ email: rawEmail }, "BOOTSTRAP_ADMIN_EMAIL is not a valid email; skipping");
     return;
   }
-  if (rawPassword.length < 8) {
-    logger.warn("BOOTSTRAP_ADMIN_PASSWORD is too short (min 8 chars); skipping");
-    return;
-  }
 
   try {
-    const passwordHash = await hashPassword(rawPassword);
     const [existing] = await db
       .select()
-      .from(clientsTable)
-      .where(eq(clientsTable.email, email));
+      .from(organizationMembersTable)
+      .where(eq(organizationMembersTable.email, email));
 
     if (existing) {
-      await db
-        .update(clientsTable)
-        .set({
-          passwordHash,
-          status: "active",
-          isAdmin: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(clientsTable.id, existing.id));
-      logger.info({ email, action: "updated" }, "Bootstrap admin updated");
-    } else {
-      await db.insert(clientsTable).values({
-        email,
-        passwordHash,
-        status: "active",
-        isAdmin: true,
-        tokenBalance: 1_000_000,
-        totalTokensUsed: 0,
-        createdAt: sql`now()`,
-        updatedAt: sql`now()`,
-      });
-      logger.info({ email, action: "created" }, "Bootstrap admin created");
+      if (existing.role !== "admin") {
+        await db
+          .update(organizationMembersTable)
+          .set({ role: "admin", status: "active" })
+          .where(eq(organizationMembersTable.id, existing.id));
+        logger.info({ email, action: "promoted" }, "Bootstrap admin promoted to admin");
+      }
+      return;
     }
+
+    // Create a personal admin org + membership shell.
+    const [org] = await db
+      .insert(organizationsTable)
+      .values({
+        name: `${email} (admin)`,
+        primaryEmail: email,
+        planType: "enterprise",
+        planStatus: "active",
+        status: "active",
+        tokenBalance: 1_000_000,
+      })
+      .returning();
+    await db.insert(organizationMembersTable).values({
+      organizationId: org.id,
+      email,
+      role: "admin",
+      status: "active",
+    });
+    logger.info({ email, orgId: org.id, action: "created" }, "Bootstrap admin org created");
   } catch (err) {
     logger.error({ err }, "bootstrapAdmin failed");
   }

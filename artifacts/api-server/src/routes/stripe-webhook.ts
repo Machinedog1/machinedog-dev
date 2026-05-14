@@ -2,7 +2,7 @@ import { Router, type IRouter, raw } from "express";
 import { eq, sql } from "drizzle-orm";
 import {
   db,
-  clientsTable,
+  organizationsTable,
   tokenPurchasesTable,
   consultingBookingsTable,
   buildOrdersTable,
@@ -296,11 +296,11 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
         .where(eq(tokenPurchasesTable.stripeSessionId, session.id));
       // Credit the balance
       await db
-        .update(clientsTable)
+        .update(organizationsTable)
         .set({
-          tokenBalance: sql`${clientsTable.tokenBalance} + ${tokens}`,
+          tokenBalance: sql`${organizationsTable.tokenBalance} + ${tokens}`,
         })
-        .where(eq(clientsTable.id, clientId));
+        .where(eq(organizationsTable.id, clientId));
       req.log.info({ clientId, tokens, bundleKey }, "Tokens credited via Stripe");
     } else if (kind === "consulting") {
       await db
@@ -314,13 +314,13 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
       const subscriptionId =
         typeof session.subscription === "string" ? session.subscription : null;
       await db
-        .update(clientsTable)
+        .update(organizationsTable)
         .set({
           stripeCustomerId: customerId ?? undefined,
           portalSubscriptionId: subscriptionId ?? undefined,
           portalSubscriptionStatus: "active",
         })
-        .where(eq(clientsTable.id, clientId));
+        .where(eq(organizationsTable.id, clientId));
       req.log.info({ clientId, subscriptionId }, "Portal Access subscription activated");
     }
   }
@@ -375,12 +375,12 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
       };
 
       if (clientId && !Number.isNaN(clientId)) {
-        await db.update(clientsTable).set(updateValues).where(eq(clientsTable.id, clientId));
+        await db.update(organizationsTable).set(updateValues).where(eq(organizationsTable.id, clientId));
       } else if (customerId) {
         await db
-          .update(clientsTable)
+          .update(organizationsTable)
           .set(updateValues)
-          .where(eq(clientsTable.stripeCustomerId, customerId));
+          .where(eq(organizationsTable.stripeCustomerId, customerId));
       }
       req.log.info(
         { clientId, subscriptionId: sub.id, status: updateValues.portalSubscriptionStatus },

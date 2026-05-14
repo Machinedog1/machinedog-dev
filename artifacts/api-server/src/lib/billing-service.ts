@@ -99,7 +99,7 @@ export interface CreatePlanCheckoutOpts {
   interval: BillingInterval;
   successUrl: string;
   cancelUrl: string;
-  actorClientId?: number | null;
+  actorOrganizationId?: number | null;
 }
 
 export async function createPlanCheckoutSession(
@@ -153,7 +153,7 @@ export async function createPlanCheckoutSession(
 
   await recordAuditEvent({
     organizationId: opts.organizationId,
-    actorClientId: opts.actorClientId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
     action: "checkout.created",
     targetType: "stripe_checkout_session",
@@ -170,7 +170,7 @@ export interface CreateTokenPackCheckoutOpts {
   packKey: string;
   successUrl: string;
   cancelUrl: string;
-  actorClientId?: number | null;
+  actorOrganizationId?: number | null;
 }
 
 export async function createTokenPackCheckoutSession(
@@ -231,7 +231,7 @@ export async function createTokenPackCheckoutSession(
 
   await recordAuditEvent({
     organizationId: opts.organizationId,
-    actorClientId: opts.actorClientId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
     action: "token_pack.checkout.created",
     targetType: "stripe_checkout_session",
@@ -502,12 +502,12 @@ async function mockPlanCheckout(opts: MockPlanArgs): Promise<{ url: string | nul
     stripeEventId: `mock:${fakeSubId}`,
     source: "dev_mock",
     description: `[demo] ${opts.plan.name} ${opts.interval} plan grant`,
-    userId: opts.actorClientId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     metadata: { interval: opts.interval, months },
   });
   await recordAuditEvent({
     organizationId: opts.organizationId,
-    actorClientId: opts.actorClientId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
     action: "subscription.dev_mock",
     targetType: "subscription",
@@ -526,11 +526,11 @@ async function mockTokenPackCheckout(opts: MockPackArgs): Promise<{ url: string 
     stripeEventId: `mock:${fakeSessionId}`,
     source: "dev_mock",
     description: `[demo] ${opts.pack.name} purchase`,
-    userId: opts.actorClientId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
   });
   await recordAuditEvent({
     organizationId: opts.organizationId,
-    actorClientId: opts.actorClientId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
     action: "token_pack.dev_mock",
     targetType: "checkout",

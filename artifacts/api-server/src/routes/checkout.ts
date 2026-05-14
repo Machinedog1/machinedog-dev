@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, buildOrdersTable, clientsTable } from "@workspace/db";
+import { db, buildOrdersTable, organizationsTable } from "@workspace/db";
 import {
   CreateBuildCheckoutBody,
   CreateBuildCheckoutResponse,

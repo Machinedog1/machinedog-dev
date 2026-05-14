@@ -4,7 +4,8 @@ import { logger } from "./logger";
 
 export interface AuditEventInput {
   organizationId?: number | null;
-  actorClientId?: number | null;
+  /** Organization id of the actor that triggered the event (often same as organizationId). */
+  actorOrganizationId?: number | null;
   actorEmail?: string | null;
   category: string;
   action: string;
@@ -19,7 +20,7 @@ export async function recordAuditEvent(event: AuditEventInput): Promise<void> {
   try {
     await db.insert(auditEventsTable).values({
       organizationId: event.organizationId ?? null,
-      actorClientId: event.actorClientId ?? null,
+      actorOrganizationId: event.actorOrganizationId ?? null,
       actorEmail: event.actorEmail ?? null,
       category: event.category,
       action: event.action,
@@ -30,7 +31,6 @@ export async function recordAuditEvent(event: AuditEventInput): Promise<void> {
       userAgent: event.userAgent ?? null,
     });
   } catch (err) {
-    // Audit must never block the parent operation. Log + swallow.
     logger.error({ err, event }, "Failed to record audit event");
   }
 }

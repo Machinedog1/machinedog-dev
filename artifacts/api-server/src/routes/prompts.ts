@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { db, promptSessionsTable, clientsTable } from "@workspace/db";
+import { db, promptSessionsTable, organizationsTable } from "@workspace/db";
 import {
   ListMyPromptsQueryParams,
   ListMyPromptsResponse,
@@ -28,14 +28,14 @@ router.get("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, asy
   const rows = await db
     .select()
     .from(promptSessionsTable)
-    .where(eq(promptSessionsTable.clientId, req.dbClient!.id))
+    .where(eq(promptSessionsTable.organizationId, req.dbClient!.id))
     .orderBy(desc(promptSessionsTable.createdAt))
     .limit(limit)
     .offset(offset);
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(promptSessionsTable)
-    .where(eq(promptSessionsTable.clientId, req.dbClient!.id));
+    .where(eq(promptSessionsTable.organizationId, req.dbClient!.id));
   res.json(ListMyPromptsResponse.parse({ data: rows, total: Number(count) }));
 });
 
@@ -64,18 +64,18 @@ router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, as
   // so we never overdraw. See lib/billing.ts for the multiplier.
   const tokensUsed = computeChargedTokens(result.totalTokens, client.tokenBalance);
   const [updatedClient] = await db
-    .update(clientsTable)
+    .update(organizationsTable)
     .set({
-      tokenBalance: sql`GREATEST(${clientsTable.tokenBalance} - ${tokensUsed}, 0)`,
-      totalTokensUsed: sql`${clientsTable.totalTokensUsed} + ${tokensUsed}`,
+      tokenBalance: sql`GREATEST(${organizationsTable.tokenBalance} - ${tokensUsed}, 0)`,
+      totalTokensUsed: sql`${organizationsTable.totalTokensUsed} + ${tokensUsed}`,
     })
-    .where(eq(clientsTable.id, client.id))
+    .where(eq(organizationsTable.id, client.id))
     .returning();
 
   const [session] = await db
     .insert(promptSessionsTable)
     .values({
-      clientId: client.id,
+      organizationId: client.id,
       prompt: parsed.data.prompt,
       output: result.output,
       tokensUsed,
@@ -105,7 +105,7 @@ router.get("/prompts/:id", requireAuth, loadOrCreateClient, async (req, res): Pr
   const [row] = await db
     .select()
     .from(promptSessionsTable)
-    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.clientId, req.dbClient!.id)));
+    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.organizationId, req.dbClient!.id)));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -137,7 +137,7 @@ router.post(
       .where(
         and(
           eq(promptSessionsTable.id, params.data.id),
-          eq(promptSessionsTable.clientId, req.dbClient!.id),
+          eq(promptSessionsTable.organizationId, req.dbClient!.id),
         ),
       );
 
@@ -159,7 +159,7 @@ router.post(
       .where(
         and(
           eq(promptSessionsTable.id, params.data.id),
-          eq(promptSessionsTable.clientId, req.dbClient!.id),
+          eq(promptSessionsTable.organizationId, req.dbClient!.id),
         ),
       )
       .returning();

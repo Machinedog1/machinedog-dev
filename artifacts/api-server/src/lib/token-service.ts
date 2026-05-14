@@ -2,7 +2,6 @@ import { eq, sql, desc } from "drizzle-orm";
 import {
   db,
   organizationsTable,
-  clientsTable,
   tokenLedgerTable,
   type TokenLedger,
 } from "@workspace/db";
@@ -12,12 +11,12 @@ export type TokenLedgerType = TokenLedger["type"];
 export type TokenLedgerSource = TokenLedger["source"];
 
 interface MutationOpts {
-  userId?: number | null;
+  /** Organization id of the actor (often same as the target org). */
+  actorOrganizationId?: number | null;
   projectId?: number | null;
   description?: string | null;
   metadata?: Record<string, unknown> | null;
-  /** Stripe event id for idempotency. If a row with this id already exists,
-   *  we return that row instead of inserting a duplicate. */
+  /** Stripe event id for idempotency. */
   stripeEventId?: string | null;
   source?: TokenLedgerSource;
 }
@@ -30,15 +29,9 @@ interface MutationResult {
 }
 
 /**
- * Centralized token mutation API. All callers go through here so the ledger
- * stays append-only, balances stay consistent, and audit events fire on every
- * change. Mutations run inside a SERIALIZABLE-ish transaction with a row lock
- * on the legacy clients row (the source of truth for `tokenBalance` until the
- * org-cutover) so concurrent deductions cannot double-spend.
- *
- * Phase 1 stores balance on `clients.tokenBalance` (legacy) AND mirrors every
- * change to the org-scoped ledger. Once Phase 0 cutover lands, the legacy
- * column will be retired in favor of a derived balance from the ledger.
+ * Centralized token mutation API. Source of truth is `organizations.token_balance`.
+ * Each mutation acquires a row lock on the org and re-checks idempotency under
+ * the lock so concurrent duplicate-webhook workers serialize safely.
  */
 async function mutate(
   organizationId: number,
@@ -51,43 +44,16 @@ async function mutate(
   }
 
   return await db.transaction(async (tx) => {
-    // Resolve the legacy clientId backing this org so we know which row to
-    // lock. The lock is acquired BEFORE the idempotency re-check so that
-    // concurrent duplicate-webhook workers serialize on the same row: the
-    // loser blocks on the lock, then sees the winner's committed ledger
-    // row when it re-checks under its own lock. This is what makes
-    // stripeEventId truly idempotent under concurrency without relying on
-    // the unique-violation rollback (which would also undo the balance
-    // update we already applied in this transaction).
-    const [org] = await tx
-      .select({ id: organizationsTable.id, legacyClientId: organizationsTable.legacyClientId })
-      .from(organizationsTable)
-      .where(eq(organizationsTable.id, organizationId))
-      .limit(1);
-    if (!org) {
+    const lockedRows = await tx.execute(
+      sql`SELECT id, token_balance FROM organizations WHERE id = ${organizationId} FOR UPDATE`,
+    );
+    const lockedOrg = (lockedRows.rows?.[0] ?? null) as
+      | { id: number; token_balance: number }
+      | null;
+    if (!lockedOrg) {
       throw new Error(`Organization ${organizationId} not found`);
     }
 
-    // Acquire the row lock that scopes balance reads/writes for this org.
-    let lockedClientRow: { id: number; token_balance: number } | null = null;
-    if (org.legacyClientId) {
-      const lockedRows = await tx.execute(
-        sql`SELECT id, token_balance FROM clients WHERE id = ${org.legacyClientId} FOR UPDATE`,
-      );
-      lockedClientRow = (lockedRows.rows?.[0] ?? null) as
-        | { id: number; token_balance: number }
-        | null;
-      if (!lockedClientRow) {
-        throw new Error(`Backing client ${org.legacyClientId} not found`);
-      }
-    } else {
-      await tx.execute(
-        sql`SELECT id FROM organizations WHERE id = ${organizationId} FOR UPDATE`,
-      );
-    }
-
-    // Idempotency re-check UNDER the lock. If a concurrent worker already
-    // applied this stripe event, return its row without touching balances.
     if (opts.stripeEventId) {
       const [existing] = await tx
         .select()
@@ -99,39 +65,25 @@ async function mutate(
       }
     }
 
-    let balanceAfter: number;
-    if (org.legacyClientId && lockedClientRow) {
-      const current = Number(lockedClientRow.token_balance) || 0;
-      const next = current + amount;
-      if (next < 0) {
-        throw new Error(`Insufficient token balance (have ${current}, need ${-amount})`);
-      }
-      const totalUsedDelta = amount < 0 ? -amount : 0;
-      await tx
-        .update(clientsTable)
-        .set({
-          tokenBalance: next,
-          totalTokensUsed: sql`${clientsTable.totalTokensUsed} + ${totalUsedDelta}`,
-        })
-        .where(eq(clientsTable.id, org.legacyClientId));
-      balanceAfter = next;
-    } else {
-      const [{ sum }] = (await tx.execute(
-        sql`SELECT COALESCE(SUM(amount), 0)::int AS sum FROM token_ledger WHERE organization_id = ${organizationId}`,
-      )).rows as Array<{ sum: number }>;
-      const current = Number(sum) || 0;
-      const next = current + amount;
-      if (next < 0) {
-        throw new Error(`Insufficient token balance (have ${current}, need ${-amount})`);
-      }
-      balanceAfter = next;
+    const current = Number(lockedOrg.token_balance) || 0;
+    const next = current + amount;
+    if (next < 0) {
+      throw new Error(`Insufficient token balance (have ${current}, need ${-amount})`);
     }
+    const totalUsedDelta = amount < 0 ? -amount : 0;
+    await tx
+      .update(organizationsTable)
+      .set({
+        tokenBalance: next,
+        totalTokensUsed: sql`${organizationsTable.totalTokensUsed} + ${totalUsedDelta}`,
+      })
+      .where(eq(organizationsTable.id, organizationId));
+    const balanceAfter = next;
 
     const [ledger] = await tx
       .insert(tokenLedgerTable)
       .values({
         organizationId,
-        userId: opts.userId ?? null,
         projectId: opts.projectId ?? null,
         type,
         amount,
@@ -148,23 +100,11 @@ async function mutate(
 
 export async function getBalance(organizationId: number): Promise<number> {
   const [org] = await db
-    .select({ legacyClientId: organizationsTable.legacyClientId })
+    .select({ balance: organizationsTable.tokenBalance })
     .from(organizationsTable)
     .where(eq(organizationsTable.id, organizationId))
     .limit(1);
-  if (!org) return 0;
-  if (org.legacyClientId) {
-    const [c] = await db
-      .select({ balance: clientsTable.tokenBalance })
-      .from(clientsTable)
-      .where(eq(clientsTable.id, org.legacyClientId))
-      .limit(1);
-    return c?.balance ?? 0;
-  }
-  const [{ sum }] = (await db.execute(
-    sql`SELECT COALESCE(SUM(amount), 0)::int AS sum FROM token_ledger WHERE organization_id = ${organizationId}`,
-  )).rows as Array<{ sum: number }>;
-  return Number(sum) || 0;
+  return org?.balance ?? 0;
 }
 
 export async function grantMonthly(
@@ -178,7 +118,7 @@ export async function grantMonthly(
   });
   await recordAuditEvent({
     organizationId,
-    actorClientId: opts.userId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
     action: "grant.monthly",
     targetType: "ledger",
@@ -199,7 +139,7 @@ export async function recordPurchase(
   });
   await recordAuditEvent({
     organizationId,
-    actorClientId: opts.userId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
     action: "purchase.completed",
     targetType: "ledger",
@@ -233,7 +173,7 @@ export async function deduct(
   });
   await recordAuditEvent({
     organizationId,
-    actorClientId: opts.userId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
     action: `deduct.${category}`,
     targetType: "ledger",
@@ -255,7 +195,7 @@ export async function adminAdjust(
   });
   await recordAuditEvent({
     organizationId,
-    actorClientId: opts.userId ?? null,
+    actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
     action: "admin.adjust",
     targetType: "ledger",
@@ -333,4 +273,3 @@ export async function usageByCategory(organizationId: number): Promise<UsageBuck
   }
   return Object.values(map).sort((a, b) => Math.abs(b.totalAmount) - Math.abs(a.totalAmount));
 }
-

@@ -6,7 +6,6 @@ import router from "./routes";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import clerkWebhookRouter from "./routes/clerk-webhook";
 import { logger } from "./lib/logger";
-import { loadSessionAndClient } from "./lib/auth";
 import { loadClerkAndOrganization } from "./lib/clerk";
 
 const app: Express = express();
@@ -41,13 +40,9 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Populate req.session and req.dbClient on every request when a valid
-// session cookie or bearer token is present. Routes opt-in to authentication
-// via the requireAuth / requireActiveClient / requireAdmin guards.
-app.use(loadSessionAndClient);
-// Phase 0 parallel auth: resolve Clerk session (if configured) and attach
-// the active organization to every request. Runs AFTER the legacy session
-// middleware so it can use `req.dbClient` as a fallback bridge.
+// Single auth path: validate Clerk session, resolve organization +
+// organization_member, populate req.dbClient compat shim. Routes opt-in via
+// requireAuth / requireActiveClient / requireAdmin / requireOrganization.
 app.use(loadClerkAndOrganization);
 
 app.use("/api", router);
