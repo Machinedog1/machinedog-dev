@@ -5,6 +5,7 @@
  * Machinedog Client Portal API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateProjectBodyHostingProvider } from "./updateProjectBodyHostingProvider";
 import type { UpdateProjectBodyStatus } from "./updateProjectBodyStatus";
 
 export interface UpdateProjectBody {
@@ -27,4 +28,9 @@ export interface UpdateProjectBody {
   productionUrl?: string | null;
   /** @nullable */
   operatorEmail?: string | null;
+  hostingProvider?: UpdateProjectBodyHostingProvider;
+  /** @nullable */
+  hostingProjectId?: string | null;
+  /** @nullable */
+  hostingCredentialsRef?: string | null;
 }

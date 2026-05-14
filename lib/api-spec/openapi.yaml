@@ -1394,6 +1394,245 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditEventList"
 
+  # ─── Build jobs & deployments ──────────────────────────────────────────────
+
+  /projects/{id}/builds:
+    get:
+      operationId: listProjectBuilds
+      tags: [projects]
+      summary: List build jobs for this project, newest first.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Build jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildJobList"
+    post:
+      operationId: triggerProjectBuild
+      tags: [projects]
+      summary: Owner-only — trigger a new build/deploy via the project's host adapter.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerBuildBody"
+      responses:
+        "201":
+          description: Build queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildJobResponse"
+
+  /projects/{id}/deployments:
+    get:
+      operationId: listProjectDeployments
+      tags: [projects]
+      summary: List deployment history for this project.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Deployments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentList"
+
+  /projects/{id}/hosting/credentials:
+    post:
+      operationId: setProjectHostingCredentials
+      tags: [projects]
+      summary: Owner-only — store host provider credentials (API token + webhook secret) on the project.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  enum: [vercel, render]
+                apiToken:
+                  type: string
+                  minLength: 1
+                webhookSecret:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Credentials stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  storedNames:
+                    type: array
+                    items:
+                      type: string
+                required: [ok, storedNames]
+
+  /projects/{id}/hosting/test:
+    post:
+      operationId: testProjectHosting
+      tags: [projects]
+      summary: Owner-only — test the configured host provider's credentials.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostingTestResult"
+
+  /admin/builds:
+    get:
+      operationId: listAdminBuilds
+      tags: [admin]
+      summary: All build jobs across orgs (admin only) with filters.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: organizationId
+          schema:
+            type: integer
+        - in: query
+          name: projectId
+          schema:
+            type: integer
+        - in: query
+          name: provider
+          schema:
+            type: string
+            enum: [replit, vercel, render]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, canceled]
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: until
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Build jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBuildJobList"
+
+  /admin/deployments:
+    get:
+      operationId: listAdminDeployments
+      tags: [admin]
+      summary: All deployments across orgs (admin only) with filters.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: organizationId
+          schema:
+            type: integer
+        - in: query
+          name: projectId
+          schema:
+            type: integer
+        - in: query
+          name: provider
+          schema:
+            type: string
+            enum: [replit, vercel, render]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, building, live, failed, canceled, rolled_back]
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: until
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Deployments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDeploymentList"
+
   /admin/orders:
     get:
       operationId: listAllBuildOrders
@@ -1687,6 +1926,13 @@ components:
         heartbeatAt:
           type: ["string", "null"]
           format: date-time
+        hostingProvider:
+          type: string
+          enum: [replit, vercel, render]
+        hostingProjectId:
+          type: ["string", "null"]
+        hostingCredentialsRef:
+          type: ["string", "null"]
         viewerRole:
           type: string
           enum: [owner, collaborator]
@@ -1696,7 +1942,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, clientId, title, description, summary, status, projectType, framework, healthcareMode, phiAllowed, baaStatus, workspaceProvider, workspaceStatus, githubDefaultBranch, viewerRole, createdAt, updatedAt]
+      required: [id, clientId, title, description, summary, status, projectType, framework, healthcareMode, phiAllowed, baaStatus, workspaceProvider, workspaceStatus, githubDefaultBranch, hostingProvider, viewerRole, createdAt, updatedAt]
 
     ProjectSecret:
       type: object
@@ -2116,6 +2362,188 @@ components:
           type: ["string", "null"]
         operatorEmail:
           type: ["string", "null"]
+        hostingProvider:
+          type: string
+          enum: [replit, vercel, render]
+        hostingProjectId:
+          type: ["string", "null"]
+        hostingCredentialsRef:
+          type: ["string", "null"]
+
+    BuildJob:
+      type: object
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+        projectId:
+          type: integer
+        changeRequestId:
+          type: ["integer", "null"]
+        provider:
+          type: string
+          enum: [replit, vercel, render]
+        externalId:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, canceled]
+        environment:
+          type: string
+          enum: [development, preview, staging, production]
+        branch:
+          type: ["string", "null"]
+        commitSha:
+          type: ["string", "null"]
+        logsUrl:
+          type: ["string", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        tokenCost:
+          type: integer
+        triggeredByEmail:
+          type: ["string", "null"]
+        metadata:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        startedAt:
+          type: ["string", "null"]
+          format: date-time
+        finishedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, organizationId, projectId, provider, status, environment, tokenCost, createdAt, updatedAt]
+
+    BuildJobList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BuildJob"
+      required: [data]
+
+    BuildJobResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/BuildJob"
+        error:
+          type: ["string", "null"]
+      required: [data]
+
+    AdminBuildJobList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BuildJob"
+        total:
+          type: integer
+      required: [data, total]
+
+    Deployment:
+      type: object
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+        projectId:
+          type: integer
+        buildJobId:
+          type: ["integer", "null"]
+        changeRequestId:
+          type: ["integer", "null"]
+        provider:
+          type: string
+          enum: [replit, vercel, render]
+        externalId:
+          type: ["string", "null"]
+        environment:
+          type: string
+          enum: [preview, staging, production]
+        status:
+          type: string
+          enum: [pending, building, live, failed, canceled, rolled_back]
+        url:
+          type: ["string", "null"]
+        commitSha:
+          type: ["string", "null"]
+        branch:
+          type: ["string", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        tokenCost:
+          type: integer
+        metadata:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        deployedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, organizationId, projectId, provider, environment, status, tokenCost, createdAt, updatedAt]
+
+    DeploymentList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Deployment"
+      required: [data]
+
+    AdminDeploymentList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Deployment"
+        total:
+          type: integer
+      required: [data, total]
+
+    TriggerBuildBody:
+      type: object
+      properties:
+        environment:
+          type: string
+          enum: [preview, staging, production]
+          default: production
+        branch:
+          type: string
+        commitSha:
+          type: ["string", "null"]
+        changeRequestId:
+          type: ["integer", "null"]
+
+    HostingTestResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+      required: [ok, message]
 
     ProjectMember:
       type: object

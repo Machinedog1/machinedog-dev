@@ -83,6 +83,10 @@ export async function importGithubAsProject(
         githubRepo: repo,
         githubDefaultBranch: defaultBranch,
         heartbeatToken: randomBytes(16).toString("hex"),
+        // GitHub-imported projects deploy via real hosts; the operator can
+        // still flip the provider in settings. Existing Replit projects keep
+        // their explicit "replit" value (no migration needed).
+        hostingProvider: "vercel",
       })
       .returning();
     return { ok: true, project: row };

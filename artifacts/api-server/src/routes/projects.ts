@@ -305,6 +305,11 @@ router.post(
           projectType: template?.projectType ?? "web_app",
           framework: template?.framework ?? "react",
           templateSlug: template?.slug ?? null,
+          // Phase 6: default new projects to GitHub-driven Vercel hosting so
+          // PR-merge auto-deploy "just works" without operator clicks. Users
+          // can switch to Render or Replit (heartbeat) in Project Settings.
+          // Existing rows keep whatever provider they had.
+          hostingProvider: "vercel",
           healthcareMode: template?.isHealthcare ?? false,
           // PHI capture stays disabled even for healthcare templates until
           // the BAA flow (Phase 8) flips it on. We only mark BAA "required"
@@ -827,6 +832,19 @@ router.patch(
         ...(body.data.previewUrlTemplate !== undefined && {
           previewUrlTemplate: body.data.previewUrlTemplate?.trim()
             ? body.data.previewUrlTemplate.trim()
+            : null,
+        }),
+        ...(body.data.hostingProvider !== undefined && {
+          hostingProvider: body.data.hostingProvider,
+        }),
+        ...(body.data.hostingProjectId !== undefined && {
+          hostingProjectId: body.data.hostingProjectId?.trim()
+            ? body.data.hostingProjectId.trim()
+            : null,
+        }),
+        ...(body.data.hostingCredentialsRef !== undefined && {
+          hostingCredentialsRef: body.data.hostingCredentialsRef?.trim()
+            ? body.data.hostingCredentialsRef.trim()
             : null,
         }),
       })

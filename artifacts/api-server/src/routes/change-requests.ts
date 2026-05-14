@@ -726,6 +726,10 @@ router.post(
           status: "awaiting_deploy",
           requestedPublishAt: now,
           mergedAt: new Date(),
+          // Persist the merge commit so host webhooks can deterministically
+          // correlate `deployment.live` events back to this CR even when
+          // there's no associated build_jobs row (auto-deploy on PR merge).
+          mergeCommitSha: result.sha ?? null,
         });
         await appendEvent(
           cr.id,

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectBaaStatus } from "./projectBaaStatus";
+import type { ProjectHostingProvider } from "./projectHostingProvider";
 import type { ProjectProjectType } from "./projectProjectType";
 import type { ProjectStatus } from "./projectStatus";
 import type { ProjectViewerRole } from "./projectViewerRole";
@@ -55,6 +56,11 @@ export interface Project {
   heartbeatToken?: string | null;
   /** @nullable */
   heartbeatAt?: Date | null;
+  hostingProvider: ProjectHostingProvider;
+  /** @nullable */
+  hostingProjectId?: string | null;
+  /** @nullable */
+  hostingCredentialsRef?: string | null;
   viewerRole: ProjectViewerRole;
   createdAt: Date;
   updatedAt: Date;

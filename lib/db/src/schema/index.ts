@@ -20,3 +20,5 @@ export * from "./ai-providers";
 export * from "./ai-models";
 export * from "./ai-usage";
 export * from "./ai-conversations";
+export * from "./build-jobs";
+export * from "./deployments";

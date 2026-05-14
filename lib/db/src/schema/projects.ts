@@ -44,6 +44,15 @@ export const projectsTable = pgTable("projects", {
   productionHeartbeatAt: timestamp("production_heartbeat_at", { withTimezone: true }),
   productionBootedAt: timestamp("production_booted_at", { withTimezone: true }),
   productionBootMarker: text("production_boot_marker"),
+  hostingProvider: text("hosting_provider", { enum: ["replit", "vercel", "render"] })
+    .notNull()
+    .default("replit"),
+  hostingProjectId: text("hosting_project_id"),
+  // Free-form pointer to where the host credentials live. Today this is the
+  // project_secrets row name (e.g. "VERCEL_API_TOKEN") so operators can spot
+  // which secrets are being used; future remote vault integrations can put
+  // their handle here without changing the project record shape.
+  hostingCredentialsRef: text("hosting_credentials_ref"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => ({

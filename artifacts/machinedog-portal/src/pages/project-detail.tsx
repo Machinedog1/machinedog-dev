@@ -86,6 +86,7 @@ import { AgentConversation } from "@/components/change-requests/AgentConversatio
 import { LivePreviewPane } from "@/components/change-requests/LivePreviewPane";
 import { WorkspaceSplit } from "@/components/change-requests/WorkspaceSplit";
 import { ProjectChangeRequestsPanel } from "@/components/change-requests/ProjectChangeRequestsPanel";
+import { HostingCredentialsForm } from "@/components/HostingCredentialsForm";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -163,6 +164,28 @@ export default function ProjectDetailPage() {
   const inviteMember = useInviteProjectMember();
   const removeMember = useRemoveProjectMember();
 
+  // Production secrets are needed in the Settings tab to drive the inline
+  // host-credentials form's "missing"/"present" badges. Owner-only — viewers
+  // can't read project secrets.
+  const settingsSecretsQuery = useListProjectSecrets(projectId, {
+    query: {
+      queryKey: getListProjectSecretsQueryKey(projectId),
+      enabled: Number.isFinite(projectId) && isOwner,
+    },
+  });
+  const settingsRequiredSecrets =
+    project?.hostingProvider === "vercel"
+      ? ["VERCEL_API_TOKEN", "VERCEL_WEBHOOK_SECRET"]
+      : project?.hostingProvider === "render"
+        ? ["RENDER_API_TOKEN", "RENDER_WEBHOOK_SECRET"]
+        : [];
+  const settingsPresentSecrets = new Set(
+    (settingsSecretsQuery.data?.data ?? []).map((s) => s.name),
+  );
+  const settingsMissingSecrets = settingsRequiredSecrets.filter(
+    (n) => !settingsPresentSecrets.has(n),
+  );
+
   // Which pane shows on the right side of the workspace split. "preview" is
   // the live iframe of the Repl's dev URL; "publishing" is the
   // ProjectChangeRequestsPanel listing every CR with per-CR Publish /
@@ -192,6 +215,8 @@ export default function ProjectDetailPage() {
     githubDefaultBranch: "main",
     previewUrlTemplate: "",
     operatorEmail: "",
+    hostingProvider: "replit" as "replit" | "vercel" | "render",
+    hostingProjectId: "",
   });
   const [inviteEmail, setInviteEmail] = useState("");
   // Replit-style split view: agent on the left, full-height live preview on the right.
@@ -517,6 +542,8 @@ export default function ProjectDetailPage() {
         githubDefaultBranch: project.githubDefaultBranch ?? "main",
         previewUrlTemplate: project.previewUrlTemplate ?? "",
         operatorEmail: project.operatorEmail ?? "",
+        hostingProvider: project.hostingProvider ?? "replit",
+        hostingProjectId: project.hostingProjectId ?? "",
       };
       setForm(next);
       // Clear baseline outside of an edit session so a stale snapshot can't
@@ -580,6 +607,8 @@ export default function ProjectDetailPage() {
         ? form.previewUrlTemplate.trim()
         : null,
       operatorEmail: form.operatorEmail.trim() ? form.operatorEmail.trim() : null,
+      hostingProvider: form.hostingProvider,
+      hostingProjectId: form.hostingProjectId.trim() ? form.hostingProjectId.trim() : null,
     };
     const patch: Partial<typeof fullPayload> = {};
     let changedCount = 0;
@@ -864,6 +893,17 @@ export default function ProjectDetailPage() {
               >
                 <LayoutPanelLeft className="h-3.5 w-3.5" />
                 Open Workspace
+              </button>
+            </Link>
+            <Link href={`/projects/${project.id}/publish`}>
+              <button
+                type="button"
+                data-testid="button-open-publish"
+                title="Build, deploy, and view live deployments"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider ring-1 ring-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
+                <Rocket className="h-3.5 w-3.5" />
+                Publish
               </button>
             </Link>
           </div>
@@ -1445,6 +1485,46 @@ export default function ProjectDetailPage() {
                     />
                   </Field>
                 </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="HOSTING PROVIDER">
+                    <select
+                      value={form.hostingProvider}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          hostingProvider: e.target.value as typeof f.hostingProvider,
+                        }))
+                      }
+                      className="w-full rounded-md border border-border/40 bg-background px-3 py-2 text-sm font-mono"
+                      data-testid="select-hosting-provider"
+                    >
+                      <option value="replit">Replit (no-op adapter)</option>
+                      <option value="vercel">Vercel</option>
+                      <option value="render">Render</option>
+                    </select>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
+                      Configure API token + webhook secret in Project Secrets.
+                    </p>
+                  </Field>
+                  <Field label="HOST PROJECT ID">
+                    <Input
+                      value={form.hostingProjectId}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, hostingProjectId: e.target.value }))
+                      }
+                      placeholder="prj_xxx (Vercel) or srv-xxx (Render)"
+                      data-testid="input-hosting-project-id"
+                    />
+                  </Field>
+                </div>
+                {form.hostingProvider !== "replit" && isOwner && (
+                  <HostingCredentialsForm
+                    projectId={project.id}
+                    provider={form.hostingProvider}
+                    missingSecrets={settingsMissingSecrets}
+                    variant="settings"
+                  />
+                )}
                 <Field label="PREVIEW URL TEMPLATE">
                   <Input
                     value={form.previewUrlTemplate}

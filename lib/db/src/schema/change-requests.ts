@@ -38,6 +38,11 @@ export const changeRequestsTable = pgTable(
     githubPrUrl: text("github_pr_url"),
     snapshotTag: text("snapshot_tag"),
     snapshotSha: text("snapshot_sha"),
+    // SHA returned by GitHub when the PR is merged. Used by Vercel/Render
+    // webhook handlers to correlate `deployment.live` events back to a
+    // change request without requiring a manual publish click that would
+    // create a build_jobs row. Indexed below for the webhook lookup path.
+    mergeCommitSha: text("merge_commit_sha"),
     previewUrl: text("preview_url"),
     errorMessage: text("error_message"),
     requestedPublishAt: timestamp("requested_publish_at", { withTimezone: true }),
@@ -50,7 +55,10 @@ export const changeRequestsTable = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [index("change_requests_project_idx").on(t.projectId, t.createdAt)],
+  (t) => [
+    index("change_requests_project_idx").on(t.projectId, t.createdAt),
+    index("change_requests_merge_sha_idx").on(t.projectId, t.mergeCommitSha),
+  ],
 );
 
 export const insertChangeRequestSchema = createInsertSchema(changeRequestsTable).omit({
@@ -81,6 +89,12 @@ export const CHANGE_REQUEST_EVENT_KINDS = [
   "rolled_back",
   "comment",
   "error",
+  "webhook_received",
+  "build_started",
+  "build_succeeded",
+  "build_failed",
+  "deployment_live",
+  "deployment_failed",
 ] as const;
 export type ChangeRequestEventKind = (typeof CHANGE_REQUEST_EVENT_KINDS)[number];
 

@@ -275,6 +275,9 @@ export const ListMyProjectsResponse = zod.object({
       operatorEmail: zod.string().nullish(),
       heartbeatToken: zod.string().nullish(),
       heartbeatAt: zod.coerce.date().nullish(),
+      hostingProvider: zod.enum(["replit", "vercel", "render"]),
+      hostingProjectId: zod.string().nullish(),
+      hostingCredentialsRef: zod.string().nullish(),
       viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -395,6 +398,9 @@ export const GetProjectResponse = zod.object({
   operatorEmail: zod.string().nullish(),
   heartbeatToken: zod.string().nullish(),
   heartbeatAt: zod.coerce.date().nullish(),
+  hostingProvider: zod.enum(["replit", "vercel", "render"]),
+  hostingProjectId: zod.string().nullish(),
+  hostingCredentialsRef: zod.string().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -420,6 +426,9 @@ export const UpdateProjectBody = zod.object({
   previewUrlTemplate: zod.string().nullish(),
   productionUrl: zod.string().nullish(),
   operatorEmail: zod.string().nullish(),
+  hostingProvider: zod.enum(["replit", "vercel", "render"]).optional(),
+  hostingProjectId: zod.string().nullish(),
+  hostingCredentialsRef: zod.string().nullish(),
 });
 
 export const UpdateProjectResponse = zod.object({
@@ -470,6 +479,9 @@ export const UpdateProjectResponse = zod.object({
   operatorEmail: zod.string().nullish(),
   heartbeatToken: zod.string().nullish(),
   heartbeatAt: zod.coerce.date().nullish(),
+  hostingProvider: zod.enum(["replit", "vercel", "render"]),
+  hostingProjectId: zod.string().nullish(),
+  hostingCredentialsRef: zod.string().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1618,6 +1630,9 @@ export const ListAllProjectsResponse = zod.object({
       operatorEmail: zod.string().nullish(),
       heartbeatToken: zod.string().nullish(),
       heartbeatAt: zod.coerce.date().nullish(),
+      hostingProvider: zod.enum(["replit", "vercel", "render"]),
+      hostingProjectId: zod.string().nullish(),
+      hostingCredentialsRef: zod.string().nullish(),
       viewerRole: zod.enum(["owner", "collaborator"]),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -1696,6 +1711,9 @@ export const ReassignProjectOwnerResponse = zod.object({
   operatorEmail: zod.string().nullish(),
   heartbeatToken: zod.string().nullish(),
   heartbeatAt: zod.coerce.date().nullish(),
+  hostingProvider: zod.enum(["replit", "vercel", "render"]),
+  hostingProjectId: zod.string().nullish(),
+  hostingCredentialsRef: zod.string().nullish(),
   viewerRole: zod.enum(["owner", "collaborator"]),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -2036,6 +2054,266 @@ export const ListAdminAuditResponse = zod.object({
       targetId: zod.string().nullish(),
       metadata: zod.record(zod.string(), zod.unknown()).nullish(),
       createdAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary List build jobs for this project, newest first.
+ */
+export const ListProjectBuildsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const listProjectBuildsQueryLimitDefault = 50;
+
+export const ListProjectBuildsQueryParams = zod.object({
+  limit: zod.coerce.number().default(listProjectBuildsQueryLimitDefault),
+});
+
+export const ListProjectBuildsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      projectId: zod.number(),
+      changeRequestId: zod.number().nullish(),
+      provider: zod.enum(["replit", "vercel", "render"]),
+      externalId: zod.string().nullish(),
+      status: zod.enum([
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "canceled",
+      ]),
+      environment: zod.enum([
+        "development",
+        "preview",
+        "staging",
+        "production",
+      ]),
+      branch: zod.string().nullish(),
+      commitSha: zod.string().nullish(),
+      logsUrl: zod.string().nullish(),
+      errorMessage: zod.string().nullish(),
+      tokenCost: zod.number(),
+      triggeredByEmail: zod.string().nullish(),
+      metadata: zod
+        .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+        .optional(),
+      startedAt: zod.coerce.date().nullish(),
+      finishedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Owner-only — trigger a new build/deploy via the project's host adapter.
+ */
+export const TriggerProjectBuildParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const triggerProjectBuildBodyEnvironmentDefault = `production`;
+
+export const TriggerProjectBuildBody = zod.object({
+  environment: zod
+    .enum(["preview", "staging", "production"])
+    .default(triggerProjectBuildBodyEnvironmentDefault),
+  branch: zod.string().optional(),
+  commitSha: zod.string().nullish(),
+  changeRequestId: zod.number().nullish(),
+});
+
+/**
+ * @summary List deployment history for this project.
+ */
+export const ListProjectDeploymentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const listProjectDeploymentsQueryLimitDefault = 50;
+
+export const ListProjectDeploymentsQueryParams = zod.object({
+  limit: zod.coerce.number().default(listProjectDeploymentsQueryLimitDefault),
+});
+
+export const ListProjectDeploymentsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      projectId: zod.number(),
+      buildJobId: zod.number().nullish(),
+      changeRequestId: zod.number().nullish(),
+      provider: zod.enum(["replit", "vercel", "render"]),
+      externalId: zod.string().nullish(),
+      environment: zod.enum(["preview", "staging", "production"]),
+      status: zod.enum([
+        "pending",
+        "building",
+        "live",
+        "failed",
+        "canceled",
+        "rolled_back",
+      ]),
+      url: zod.string().nullish(),
+      commitSha: zod.string().nullish(),
+      branch: zod.string().nullish(),
+      errorMessage: zod.string().nullish(),
+      tokenCost: zod.number(),
+      metadata: zod
+        .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+        .optional(),
+      deployedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Owner-only — store host provider credentials (API token + webhook secret) on the project.
+ */
+export const SetProjectHostingCredentialsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetProjectHostingCredentialsBody = zod.object({
+  provider: zod.enum(["vercel", "render"]).optional(),
+  apiToken: zod.string().min(1).optional(),
+  webhookSecret: zod.string().min(1).optional(),
+});
+
+export const SetProjectHostingCredentialsResponse = zod.object({
+  ok: zod.boolean(),
+  storedNames: zod.array(zod.string()),
+});
+
+/**
+ * @summary Owner-only — test the configured host provider's credentials.
+ */
+export const TestProjectHostingParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const TestProjectHostingResponse = zod.object({
+  ok: zod.boolean(),
+  message: zod.string(),
+});
+
+/**
+ * @summary All build jobs across orgs (admin only) with filters.
+ */
+export const listAdminBuildsQueryLimitDefault = 100;
+export const listAdminBuildsQueryOffsetDefault = 0;
+
+export const ListAdminBuildsQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminBuildsQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminBuildsQueryOffsetDefault),
+  organizationId: zod.coerce.number().optional(),
+  projectId: zod.coerce.number().optional(),
+  provider: zod.enum(["replit", "vercel", "render"]).optional(),
+  status: zod
+    .enum(["queued", "running", "succeeded", "failed", "canceled"])
+    .optional(),
+  since: zod.date().optional(),
+  until: zod.date().optional(),
+});
+
+export const ListAdminBuildsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      projectId: zod.number(),
+      changeRequestId: zod.number().nullish(),
+      provider: zod.enum(["replit", "vercel", "render"]),
+      externalId: zod.string().nullish(),
+      status: zod.enum([
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "canceled",
+      ]),
+      environment: zod.enum([
+        "development",
+        "preview",
+        "staging",
+        "production",
+      ]),
+      branch: zod.string().nullish(),
+      commitSha: zod.string().nullish(),
+      logsUrl: zod.string().nullish(),
+      errorMessage: zod.string().nullish(),
+      tokenCost: zod.number(),
+      triggeredByEmail: zod.string().nullish(),
+      metadata: zod
+        .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+        .optional(),
+      startedAt: zod.coerce.date().nullish(),
+      finishedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary All deployments across orgs (admin only) with filters.
+ */
+export const listAdminDeploymentsQueryLimitDefault = 100;
+export const listAdminDeploymentsQueryOffsetDefault = 0;
+
+export const ListAdminDeploymentsQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminDeploymentsQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminDeploymentsQueryOffsetDefault),
+  organizationId: zod.coerce.number().optional(),
+  projectId: zod.coerce.number().optional(),
+  provider: zod.enum(["replit", "vercel", "render"]).optional(),
+  status: zod
+    .enum(["pending", "building", "live", "failed", "canceled", "rolled_back"])
+    .optional(),
+  since: zod.date().optional(),
+  until: zod.date().optional(),
+});
+
+export const ListAdminDeploymentsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      projectId: zod.number(),
+      buildJobId: zod.number().nullish(),
+      changeRequestId: zod.number().nullish(),
+      provider: zod.enum(["replit", "vercel", "render"]),
+      externalId: zod.string().nullish(),
+      environment: zod.enum(["preview", "staging", "production"]),
+      status: zod.enum([
+        "pending",
+        "building",
+        "live",
+        "failed",
+        "canceled",
+        "rolled_back",
+      ]),
+      url: zod.string().nullish(),
+      commitSha: zod.string().nullish(),
+      branch: zod.string().nullish(),
+      errorMessage: zod.string().nullish(),
+      tokenCost: zod.number(),
+      metadata: zod
+        .union([zod.record(zod.string(), zod.unknown()), zod.null()])
+        .optional(),
+      deployedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
     }),
   ),
   total: zod.number(),

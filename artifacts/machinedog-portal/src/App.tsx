@@ -23,6 +23,7 @@ import ProjectNewPage from "@/pages/project-new";
 import TemplatesPage from "@/pages/templates";
 import ProjectDetailPage from "@/pages/project-detail";
 import ProjectWorkspacePage from "@/pages/project-workspace";
+import ProjectPublishPage from "@/pages/project-publish";
 import WorkPage from "@/pages/work";
 import ConsultingPage from "@/pages/consulting";
 import AdminDashboard from "@/pages/admin/index";
@@ -30,6 +31,8 @@ import AdminClients from "@/pages/admin/clients";
 import AdminProjects from "@/pages/admin/projects";
 import AdminOrders from "@/pages/admin/orders";
 import AdminAuditPage from "@/pages/admin/audit";
+import AdminBuildsPage from "@/pages/admin/builds";
+import AdminDeploymentsPage from "@/pages/admin/deployments";
 import AdminAiModelsPage from "@/pages/admin/ai-models";
 import SettingsPage from "@/pages/settings";
 
@@ -173,6 +176,9 @@ function AuthedRoutes() {
       <Route path="/projects/:id/secrets">
         <AuthGuard><ProjectDetailPage /></AuthGuard>
       </Route>
+      <Route path="/projects/:id/publish">
+        <AuthGuard><ProjectPublishPage /></AuthGuard>
+      </Route>
       <Route path="/projects/:id/history">
         <AuthGuard><ProjectDetailPage /></AuthGuard>
       </Route>
@@ -203,6 +209,12 @@ function AuthedRoutes() {
       </Route>
       <Route path="/admin/orders">
         <AuthGuard><AdminGuard><AdminOrders /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/builds">
+        <AuthGuard><AdminGuard><AdminBuildsPage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/deployments">
+        <AuthGuard><AdminGuard><AdminDeploymentsPage /></AdminGuard></AuthGuard>
       </Route>
 
       <Route component={NotFound} />

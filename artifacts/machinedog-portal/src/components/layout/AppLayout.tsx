@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { Logo } from "@/components/Logo";
+import { ActiveBuildProvider } from "@/components/ActiveBuildContext";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -69,6 +70,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/admin/clients", label: "Clients", icon: ShieldAlert },
     { href: "/admin/projects", label: "All Projects", icon: ShieldAlert },
     { href: "/admin/orders", label: "Orders", icon: ShieldAlert },
+    { href: "/admin/builds", label: "Builds", icon: ShieldAlert },
+    { href: "/admin/deployments", label: "Deployments", icon: ShieldAlert },
+    { href: "/admin/audit", label: "Audit", icon: ShieldAlert },
     { href: "/admin/ai-models", label: "AI Models", icon: ShieldAlert },
   ];
 
@@ -332,7 +336,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative pt-14 md:pt-0">
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <ActiveBuildProvider>
+          <div className="flex-1 overflow-y-auto">{children}</div>
+        </ActiveBuildProvider>
       </main>
 
       {/* Mobile overlay */}

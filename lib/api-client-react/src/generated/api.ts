@@ -18,9 +18,13 @@ import type {
 
 import type {
   AdjustBalanceBody,
+  AdminBuildJobList,
+  AdminDeploymentList,
   AdminStats,
   AgentThreadResponse,
   AuditEventList,
+  BuildJobList,
+  BuildJobResponse,
   BuildOrderList,
   ChangeRequest,
   ChangeRequestDetail,
@@ -38,18 +42,24 @@ import type {
   CreateProjectSecretBody,
   CreateTokenCheckoutBody,
   DeleteClientResponse,
+  DeploymentList,
   ErrorResponse,
   HealthStatus,
+  HostingTestResult,
   ImportGithubProjectBody,
   InviteClientBody,
   InviteProjectMemberBody,
   InviteResponse,
   ListAdminAuditParams,
+  ListAdminBuildsParams,
+  ListAdminDeploymentsParams,
   ListAdminGithubReposResponse,
   ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
   ListProjectAuditParams,
+  ListProjectBuildsParams,
+  ListProjectDeploymentsParams,
   ListTemplatesParams,
   Project,
   ProjectComment,
@@ -73,12 +83,15 @@ import type {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
   RotateHeartbeatTokenResponse,
+  SetProjectHostingCredentials200,
+  SetProjectHostingCredentialsBody,
   SubmitLeadBody,
   SubmitLeadResponse,
   SubmitPromptBody,
   TemplateList,
   TokenBundleList,
   TokenPurchaseList,
+  TriggerBuildBody,
   UpdateProjectBody,
   UpdateProjectSecretBody,
 } from "./api.schemas";
@@ -5552,6 +5565,689 @@ export function useListAdminAudit<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListAdminAuditQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List build jobs for this project, newest first.
+ */
+export const getListProjectBuildsUrl = (
+  id: number,
+  params?: ListProjectBuildsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/projects/${id}/builds?${stringifiedParams}`
+    : `/api/projects/${id}/builds`;
+};
+
+export const listProjectBuilds = async (
+  id: number,
+  params?: ListProjectBuildsParams,
+  options?: RequestInit,
+): Promise<BuildJobList> => {
+  return customFetch<BuildJobList>(getListProjectBuildsUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectBuildsQueryKey = (
+  id: number,
+  params?: ListProjectBuildsParams,
+) => {
+  return [`/api/projects/${id}/builds`, ...(params ? [params] : [])] as const;
+};
+
+export const getListProjectBuildsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectBuilds>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ListProjectBuildsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectBuilds>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListProjectBuildsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectBuilds>>
+  > = ({ signal }) =>
+    listProjectBuilds(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectBuilds>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectBuildsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectBuilds>>
+>;
+export type ListProjectBuildsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List build jobs for this project, newest first.
+ */
+
+export function useListProjectBuilds<
+  TData = Awaited<ReturnType<typeof listProjectBuilds>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ListProjectBuildsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectBuilds>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectBuildsQueryOptions(id, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Owner-only — trigger a new build/deploy via the project's host adapter.
+ */
+export const getTriggerProjectBuildUrl = (id: number) => {
+  return `/api/projects/${id}/builds`;
+};
+
+export const triggerProjectBuild = async (
+  id: number,
+  triggerBuildBody: TriggerBuildBody,
+  options?: RequestInit,
+): Promise<BuildJobResponse> => {
+  return customFetch<BuildJobResponse>(getTriggerProjectBuildUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(triggerBuildBody),
+  });
+};
+
+export const getTriggerProjectBuildMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triggerProjectBuild>>,
+    TError,
+    { id: number; data: BodyType<TriggerBuildBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof triggerProjectBuild>>,
+  TError,
+  { id: number; data: BodyType<TriggerBuildBody> },
+  TContext
+> => {
+  const mutationKey = ["triggerProjectBuild"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof triggerProjectBuild>>,
+    { id: number; data: BodyType<TriggerBuildBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return triggerProjectBuild(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TriggerProjectBuildMutationResult = NonNullable<
+  Awaited<ReturnType<typeof triggerProjectBuild>>
+>;
+export type TriggerProjectBuildMutationBody = BodyType<TriggerBuildBody>;
+export type TriggerProjectBuildMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Owner-only — trigger a new build/deploy via the project's host adapter.
+ */
+export const useTriggerProjectBuild = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triggerProjectBuild>>,
+    TError,
+    { id: number; data: BodyType<TriggerBuildBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof triggerProjectBuild>>,
+  TError,
+  { id: number; data: BodyType<TriggerBuildBody> },
+  TContext
+> => {
+  return useMutation(getTriggerProjectBuildMutationOptions(options));
+};
+
+/**
+ * @summary List deployment history for this project.
+ */
+export const getListProjectDeploymentsUrl = (
+  id: number,
+  params?: ListProjectDeploymentsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/projects/${id}/deployments?${stringifiedParams}`
+    : `/api/projects/${id}/deployments`;
+};
+
+export const listProjectDeployments = async (
+  id: number,
+  params?: ListProjectDeploymentsParams,
+  options?: RequestInit,
+): Promise<DeploymentList> => {
+  return customFetch<DeploymentList>(getListProjectDeploymentsUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectDeploymentsQueryKey = (
+  id: number,
+  params?: ListProjectDeploymentsParams,
+) => {
+  return [
+    `/api/projects/${id}/deployments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListProjectDeploymentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectDeployments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ListProjectDeploymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectDeployments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListProjectDeploymentsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectDeployments>>
+  > = ({ signal }) =>
+    listProjectDeployments(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectDeployments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectDeploymentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectDeployments>>
+>;
+export type ListProjectDeploymentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List deployment history for this project.
+ */
+
+export function useListProjectDeployments<
+  TData = Awaited<ReturnType<typeof listProjectDeployments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ListProjectDeploymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectDeployments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectDeploymentsQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Owner-only — store host provider credentials (API token + webhook secret) on the project.
+ */
+export const getSetProjectHostingCredentialsUrl = (id: number) => {
+  return `/api/projects/${id}/hosting/credentials`;
+};
+
+export const setProjectHostingCredentials = async (
+  id: number,
+  setProjectHostingCredentialsBody: SetProjectHostingCredentialsBody,
+  options?: RequestInit,
+): Promise<SetProjectHostingCredentials200> => {
+  return customFetch<SetProjectHostingCredentials200>(
+    getSetProjectHostingCredentialsUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(setProjectHostingCredentialsBody),
+    },
+  );
+};
+
+export const getSetProjectHostingCredentialsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setProjectHostingCredentials>>,
+    TError,
+    { id: number; data: BodyType<SetProjectHostingCredentialsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setProjectHostingCredentials>>,
+  TError,
+  { id: number; data: BodyType<SetProjectHostingCredentialsBody> },
+  TContext
+> => {
+  const mutationKey = ["setProjectHostingCredentials"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setProjectHostingCredentials>>,
+    { id: number; data: BodyType<SetProjectHostingCredentialsBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setProjectHostingCredentials(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetProjectHostingCredentialsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setProjectHostingCredentials>>
+>;
+export type SetProjectHostingCredentialsMutationBody =
+  BodyType<SetProjectHostingCredentialsBody>;
+export type SetProjectHostingCredentialsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Owner-only — store host provider credentials (API token + webhook secret) on the project.
+ */
+export const useSetProjectHostingCredentials = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setProjectHostingCredentials>>,
+    TError,
+    { id: number; data: BodyType<SetProjectHostingCredentialsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setProjectHostingCredentials>>,
+  TError,
+  { id: number; data: BodyType<SetProjectHostingCredentialsBody> },
+  TContext
+> => {
+  return useMutation(getSetProjectHostingCredentialsMutationOptions(options));
+};
+
+/**
+ * @summary Owner-only — test the configured host provider's credentials.
+ */
+export const getTestProjectHostingUrl = (id: number) => {
+  return `/api/projects/${id}/hosting/test`;
+};
+
+export const testProjectHosting = async (
+  id: number,
+  options?: RequestInit,
+): Promise<HostingTestResult> => {
+  return customFetch<HostingTestResult>(getTestProjectHostingUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getTestProjectHostingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testProjectHosting>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testProjectHosting>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["testProjectHosting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testProjectHosting>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return testProjectHosting(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TestProjectHostingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testProjectHosting>>
+>;
+
+export type TestProjectHostingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Owner-only — test the configured host provider's credentials.
+ */
+export const useTestProjectHosting = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testProjectHosting>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof testProjectHosting>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getTestProjectHostingMutationOptions(options));
+};
+
+/**
+ * @summary All build jobs across orgs (admin only) with filters.
+ */
+export const getListAdminBuildsUrl = (params?: ListAdminBuildsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/builds?${stringifiedParams}`
+    : `/api/admin/builds`;
+};
+
+export const listAdminBuilds = async (
+  params?: ListAdminBuildsParams,
+  options?: RequestInit,
+): Promise<AdminBuildJobList> => {
+  return customFetch<AdminBuildJobList>(getListAdminBuildsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminBuildsQueryKey = (params?: ListAdminBuildsParams) => {
+  return [`/api/admin/builds`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminBuildsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminBuilds>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminBuildsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminBuilds>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAdminBuildsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminBuilds>>> = ({
+    signal,
+  }) => listAdminBuilds(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminBuilds>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminBuildsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminBuilds>>
+>;
+export type ListAdminBuildsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary All build jobs across orgs (admin only) with filters.
+ */
+
+export function useListAdminBuilds<
+  TData = Awaited<ReturnType<typeof listAdminBuilds>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminBuildsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminBuilds>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminBuildsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary All deployments across orgs (admin only) with filters.
+ */
+export const getListAdminDeploymentsUrl = (
+  params?: ListAdminDeploymentsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/deployments?${stringifiedParams}`
+    : `/api/admin/deployments`;
+};
+
+export const listAdminDeployments = async (
+  params?: ListAdminDeploymentsParams,
+  options?: RequestInit,
+): Promise<AdminDeploymentList> => {
+  return customFetch<AdminDeploymentList>(getListAdminDeploymentsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminDeploymentsQueryKey = (
+  params?: ListAdminDeploymentsParams,
+) => {
+  return [`/api/admin/deployments`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminDeploymentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminDeployments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminDeploymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminDeployments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAdminDeploymentsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAdminDeployments>>
+  > = ({ signal }) =>
+    listAdminDeployments(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminDeployments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminDeploymentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminDeployments>>
+>;
+export type ListAdminDeploymentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary All deployments across orgs (admin only) with filters.
+ */
+
+export function useListAdminDeployments<
+  TData = Awaited<ReturnType<typeof listAdminDeployments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminDeploymentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminDeployments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminDeploymentsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

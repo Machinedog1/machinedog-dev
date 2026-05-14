@@ -183,6 +183,15 @@ export const ProjectWorkspaceStatus = {
   error: "error",
 } as const;
 
+export type ProjectHostingProvider =
+  (typeof ProjectHostingProvider)[keyof typeof ProjectHostingProvider];
+
+export const ProjectHostingProvider = {
+  replit: "replit",
+  vercel: "vercel",
+  render: "render",
+} as const;
+
 export type ProjectViewerRole =
   (typeof ProjectViewerRole)[keyof typeof ProjectViewerRole];
 
@@ -234,6 +243,11 @@ export interface Project {
   heartbeatToken?: string | null;
   /** @nullable */
   heartbeatAt?: string | null;
+  hostingProvider: ProjectHostingProvider;
+  /** @nullable */
+  hostingProjectId?: string | null;
+  /** @nullable */
+  hostingCredentialsRef?: string | null;
   viewerRole: ProjectViewerRole;
   createdAt: string;
   updatedAt: string;
@@ -551,6 +565,15 @@ export const UpdateProjectBodyStatus = {
   archived: "archived",
 } as const;
 
+export type UpdateProjectBodyHostingProvider =
+  (typeof UpdateProjectBodyHostingProvider)[keyof typeof UpdateProjectBodyHostingProvider];
+
+export const UpdateProjectBodyHostingProvider = {
+  replit: "replit",
+  vercel: "vercel",
+  render: "render",
+} as const;
+
 export interface UpdateProjectBody {
   title?: string;
   description?: string;
@@ -571,6 +594,182 @@ export interface UpdateProjectBody {
   productionUrl?: string | null;
   /** @nullable */
   operatorEmail?: string | null;
+  hostingProvider?: UpdateProjectBodyHostingProvider;
+  /** @nullable */
+  hostingProjectId?: string | null;
+  /** @nullable */
+  hostingCredentialsRef?: string | null;
+}
+
+export type BuildJobProvider =
+  (typeof BuildJobProvider)[keyof typeof BuildJobProvider];
+
+export const BuildJobProvider = {
+  replit: "replit",
+  vercel: "vercel",
+  render: "render",
+} as const;
+
+export type BuildJobStatus =
+  (typeof BuildJobStatus)[keyof typeof BuildJobStatus];
+
+export const BuildJobStatus = {
+  queued: "queued",
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
+  canceled: "canceled",
+} as const;
+
+export type BuildJobEnvironment =
+  (typeof BuildJobEnvironment)[keyof typeof BuildJobEnvironment];
+
+export const BuildJobEnvironment = {
+  development: "development",
+  preview: "preview",
+  staging: "staging",
+  production: "production",
+} as const;
+
+export type BuildJobMetadata = { [key: string]: unknown } | null;
+
+export interface BuildJob {
+  id: number;
+  organizationId: number;
+  projectId: number;
+  /** @nullable */
+  changeRequestId?: number | null;
+  provider: BuildJobProvider;
+  /** @nullable */
+  externalId?: string | null;
+  status: BuildJobStatus;
+  environment: BuildJobEnvironment;
+  /** @nullable */
+  branch?: string | null;
+  /** @nullable */
+  commitSha?: string | null;
+  /** @nullable */
+  logsUrl?: string | null;
+  /** @nullable */
+  errorMessage?: string | null;
+  tokenCost: number;
+  /** @nullable */
+  triggeredByEmail?: string | null;
+  metadata?: BuildJobMetadata;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  finishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BuildJobList {
+  data: BuildJob[];
+}
+
+export interface BuildJobResponse {
+  data: BuildJob;
+  /** @nullable */
+  error?: string | null;
+}
+
+export interface AdminBuildJobList {
+  data: BuildJob[];
+  total: number;
+}
+
+export type DeploymentProvider =
+  (typeof DeploymentProvider)[keyof typeof DeploymentProvider];
+
+export const DeploymentProvider = {
+  replit: "replit",
+  vercel: "vercel",
+  render: "render",
+} as const;
+
+export type DeploymentEnvironment =
+  (typeof DeploymentEnvironment)[keyof typeof DeploymentEnvironment];
+
+export const DeploymentEnvironment = {
+  preview: "preview",
+  staging: "staging",
+  production: "production",
+} as const;
+
+export type DeploymentStatus =
+  (typeof DeploymentStatus)[keyof typeof DeploymentStatus];
+
+export const DeploymentStatus = {
+  pending: "pending",
+  building: "building",
+  live: "live",
+  failed: "failed",
+  canceled: "canceled",
+  rolled_back: "rolled_back",
+} as const;
+
+export type DeploymentMetadata = { [key: string]: unknown } | null;
+
+export interface Deployment {
+  id: number;
+  organizationId: number;
+  projectId: number;
+  /** @nullable */
+  buildJobId?: number | null;
+  /** @nullable */
+  changeRequestId?: number | null;
+  provider: DeploymentProvider;
+  /** @nullable */
+  externalId?: string | null;
+  environment: DeploymentEnvironment;
+  status: DeploymentStatus;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  commitSha?: string | null;
+  /** @nullable */
+  branch?: string | null;
+  /** @nullable */
+  errorMessage?: string | null;
+  tokenCost: number;
+  metadata?: DeploymentMetadata;
+  /** @nullable */
+  deployedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeploymentList {
+  data: Deployment[];
+}
+
+export interface AdminDeploymentList {
+  data: Deployment[];
+  total: number;
+}
+
+export type TriggerBuildBodyEnvironment =
+  (typeof TriggerBuildBodyEnvironment)[keyof typeof TriggerBuildBodyEnvironment];
+
+export const TriggerBuildBodyEnvironment = {
+  preview: "preview",
+  staging: "staging",
+  production: "production",
+} as const;
+
+export interface TriggerBuildBody {
+  environment?: TriggerBuildBodyEnvironment;
+  branch?: string;
+  /** @nullable */
+  commitSha?: string | null;
+  /** @nullable */
+  changeRequestId?: number | null;
+}
+
+export interface HostingTestResult {
+  ok: boolean;
+  message: string;
 }
 
 export type ProjectMemberRole =
@@ -1065,6 +1264,98 @@ export type ListAdminAuditParams = {
   since?: string;
   until?: string;
 };
+
+export type ListProjectBuildsParams = {
+  limit?: number;
+};
+
+export type ListProjectDeploymentsParams = {
+  limit?: number;
+};
+
+export type SetProjectHostingCredentialsBodyProvider =
+  (typeof SetProjectHostingCredentialsBodyProvider)[keyof typeof SetProjectHostingCredentialsBodyProvider];
+
+export const SetProjectHostingCredentialsBodyProvider = {
+  vercel: "vercel",
+  render: "render",
+} as const;
+
+export type SetProjectHostingCredentialsBody = {
+  provider?: SetProjectHostingCredentialsBodyProvider;
+  /** @minLength 1 */
+  apiToken?: string;
+  /** @minLength 1 */
+  webhookSecret?: string;
+};
+
+export type SetProjectHostingCredentials200 = {
+  ok: boolean;
+  storedNames: string[];
+};
+
+export type ListAdminBuildsParams = {
+  limit?: number;
+  offset?: number;
+  organizationId?: number;
+  projectId?: number;
+  provider?: ListAdminBuildsProvider;
+  status?: ListAdminBuildsStatus;
+  since?: string;
+  until?: string;
+};
+
+export type ListAdminBuildsProvider =
+  (typeof ListAdminBuildsProvider)[keyof typeof ListAdminBuildsProvider];
+
+export const ListAdminBuildsProvider = {
+  replit: "replit",
+  vercel: "vercel",
+  render: "render",
+} as const;
+
+export type ListAdminBuildsStatus =
+  (typeof ListAdminBuildsStatus)[keyof typeof ListAdminBuildsStatus];
+
+export const ListAdminBuildsStatus = {
+  queued: "queued",
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
+  canceled: "canceled",
+} as const;
+
+export type ListAdminDeploymentsParams = {
+  limit?: number;
+  offset?: number;
+  organizationId?: number;
+  projectId?: number;
+  provider?: ListAdminDeploymentsProvider;
+  status?: ListAdminDeploymentsStatus;
+  since?: string;
+  until?: string;
+};
+
+export type ListAdminDeploymentsProvider =
+  (typeof ListAdminDeploymentsProvider)[keyof typeof ListAdminDeploymentsProvider];
+
+export const ListAdminDeploymentsProvider = {
+  replit: "replit",
+  vercel: "vercel",
+  render: "render",
+} as const;
+
+export type ListAdminDeploymentsStatus =
+  (typeof ListAdminDeploymentsStatus)[keyof typeof ListAdminDeploymentsStatus];
+
+export const ListAdminDeploymentsStatus = {
+  pending: "pending",
+  building: "building",
+  live: "live",
+  failed: "failed",
+  canceled: "canceled",
+  rolled_back: "rolled_back",
+} as const;
 
 export type ListAllBuildOrdersParams = {
   limit?: number;

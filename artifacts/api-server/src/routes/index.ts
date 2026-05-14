@@ -18,6 +18,7 @@ import aiRouter from "./ai";
 import adminAiRouter from "./admin-ai";
 import secretsRouter from "./secrets";
 import auditRouter from "./audit";
+import buildsRouter from "./builds";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(aiRouter);
 router.use(adminAiRouter);
 router.use(secretsRouter);
 router.use(auditRouter);
+router.use(buildsRouter);
 
 export default router;

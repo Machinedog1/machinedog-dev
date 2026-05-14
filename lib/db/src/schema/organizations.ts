@@ -38,6 +38,10 @@ export const organizationsTable = pgTable(
     // Token wallet — moved from legacy clients table.
     tokenBalance: integer("token_balance").notNull().default(0),
     totalTokensUsed: integer("total_tokens_used").notNull().default(0),
+    // Phase 6: per-org build-minute accounting for future per-minute pricing.
+    // Bumped atomically when a build_job reaches a terminal state with
+    // both startedAt + finishedAt populated; never decremented.
+    buildMinutesUsed: integer("build_minutes_used").notNull().default(0),
     // Account status — moved from legacy clients.status.
     status: text("status", { enum: ["active", "suspended", "invited"] })
       .notNull()

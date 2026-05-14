@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import clerkWebhookRouter from "./routes/clerk-webhook";
+import hostsWebhookRouter from "./routes/hosts-webhook";
 import { logger } from "./lib/logger";
 import { loadClerkAndOrganization } from "./lib/clerk";
 
@@ -34,6 +35,8 @@ app.use(
 app.use("/api/stripe/webhook", stripeWebhookRouter);
 // Clerk webhook also needs the raw body for svix signature verification
 app.use("/api", clerkWebhookRouter);
+// Host (Vercel/Render) webhooks need the raw body for HMAC verification.
+app.use("/api", hostsWebhookRouter);
 
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json({ limit: "2mb" }));
