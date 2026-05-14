@@ -13,4 +13,12 @@ export interface CreateProjectBody {
   summary?: string;
   liveUrl?: string;
   coverImageUrl?: string;
+  /** @nullable */
+  templateSlug?: string | null;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  /** @nullable */
+  githubDefaultBranch?: string | null;
 }

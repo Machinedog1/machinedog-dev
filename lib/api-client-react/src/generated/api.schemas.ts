@@ -35,6 +35,15 @@ export const ClientPortalSubscriptionStatus = {
   incomplete: "incomplete",
 } as const;
 
+/**
+ * @nullable
+ */
+export type ClientOrganization = {
+  id: string;
+  name: string;
+  planType: "free" | "starter" | "pro" | "healthcare" | "enterprise";
+} | null;
+
 export interface Client {
   id: number;
   /** @nullable */
@@ -50,6 +59,8 @@ export interface Client {
   /** @nullable */
   portalCurrentPeriodEnd?: string | null;
   createdAt: string;
+  /** @nullable */
+  organization?: ClientOrganization;
 }
 
 export interface ClientList {
@@ -129,6 +140,49 @@ export const ProjectStatus = {
   archived: "archived",
 } as const;
 
+export type ProjectProjectType =
+  (typeof ProjectProjectType)[keyof typeof ProjectProjectType];
+
+export const ProjectProjectType = {
+  web_app: "web_app",
+  mobile_app: "mobile_app",
+  api: "api",
+  internal_tool: "internal_tool",
+  healthcare_template: "healthcare_template",
+  other: "other",
+} as const;
+
+export type ProjectBaaStatus =
+  (typeof ProjectBaaStatus)[keyof typeof ProjectBaaStatus];
+
+export const ProjectBaaStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  active: "active",
+  expired: "expired",
+} as const;
+
+export type ProjectWorkspaceProvider =
+  (typeof ProjectWorkspaceProvider)[keyof typeof ProjectWorkspaceProvider];
+
+export const ProjectWorkspaceProvider = {
+  database: "database",
+  replit: "replit",
+  external: "external",
+} as const;
+
+export type ProjectWorkspaceStatus =
+  (typeof ProjectWorkspaceStatus)[keyof typeof ProjectWorkspaceStatus];
+
+export const ProjectWorkspaceStatus = {
+  idle: "idle",
+  starting: "starting",
+  running: "running",
+  stopping: "stopping",
+  error: "error",
+} as const;
+
 export type ProjectViewerRole =
   (typeof ProjectViewerRole)[keyof typeof ProjectViewerRole];
 
@@ -148,6 +202,21 @@ export interface Project {
   /** @nullable */
   coverImageUrl?: string | null;
   status: ProjectStatus;
+  projectType: ProjectProjectType;
+  framework: string;
+  /** @nullable */
+  templateSlug?: string | null;
+  healthcareMode: boolean;
+  phiAllowed: boolean;
+  baaStatus: ProjectBaaStatus;
+  workspaceProvider: ProjectWorkspaceProvider;
+  workspaceStatus: ProjectWorkspaceStatus;
+  /** @nullable */
+  workspaceUrl?: string | null;
+  /** @nullable */
+  lastStartedAt?: string | null;
+  /** @nullable */
+  lastStoppedAt?: string | null;
   /** @nullable */
   consultingBookingId?: number | null;
   /** @nullable */
@@ -170,6 +239,44 @@ export interface Project {
   updatedAt: string;
 }
 
+export type TemplateCategory =
+  (typeof TemplateCategory)[keyof typeof TemplateCategory];
+
+export const TemplateCategory = {
+  general: "general",
+  healthcare: "healthcare",
+} as const;
+
+export type TemplateProjectType =
+  (typeof TemplateProjectType)[keyof typeof TemplateProjectType];
+
+export const TemplateProjectType = {
+  web_app: "web_app",
+  mobile_app: "mobile_app",
+  api: "api",
+  internal_tool: "internal_tool",
+  healthcare_template: "healthcare_template",
+  other: "other",
+} as const;
+
+export interface Template {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  category: TemplateCategory;
+  framework: string;
+  projectType: TemplateProjectType;
+  isHealthcare: boolean;
+  tokenCost: number;
+  complianceNotes: string;
+  createdAt: string;
+}
+
+export interface TemplateList {
+  data: Template[];
+}
+
 export interface ProjectList {
   data: Project[];
 }
@@ -181,6 +288,14 @@ export interface CreateProjectBody {
   summary?: string;
   liveUrl?: string;
   coverImageUrl?: string;
+  /** @nullable */
+  templateSlug?: string | null;
+  /** @nullable */
+  githubOwner?: string | null;
+  /** @nullable */
+  githubRepo?: string | null;
+  /** @nullable */
+  githubDefaultBranch?: string | null;
 }
 
 export interface ReassignProjectOwnerBody {
@@ -765,6 +880,18 @@ export type ListMyPromptsParams = {
   limit?: number;
   offset?: number;
 };
+
+export type ListTemplatesParams = {
+  category?: ListTemplatesCategory;
+};
+
+export type ListTemplatesCategory =
+  (typeof ListTemplatesCategory)[keyof typeof ListTemplatesCategory];
+
+export const ListTemplatesCategory = {
+  general: "general",
+  healthcare: "healthcare",
+} as const;
 
 export type ListClientsParams = {
   limit?: number;

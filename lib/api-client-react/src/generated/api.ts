@@ -46,6 +46,7 @@ import type {
   ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
+  ListTemplatesParams,
   Project,
   ProjectComment,
   ProjectCommentList,
@@ -69,6 +70,7 @@ import type {
   SubmitLeadBody,
   SubmitLeadResponse,
   SubmitPromptBody,
+  TemplateList,
   TokenBundleList,
   TokenPurchaseList,
   UpdateProjectBody,
@@ -808,6 +810,100 @@ export const useCreateTokenCheckout = <
 > => {
   return useMutation(getCreateTokenCheckoutMutationOptions(options));
 };
+
+/**
+ * @summary List project starter templates
+ */
+export const getListTemplatesUrl = (params?: ListTemplatesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/templates?${stringifiedParams}`
+    : `/api/templates`;
+};
+
+export const listTemplates = async (
+  params?: ListTemplatesParams,
+  options?: RequestInit,
+): Promise<TemplateList> => {
+  return customFetch<TemplateList>(getListTemplatesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTemplatesQueryKey = (params?: ListTemplatesParams) => {
+  return [`/api/templates`, ...(params ? [params] : [])] as const;
+};
+
+export const getListTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListTemplatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTemplates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTemplatesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTemplates>>> = ({
+    signal,
+  }) => listTemplates(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTemplates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTemplates>>
+>;
+export type ListTemplatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List project starter templates
+ */
+
+export function useListTemplates<
+  TData = Awaited<ReturnType<typeof listTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListTemplatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTemplates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTemplatesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List my projects

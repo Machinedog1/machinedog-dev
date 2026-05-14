@@ -5,8 +5,12 @@
  * Machinedog Client Portal API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectBaaStatus } from "./projectBaaStatus";
+import type { ProjectProjectType } from "./projectProjectType";
 import type { ProjectStatus } from "./projectStatus";
 import type { ProjectViewerRole } from "./projectViewerRole";
+import type { ProjectWorkspaceProvider } from "./projectWorkspaceProvider";
+import type { ProjectWorkspaceStatus } from "./projectWorkspaceStatus";
 
 export interface Project {
   id: number;
@@ -19,6 +23,21 @@ export interface Project {
   /** @nullable */
   coverImageUrl?: string | null;
   status: ProjectStatus;
+  projectType: ProjectProjectType;
+  framework: string;
+  /** @nullable */
+  templateSlug?: string | null;
+  healthcareMode: boolean;
+  phiAllowed: boolean;
+  baaStatus: ProjectBaaStatus;
+  workspaceProvider: ProjectWorkspaceProvider;
+  workspaceStatus: ProjectWorkspaceStatus;
+  /** @nullable */
+  workspaceUrl?: string | null;
+  /** @nullable */
+  lastStartedAt?: Date | null;
+  /** @nullable */
+  lastStoppedAt?: Date | null;
   /** @nullable */
   consultingBookingId?: number | null;
   /** @nullable */

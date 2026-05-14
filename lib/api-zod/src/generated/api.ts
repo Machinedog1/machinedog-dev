@@ -36,6 +36,19 @@ export const GetMeResponse = zod.object({
   ]),
   portalCurrentPeriodEnd: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
+  organization: zod
+    .object({
+      id: zod.string(),
+      name: zod.string(),
+      planType: zod.enum([
+        "free",
+        "starter",
+        "pro",
+        "healthcare",
+        "enterprise",
+      ]),
+    })
+    .nullish(),
 });
 
 /**
@@ -178,6 +191,38 @@ export const CreateTokenCheckoutResponse = zod.object({
 });
 
 /**
+ * @summary List project starter templates
+ */
+export const ListTemplatesQueryParams = zod.object({
+  category: zod.enum(["general", "healthcare"]).optional(),
+});
+
+export const ListTemplatesResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      slug: zod.string(),
+      name: zod.string(),
+      description: zod.string(),
+      category: zod.enum(["general", "healthcare"]),
+      framework: zod.string(),
+      projectType: zod.enum([
+        "web_app",
+        "mobile_app",
+        "api",
+        "internal_tool",
+        "healthcare_template",
+        "other",
+      ]),
+      isHealthcare: zod.boolean(),
+      tokenCost: zod.number(),
+      complianceNotes: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
  * @summary List my projects
  */
 export const ListMyProjectsResponse = zod.object({
@@ -191,6 +236,36 @@ export const ListMyProjectsResponse = zod.object({
       liveUrl: zod.string().nullish(),
       coverImageUrl: zod.string().nullish(),
       status: zod.enum(["draft", "active", "completed", "archived"]),
+      projectType: zod.enum([
+        "web_app",
+        "mobile_app",
+        "api",
+        "internal_tool",
+        "healthcare_template",
+        "other",
+      ]),
+      framework: zod.string(),
+      templateSlug: zod.string().nullish(),
+      healthcareMode: zod.boolean(),
+      phiAllowed: zod.boolean(),
+      baaStatus: zod.enum([
+        "not_required",
+        "required",
+        "pending",
+        "active",
+        "expired",
+      ]),
+      workspaceProvider: zod.enum(["database", "replit", "external"]),
+      workspaceStatus: zod.enum([
+        "idle",
+        "starting",
+        "running",
+        "stopping",
+        "error",
+      ]),
+      workspaceUrl: zod.string().nullish(),
+      lastStartedAt: zod.coerce.date().nullish(),
+      lastStoppedAt: zod.coerce.date().nullish(),
       consultingBookingId: zod.number().nullish(),
       githubOwner: zod.string().nullish(),
       githubRepo: zod.string().nullish(),
@@ -217,6 +292,10 @@ export const CreateProjectBody = zod.object({
   summary: zod.string().optional(),
   liveUrl: zod.string().optional(),
   coverImageUrl: zod.string().optional(),
+  templateSlug: zod.string().nullish(),
+  githubOwner: zod.string().nullish(),
+  githubRepo: zod.string().nullish(),
+  githubDefaultBranch: zod.string().nullish(),
 });
 
 /**
@@ -277,6 +356,36 @@ export const GetProjectResponse = zod.object({
   liveUrl: zod.string().nullish(),
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
+  projectType: zod.enum([
+    "web_app",
+    "mobile_app",
+    "api",
+    "internal_tool",
+    "healthcare_template",
+    "other",
+  ]),
+  framework: zod.string(),
+  templateSlug: zod.string().nullish(),
+  healthcareMode: zod.boolean(),
+  phiAllowed: zod.boolean(),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  workspaceProvider: zod.enum(["database", "replit", "external"]),
+  workspaceStatus: zod.enum([
+    "idle",
+    "starting",
+    "running",
+    "stopping",
+    "error",
+  ]),
+  workspaceUrl: zod.string().nullish(),
+  lastStartedAt: zod.coerce.date().nullish(),
+  lastStoppedAt: zod.coerce.date().nullish(),
   consultingBookingId: zod.number().nullish(),
   githubOwner: zod.string().nullish(),
   githubRepo: zod.string().nullish(),
@@ -322,6 +431,36 @@ export const UpdateProjectResponse = zod.object({
   liveUrl: zod.string().nullish(),
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
+  projectType: zod.enum([
+    "web_app",
+    "mobile_app",
+    "api",
+    "internal_tool",
+    "healthcare_template",
+    "other",
+  ]),
+  framework: zod.string(),
+  templateSlug: zod.string().nullish(),
+  healthcareMode: zod.boolean(),
+  phiAllowed: zod.boolean(),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  workspaceProvider: zod.enum(["database", "replit", "external"]),
+  workspaceStatus: zod.enum([
+    "idle",
+    "starting",
+    "running",
+    "stopping",
+    "error",
+  ]),
+  workspaceUrl: zod.string().nullish(),
+  lastStartedAt: zod.coerce.date().nullish(),
+  lastStoppedAt: zod.coerce.date().nullish(),
   consultingBookingId: zod.number().nullish(),
   githubOwner: zod.string().nullish(),
   githubRepo: zod.string().nullish(),
@@ -1280,6 +1419,19 @@ export const ListClientsResponse = zod.object({
       ]),
       portalCurrentPeriodEnd: zod.coerce.date().nullish(),
       createdAt: zod.coerce.date(),
+      organization: zod
+        .object({
+          id: zod.string(),
+          name: zod.string(),
+          planType: zod.enum([
+            "free",
+            "starter",
+            "pro",
+            "healthcare",
+            "enterprise",
+          ]),
+        })
+        .nullish(),
     }),
   ),
   total: zod.number(),
@@ -1323,6 +1475,19 @@ export const GetClientByIdResponse = zod.object({
   ]),
   portalCurrentPeriodEnd: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
+  organization: zod
+    .object({
+      id: zod.string(),
+      name: zod.string(),
+      planType: zod.enum([
+        "free",
+        "starter",
+        "pro",
+        "healthcare",
+        "enterprise",
+      ]),
+    })
+    .nullish(),
 });
 
 /**
@@ -1385,6 +1550,19 @@ export const AdjustClientBalanceResponse = zod.object({
   ]),
   portalCurrentPeriodEnd: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
+  organization: zod
+    .object({
+      id: zod.string(),
+      name: zod.string(),
+      planType: zod.enum([
+        "free",
+        "starter",
+        "pro",
+        "healthcare",
+        "enterprise",
+      ]),
+    })
+    .nullish(),
 });
 
 /**
@@ -1401,6 +1579,36 @@ export const ListAllProjectsResponse = zod.object({
       liveUrl: zod.string().nullish(),
       coverImageUrl: zod.string().nullish(),
       status: zod.enum(["draft", "active", "completed", "archived"]),
+      projectType: zod.enum([
+        "web_app",
+        "mobile_app",
+        "api",
+        "internal_tool",
+        "healthcare_template",
+        "other",
+      ]),
+      framework: zod.string(),
+      templateSlug: zod.string().nullish(),
+      healthcareMode: zod.boolean(),
+      phiAllowed: zod.boolean(),
+      baaStatus: zod.enum([
+        "not_required",
+        "required",
+        "pending",
+        "active",
+        "expired",
+      ]),
+      workspaceProvider: zod.enum(["database", "replit", "external"]),
+      workspaceStatus: zod.enum([
+        "idle",
+        "starting",
+        "running",
+        "stopping",
+        "error",
+      ]),
+      workspaceUrl: zod.string().nullish(),
+      lastStartedAt: zod.coerce.date().nullish(),
+      lastStoppedAt: zod.coerce.date().nullish(),
       consultingBookingId: zod.number().nullish(),
       githubOwner: zod.string().nullish(),
       githubRepo: zod.string().nullish(),
@@ -1449,6 +1657,36 @@ export const ReassignProjectOwnerResponse = zod.object({
   liveUrl: zod.string().nullish(),
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]),
+  projectType: zod.enum([
+    "web_app",
+    "mobile_app",
+    "api",
+    "internal_tool",
+    "healthcare_template",
+    "other",
+  ]),
+  framework: zod.string(),
+  templateSlug: zod.string().nullish(),
+  healthcareMode: zod.boolean(),
+  phiAllowed: zod.boolean(),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  workspaceProvider: zod.enum(["database", "replit", "external"]),
+  workspaceStatus: zod.enum([
+    "idle",
+    "starting",
+    "running",
+    "stopping",
+    "error",
+  ]),
+  workspaceUrl: zod.string().nullish(),
+  lastStartedAt: zod.coerce.date().nullish(),
+  lastStoppedAt: zod.coerce.date().nullish(),
   consultingBookingId: zod.number().nullish(),
   githubOwner: zod.string().nullish(),
   githubRepo: zod.string().nullish(),

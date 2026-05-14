@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, gt, and } from "drizzle-orm";
 import { z } from "zod";
-import { db, clientsTable } from "@workspace/db";
+import { db, clientsTable, resolveOrganizationForClient } from "@workspace/db";
 import { hashPassword, verifyPassword, generateSecureToken } from "../lib/passwords";
 import {
   createSession,
@@ -278,8 +278,11 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
 /**
  * GET /api/auth/me — return current session's client (or 401).
  */
-router.get("/auth/me", requireAuth, (req, res) => {
+router.get("/auth/me", requireAuth, async (req, res) => {
   const c = req.dbClient!;
+  // Resolve the org so the frontend can gate plan-restricted surfaces
+  // (e.g. healthcare templates) without a second round-trip.
+  const resolved = await resolveOrganizationForClient(c.id);
   res.json({
     client: {
       id: c.id,
@@ -289,6 +292,13 @@ router.get("/auth/me", requireAuth, (req, res) => {
       tokenBalance: c.tokenBalance,
       portalSubscriptionStatus: c.portalSubscriptionStatus,
       portalCurrentPeriodEnd: c.portalCurrentPeriodEnd,
+      organization: resolved
+        ? {
+            id: resolved.organization.id,
+            name: resolved.organization.name,
+            planType: resolved.organization.planType,
+          }
+        : null,
     },
   });
 });

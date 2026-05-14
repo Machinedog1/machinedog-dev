@@ -8,6 +8,7 @@ export * from "./projects";
 export * from "./project-members";
 export * from "./project-comments";
 export * from "./project-files";
+export * from "./templates";
 export * from "./consulting-bookings";
 export * from "./intake-submissions";
 export * from "./leads";

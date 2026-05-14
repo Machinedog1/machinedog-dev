@@ -28,6 +28,8 @@ tags:
     description: Public Stripe Checkout entry points (no auth)
   - name: storage
     description: Object storage upload and serving endpoints
+  - name: templates
+    description: Project starter templates
 
 paths:
   /healthz:
@@ -205,6 +207,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CheckoutResponse"
+
+  # ─── Templates ─────────────────────────────────────────────────────────────
+
+  /templates:
+    get:
+      operationId: listTemplates
+      tags: [templates]
+      summary: List project starter templates
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [general, healthcare]
+      responses:
+        "200":
+          description: Templates list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateList"
 
   # ─── Projects ──────────────────────────────────────────────────────────────
 
@@ -1241,6 +1264,21 @@ components:
         createdAt:
           type: string
           format: date-time
+        # The organization the client belongs to. Optional because legacy
+        # clients may not yet have a backfilled organization row. The
+        # frontend uses `organization.planType` to gate plan-restricted
+        # surfaces (e.g. healthcare templates).
+        organization:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            planType:
+              type: string
+              enum: [free, starter, pro, healthcare, enterprise]
+          required: [id, name, planType]
       required: [id, email, tokenBalance, totalTokensUsed, isAdmin, status, portalSubscriptionStatus, createdAt]
 
     ClientList:
@@ -1395,6 +1433,34 @@ components:
         status:
           type: string
           enum: [draft, active, completed, archived]
+        projectType:
+          type: string
+          enum: [web_app, mobile_app, api, internal_tool, healthcare_template, other]
+        framework:
+          type: string
+        templateSlug:
+          type: ["string", "null"]
+        healthcareMode:
+          type: boolean
+        phiAllowed:
+          type: boolean
+        baaStatus:
+          type: string
+          enum: [not_required, required, pending, active, expired]
+        workspaceProvider:
+          type: string
+          enum: [database, replit, external]
+        workspaceStatus:
+          type: string
+          enum: [idle, starting, running, stopping, error]
+        workspaceUrl:
+          type: ["string", "null"]
+        lastStartedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastStoppedAt:
+          type: ["string", "null"]
+          format: date-time
         consultingBookingId:
           type: ["integer", "null"]
         githubOwner:
@@ -1427,7 +1493,46 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, clientId, title, description, summary, status, githubDefaultBranch, viewerRole, createdAt, updatedAt]
+      required: [id, clientId, title, description, summary, status, projectType, framework, healthcareMode, phiAllowed, baaStatus, workspaceProvider, workspaceStatus, githubDefaultBranch, viewerRole, createdAt, updatedAt]
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [general, healthcare]
+        framework:
+          type: string
+        projectType:
+          type: string
+          enum: [web_app, mobile_app, api, internal_tool, healthcare_template, other]
+        isHealthcare:
+          type: boolean
+        tokenCost:
+          type: integer
+        complianceNotes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, slug, name, description, category, framework, projectType, isHealthcare, tokenCost, complianceNotes, createdAt]
+
+    TemplateList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Template"
+      required: [data]
 
     ProjectList:
       type: object
@@ -1452,6 +1557,21 @@ components:
           type: string
         coverImageUrl:
           type: string
+        # When set, the new project is bootstrapped from this template's
+        # starterFiles. The server validates plan tier for healthcare
+        # templates and copies starter files into project_files. Mutually
+        # exclusive with githubOwner/githubRepo (which trigger import).
+        templateSlug:
+          type: ["string", "null"]
+        # When set, the project is created with these GitHub fields and the
+        # admin /admin/projects/import-github flow is bypassed. Used by the
+        # 3-step wizard when origin == "github".
+        githubOwner:
+          type: ["string", "null"]
+        githubRepo:
+          type: ["string", "null"]
+        githubDefaultBranch:
+          type: ["string", "null"]
       required: [title, description]
 
     ReassignProjectOwnerBody:

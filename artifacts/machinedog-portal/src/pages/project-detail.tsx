@@ -24,6 +24,7 @@ import {
   getListProjectPromptsQueryKey,
   getListProjectFilesQueryKey,
   getGetMeQueryKey,
+  type Project,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -56,6 +57,15 @@ import {
   Check,
   RotateCw,
   Plug,
+  GitCommit,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  KeyRound,
+  History,
+  Sparkles,
+  ShieldCheck,
+  Stethoscope,
+  LayoutTemplate,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1271,6 +1281,14 @@ export default function ProjectDetailPage() {
       </Dialog>
 
       {view === "details" && (<>
+      {/* ─── Workspace action bar shell ─────────────────────────────────────
+          Phase 2 surface for the workspace lifecycle controls. The actual
+          start/stop/branch/PR plumbing lands in Phase 3 (workspace UI) and
+          Phase 5 (live preview). For now, render the controls disabled with
+          tooltips so the Information Architecture is locked in and design
+          can iterate on copy without re-shipping the page. */}
+      <ProjectActionBarShell project={project} />
+
       <div className="glass-strong rounded-2xl overflow-hidden">
         {project.coverImageUrl && (
           <div
@@ -2135,6 +2153,162 @@ function LiveSitePanel({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── ProjectActionBarShell ────────────────────────────────────────────────
+// Workspace lifecycle action bar. Phase 2 ships this as a pure shell —
+// every interactive button is disabled with a tooltip explaining when the
+// real plumbing arrives. This locks in IA so the workspace UI (Phase 3+)
+// just wires handlers in without re-shipping markup.
+function ProjectActionBarShell({ project }: { project: Project }) {
+  const status = project.workspaceStatus ?? "idle";
+  const STATUS_COPY: Record<string, string> = {
+    idle: "Workspace not started",
+    starting: "Workspace starting…",
+    running: "Workspace running",
+    stopping: "Workspace stopping…",
+    error: "Workspace error",
+  };
+  const STATUS_DOT: Record<string, string> = {
+    idle: "bg-muted-foreground/40",
+    starting: "bg-amber-500 animate-pulse",
+    running: "bg-emerald-500 shadow-emerald-500/60 shadow-md",
+    stopping: "bg-amber-500 animate-pulse",
+    error: "bg-red-500",
+  };
+  // Phase 2 ships these as a disabled shell so the IA is locked in. The
+  // tooltip on each button calls out the phase that wires it up so design
+  // and ops can iterate without re-shipping markup.
+  const ACTIONS: {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    tooltip: string;
+    primary?: boolean;
+  }[] = [
+    {
+      id: "save",
+      label: "Save",
+      icon: Save,
+      tooltip: "File saves land in Phase 3 (workspace UI).",
+    },
+    {
+      id: "ai-plan",
+      label: "AI Plan",
+      icon: Sparkles,
+      tooltip: "Per-template AI plans land in Phase 4.",
+    },
+    {
+      id: "commit",
+      label: "Commit",
+      icon: GitCommit,
+      tooltip: "Workspace-scoped commits land in Phase 3.",
+    },
+    {
+      id: "pull",
+      label: "Pull",
+      icon: ArrowDownToLine,
+      tooltip: "Pull from origin lands in Phase 3.",
+    },
+    {
+      id: "push",
+      label: "Push",
+      icon: ArrowUpFromLine,
+      tooltip: "Push to origin lands in Phase 3.",
+    },
+    {
+      id: "publish",
+      label: "Publish",
+      icon: Rocket,
+      tooltip: "Publish + live preview land in Phase 5.",
+      primary: true,
+    },
+    {
+      id: "secrets",
+      label: "Secrets",
+      icon: KeyRound,
+      tooltip: "Per-project secrets manager lands in Phase 6.",
+    },
+    {
+      id: "history",
+      label: "History",
+      icon: History,
+      tooltip: "Change history & audit timeline lands in Phase 7.",
+    },
+  ];
+  return (
+    <div
+      data-testid="action-bar-shell"
+      className="glass rounded-xl ring-1 ring-border/30 px-3 py-2 flex items-center gap-2 flex-wrap"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[status] ?? STATUS_DOT.idle}`} />
+        <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+          {STATUS_COPY[status] ?? STATUS_COPY.idle}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {project.healthcareMode && (
+          <span
+            data-testid="badge-healthcare"
+            className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-emerald-300 px-2 py-0.5 rounded bg-emerald-500/10 ring-1 ring-emerald-500/30"
+          >
+            <Stethoscope className="h-3 w-3" /> Healthcare
+          </span>
+        )}
+        {project.healthcareMode && (
+          <span
+            data-testid="badge-baa-status"
+            className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded ring-1 ${
+              project.phiAllowed
+                ? "text-emerald-300 bg-emerald-500/10 ring-emerald-500/30"
+                : "text-amber-300 bg-amber-500/10 ring-amber-500/30"
+            }`}
+            title={
+              project.phiAllowed
+                ? "BAA active. PHI capture enabled."
+                : `BAA ${project.baaStatus ?? "required"}. PHI capture disabled until BAA is signed (Phase 8).`
+            }
+          >
+            <ShieldCheck className="h-3 w-3" />
+            BAA {project.baaStatus ?? "required"}
+          </span>
+        )}
+        {project.templateSlug && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded bg-background/40 ring-1 ring-border/30">
+            <LayoutTemplate className="h-3 w-3" /> {project.templateSlug}
+          </span>
+        )}
+        {project.framework && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded bg-background/40 ring-1 ring-border/30">
+            <Code2 className="h-3 w-3" /> {project.framework}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {ACTIONS.map((a) => {
+          const Icon = a.icon;
+          return (
+            <Button
+              key={a.id}
+              size="sm"
+              variant={a.primary ? "default" : "outline"}
+              disabled
+              title={a.tooltip}
+              data-testid={`button-workspace-${a.id}`}
+              className={`font-mono text-[11px] uppercase ${a.primary ? "bg-primary/40 text-primary-foreground" : ""}`}
+            >
+              <Icon className="h-3.5 w-3.5 mr-1.5" /> {a.label}
+            </Button>
+          );
+        })}
+      </div>
     </div>
   );
 }

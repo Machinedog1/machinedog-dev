@@ -8,6 +8,8 @@ import {
   Coins,
   CreditCard,
   Briefcase,
+  FolderGit2,
+  LayoutTemplate,
   Settings,
   ShieldAlert,
   Menu,
@@ -54,6 +56,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const navItems = [
     { href: "/", label: "Console", icon: Terminal },
+    { href: "/projects", label: "Projects", icon: FolderGit2 },
+    { href: "/templates", label: "Templates", icon: LayoutTemplate },
     { href: "/history", label: "History", icon: History },
     { href: "/tokens", label: "Tokens", icon: Coins },
     { href: "/billing", label: "Billing", icon: CreditCard },

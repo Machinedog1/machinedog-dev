@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -18,6 +18,35 @@ export const projectsTable = pgTable("projects", {
   liveUrl: text("live_url"),
   coverImageUrl: text("cover_image_url"),
   status: text("status", { enum: ["draft", "active", "completed", "archived"] }).notNull().default("draft"),
+  // Phase 2: Template / project-type metadata. Drives Template Center filters,
+  // per-template AI system prompts (Phase 4), and healthcare gating (Phase 8).
+  projectType: text("project_type", {
+    enum: ["web_app", "mobile_app", "api", "internal_tool", "healthcare_template", "other"],
+  }).notNull().default("web_app"),
+  framework: text("framework").notNull().default("react"),
+  // Slug of the template the project was created from (null for blank /
+  // GitHub-imported projects). Lets us re-render the original template badge
+  // and gate per-template AI system prompts in later phases.
+  templateSlug: text("template_slug"),
+  // Healthcare tier flags. healthcareMode unlocks the compliance UI (Phase 8);
+  // phiAllowed only flips on after the org's BAA is signed.
+  healthcareMode: boolean("healthcare_mode").notNull().default(false),
+  phiAllowed: boolean("phi_allowed").notNull().default(false),
+  baaStatus: text("baa_status", {
+    enum: ["not_required", "required", "pending", "active", "expired"],
+  }).notNull().default("not_required"),
+  // Workspace runtime metadata. v1 uses a database-backed file tree
+  // (Phase 3) rather than a real per-project sandbox, but we record what
+  // provider would back this workspace if we promoted it later.
+  workspaceProvider: text("workspace_provider", {
+    enum: ["database", "replit", "external"],
+  }).notNull().default("database"),
+  workspaceStatus: text("workspace_status", {
+    enum: ["idle", "starting", "running", "stopping", "error"],
+  }).notNull().default("idle"),
+  workspaceUrl: text("workspace_url"),
+  lastStartedAt: timestamp("last_started_at", { withTimezone: true }),
+  lastStoppedAt: timestamp("last_stopped_at", { withTimezone: true }),
   consultingBookingId: integer("consulting_booking_id"),
   // GitHub repo Machinedog opens change-request PRs against. When unset, the
   // change-request flow runs in "draft only" mode (no PR / no preview).

@@ -5,6 +5,7 @@
  * Machinedog Client Portal API
  * OpenAPI spec version: 0.1.0
  */
+import type { ClientOrganization } from "./clientOrganization";
 import type { ClientPortalSubscriptionStatus } from "./clientPortalSubscriptionStatus";
 import type { ClientStatus } from "./clientStatus";
 
@@ -23,4 +24,6 @@ export interface Client {
   /** @nullable */
   portalCurrentPeriodEnd?: Date | null;
   createdAt: Date;
+  /** @nullable */
+  organization?: ClientOrganization;
 }

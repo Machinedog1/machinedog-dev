@@ -128,6 +128,32 @@ export class ObjectStorageService {
     });
   }
 
+  /**
+   * Server-side upload of inline content (e.g. starter file contents seeded
+   * during project creation). Writes the bytes directly into the same
+   * private bucket layout used by user uploads and returns the
+   * `/objects/<entityId>` path that the rest of the system already knows
+   * how to read via getObjectEntityFile / the /objects/* download route.
+   */
+  async uploadInlineObject({
+    contents,
+    contentType,
+  }: {
+    contents: string | Buffer;
+    contentType: string;
+  }): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const entityId = randomUUID();
+    const fullPath = `${privateObjectDir.replace(/\/$/, "")}/uploads/${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const file = objectStorageClient.bucket(bucketName).file(objectName);
+    await file.save(typeof contents === "string" ? Buffer.from(contents, "utf8") : contents, {
+      contentType,
+      resumable: false,
+    });
+    return `/objects/uploads/${entityId}`;
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();

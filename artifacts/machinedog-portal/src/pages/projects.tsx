@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useListMyProjects, useCreateProject } from "@workspace/api-client-react";
+import { useListMyProjects } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   FolderGit2,
   Plus,
@@ -13,11 +11,12 @@ import {
   CheckCircle2,
   ExternalLink,
   Users,
+  Code2,
+  Stethoscope,
+  Github,
+  LayoutTemplate,
 } from "lucide-react";
 import { format } from "date-fns";
-import { useQueryClient } from "@tanstack/react-query";
-import { getListMyProjectsQueryKey } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 
@@ -37,55 +36,18 @@ const statusIcons = {
 
 export default function ProjectsPage() {
   const { data, isLoading } = useListMyProjects();
-  const createProject = useCreateProject();
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [location, setLocation] = useLocation();
 
-  // Auto-open the create dialog when navigated to with ?new=1 (e.g. from the
-  // ProjectsPicker "New project" footer link). Clears the query param after
-  // opening so a refresh doesn't re-trigger.
+  // Legacy ?new=1 entry-point now bounces straight into the 3-step wizard.
+  // Keeping this in place avoids breaking the ProjectsPicker "New project"
+  // shortcut and any old bookmarks.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("new") === "1") {
-      setOpen(true);
-      params.delete("new");
-      const next = params.toString();
-      setLocation(next ? `/projects?${next}` : "/projects", { replace: true });
+      setLocation("/projects/new", { replace: true });
     }
   }, [location, setLocation]);
-
-  const [title, setTitle] = useState("");
-  const [summary, setSummary] = useState("");
-  const [liveUrl, setLiveUrl] = useState("");
-  const [description, setDescription] = useState("");
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    createProject.mutate(
-      {
-        data: {
-          title,
-          description,
-          summary,
-          liveUrl: liveUrl.trim() || undefined,
-        },
-      },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListMyProjectsQueryKey() });
-          setOpen(false);
-          setTitle("");
-          setSummary("");
-          setLiveUrl("");
-          setDescription("");
-        },
-      },
-    );
-  };
 
   return (
     <div className="h-full flex flex-col p-4 md:p-8 max-w-5xl mx-auto w-full gap-6">
@@ -100,66 +62,21 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="font-mono bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+        <div className="flex items-center gap-2">
+          <Link href="/templates">
+            <Button variant="outline" className="font-mono" data-testid="button-browse-templates">
+              <LayoutTemplate className="h-4 w-4 mr-2" /> BROWSE_TEMPLATES
+            </Button>
+          </Link>
+          <Link href="/projects/new">
+            <Button
+              className="font-mono bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+              data-testid="button-new-project"
+            >
               <Plus className="h-4 w-4 mr-2" /> NEW_PROJECT
             </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle className="font-mono flex items-center gap-2">
-                <FolderGit2 className="h-5 w-5 text-primary" /> INIT_PROJECT
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-muted-foreground">TITLE</label>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. BeeSuite.farm"
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-muted-foreground">ONE-LINE SUMMARY</label>
-                <Input
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                  placeholder="Beekeeping operations platform"
-                  maxLength={160}
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-muted-foreground">DEV PREVIEW URL</label>
-                <Input
-                  value={liveUrl}
-                  onChange={(e) => setLiveUrl(e.target.value)}
-                  placeholder="https://your-app.replit.dev"
-                  type="url"
-                  className="font-mono"
-                />
-                <p className="text-[10px] font-mono text-muted-foreground/70">
-                  The Replit .replit.dev URL of the project's dev environment. Auto-loads in the preview pane when you open the project.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-mono font-bold text-muted-foreground">DESCRIPTION</label>
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Context and goals..."
-                  className="font-mono min-h-[100px] resize-y"
-                />
-              </div>
-              <Button type="submit" className="w-full font-mono bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20" disabled={createProject.isPending || !title.trim()}>
-                {createProject.isPending ? "INITIALIZING..." : "CREATE"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -194,11 +111,34 @@ export default function ProjectsPage() {
                     </span>
                   </div>
 
-                  {project.viewerRole === "collaborator" && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-primary self-start px-2 py-0.5 rounded bg-primary/10 ring-1 ring-primary/20">
-                      <Users className="h-3 w-3" /> Shared with me
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {project.viewerRole === "collaborator" && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-primary px-2 py-0.5 rounded bg-primary/10 ring-1 ring-primary/20">
+                        <Users className="h-3 w-3" /> Shared
+                      </span>
+                    )}
+                    {project.healthcareMode && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-emerald-300 px-2 py-0.5 rounded bg-emerald-500/10 ring-1 ring-emerald-500/30">
+                        <Stethoscope className="h-3 w-3" /> Healthcare
+                      </span>
+                    )}
+                    {project.templateSlug && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded bg-background/40 ring-1 ring-border/30">
+                        <LayoutTemplate className="h-3 w-3" /> {project.templateSlug}
+                      </span>
+                    )}
+                    {project.githubOwner && project.githubRepo && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded bg-background/40 ring-1 ring-border/30">
+                        <Github className="h-3 w-3" />
+                        {project.githubOwner}/{project.githubRepo}
+                      </span>
+                    )}
+                    {project.framework && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded bg-background/40 ring-1 ring-border/30">
+                        <Code2 className="h-3 w-3" /> {project.framework}
+                      </span>
+                    )}
+                  </div>
 
                   <p className="text-sm text-muted-foreground flex-1 line-clamp-3 relative z-10">
                     {project.summary || project.description || "No description provided."}

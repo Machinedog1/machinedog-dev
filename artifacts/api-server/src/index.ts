@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { bootstrapAdmin } from "./lib/bootstrap-admin";
+import { seedTemplates } from "./lib/seed-templates";
 import { isStripeConfigured, isDemoBillingAllowed } from "./lib/billing-service";
 
 const rawPort = process.env["PORT"];
@@ -43,5 +44,8 @@ app.listen(port, (err) => {
   // Fire-and-forget bootstrap so it doesn't block request handling.
   bootstrapAdmin().catch((boot) => {
     logger.error({ err: boot }, "bootstrapAdmin threw");
+  });
+  seedTemplates().catch((err) => {
+    logger.error({ err }, "seedTemplates threw");
   });
 });

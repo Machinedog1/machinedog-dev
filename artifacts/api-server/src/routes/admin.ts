@@ -35,6 +35,7 @@ import {
 import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
 import { generateSecureToken } from "../lib/passwords";
 import { sendInviteEmail } from "../lib/mailer";
+import { importGithubAsProject } from "../lib/github-import";
 import {
   getConnectedGithubUser,
   listConnectedUserRepos,
@@ -564,80 +565,31 @@ router.post("/admin/projects/import-github", async (req, res): Promise<void> => 
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const owner = body.data.owner.trim();
-  const repo = body.data.repo.trim();
-  const defaultBranch = body.data.defaultBranch.trim() || "main";
-
-  // GitHub owner/repo names are case-insensitive — match the same
-  // normalization used on the list side so "Owner/Repo" and "owner/repo"
-  // dedupe against each other.
-  const [existing] = await db
-    .select()
-    .from(projectsTable)
-    .where(
-      and(
-        sql`lower(${projectsTable.githubOwner}) = ${owner.toLowerCase()}`,
-        sql`lower(${projectsTable.githubRepo}) = ${repo.toLowerCase()}`,
-      ),
-    );
-  if (existing) {
-    res
-      .status(409)
-      .json({
-        error: `Project for ${existing.githubOwner}/${existing.githubRepo} already exists (id ${existing.id}).`,
-      });
+  // Reuse the shared github-import service so admin and the user-facing
+  // wizard create-from-github path share identical dedupe semantics and
+  // normalization.
+  const outcome = await importGithubAsProject({
+    clientId: req.dbClient!.id,
+    owner: body.data.owner,
+    repo: body.data.repo,
+    defaultBranch: body.data.defaultBranch,
+    title: body.data.title ?? undefined,
+  });
+  if (!outcome.ok) {
+    res.status(409).json({ error: outcome.message });
     return;
   }
-
-  const title =
-    body.data.title?.trim() ||
-    repo
-      .replace(/[-_]+/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-
-  // Wrap the insert so a concurrent import of the same repo (which would
-  // race past the read-then-insert dedupe above) trips the
-  // projects_github_owner_repo_unique index and is reported as a clean 409
-  // instead of a 500.
-  let row;
-  try {
-    [row] = await db
-      .insert(projectsTable)
-      .values({
-        clientId: req.dbClient!.id,
-        title,
-        description: `Imported from github.com/${owner}/${repo}`,
-        summary: "",
-        status: "draft",
-        githubOwner: owner,
-        githubRepo: repo,
-        githubDefaultBranch: defaultBranch,
-        heartbeatToken: randomBytes(16).toString("hex"),
-      })
-      .returning();
-  } catch (err: unknown) {
-    const code = (err as { code?: string } | null)?.code;
-    if (code === "23505") {
-      res
-        .status(409)
-        .json({ error: `Project for ${owner}/${repo} already exists.` });
-      return;
-    }
-    throw err;
-  }
-
   req.log.info(
     {
-      projectId: row.id,
-      owner,
-      repo,
-      defaultBranch,
+      projectId: outcome.project.id,
+      owner: outcome.project.githubOwner,
+      repo: outcome.project.githubRepo,
+      defaultBranch: outcome.project.githubDefaultBranch,
       adminClientId: req.dbClient!.id,
     },
     "Admin imported GitHub repo as project",
   );
-
-  res.status(201).json({ ...row, viewerRole: "owner" });
+  res.status(201).json({ ...outcome.project, viewerRole: "owner" });
 });
 
 router.get("/admin/orders", async (req, res): Promise<void> => {

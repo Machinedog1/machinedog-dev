@@ -19,6 +19,8 @@ import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
 import BillingPage from "@/pages/billing";
 import ProjectsPage from "@/pages/projects";
+import ProjectNewPage from "@/pages/project-new";
+import TemplatesPage from "@/pages/templates";
 import ProjectDetailPage from "@/pages/project-detail";
 import WorkPage from "@/pages/work";
 import ConsultingPage from "@/pages/consulting";
@@ -155,6 +157,12 @@ function AuthedRoutes() {
       </Route>
       <Route path="/projects">
         <AuthGuard><ProjectsPage /></AuthGuard>
+      </Route>
+      <Route path="/projects/new">
+        <AuthGuard><ProjectNewPage /></AuthGuard>
+      </Route>
+      <Route path="/templates">
+        <AuthGuard><TemplatesPage /></AuthGuard>
       </Route>
       <Route path="/projects/:id">
         <AuthGuard><ProjectDetailPage /></AuthGuard>

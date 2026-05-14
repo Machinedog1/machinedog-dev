@@ -10,8 +10,10 @@ import {
   clientsTable,
   changeRequestsTable,
   changeRequestEventsTable,
+  templatesTable,
   type Project,
 } from "@workspace/db";
+import { resolveOrganizationForClient } from "@workspace/db";
 import {
   ListMyProjectsResponse,
   CreateProjectBody,
@@ -53,7 +55,10 @@ import { sendProjectInviteEmail } from "../lib/project-invites";
 import { logger } from "../lib/logger";
 import { runClaudePrompt } from "../lib/anthropic";
 import { computeChargedTokens } from "../lib/billing";
+import { deduct as deductTokens, getBalance as getTokenBalance } from "../lib/token-service";
+import { importGithubAsProject } from "../lib/github-import";
 import { generateSecureToken } from "../lib/passwords";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const PROJECT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -175,19 +180,219 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const [row] = await db
-      .insert(projectsTable)
-      .values({
+    const data = parsed.data;
+    const templateSlug = data.templateSlug?.trim() || null;
+    const githubOwner = data.githubOwner?.trim() || null;
+    const githubRepo = data.githubRepo?.trim() || null;
+    const githubDefaultBranch = data.githubDefaultBranch?.trim() || "main";
+
+    // The wizard sends one of: blank (neither), template (templateSlug), or
+    // GitHub (owner+repo). Mixing them would imply ambiguous origin, so we
+    // bail rather than guess which one wins.
+    if (templateSlug && (githubOwner || githubRepo)) {
+      res
+        .status(400)
+        .json({ error: "Cannot combine templateSlug with GitHub fields." });
+      return;
+    }
+    // Reject partial GitHub input — owner without repo (or vice versa) is
+    // ambiguous and would silently fall back to a blank project, which has
+    // bitten the wizard in QA. Require both, or neither.
+    if (Boolean(githubOwner) !== Boolean(githubRepo)) {
+      res.status(400).json({
+        error:
+          "githubOwner and githubRepo must be provided together for a GitHub-origin project.",
+        code: "github_partial_input",
+      });
+      return;
+    }
+
+    let template: typeof templatesTable.$inferSelect | undefined;
+    if (templateSlug) {
+      [template] = await db
+        .select()
+        .from(templatesTable)
+        .where(eq(templatesTable.slug, templateSlug));
+      if (!template) {
+        res.status(404).json({ error: `Template "${templateSlug}" not found.` });
+        return;
+      }
+      // Healthcare templates are gated by org plan tier — surface a clear
+      // upgrade-required error rather than silently allowing creation.
+      const resolved = await resolveOrganizationForClient(req.dbClient!.id);
+      if (template.isHealthcare) {
+        const tier = resolved?.organization.planType ?? null;
+        if (tier !== "healthcare" && tier !== "enterprise") {
+          res.status(403).json({
+            error:
+              "This template requires a Healthcare or Enterprise plan. Upgrade your workspace to enable HIPAA-ready templates.",
+            code: "plan_upgrade_required",
+            requiredPlans: ["healthcare", "enterprise"],
+          });
+          return;
+        }
+      }
+      // Premium-template token preflight. Templates with a non-zero
+      // tokenCost charge the org's token ledger when a project is created
+      // from them. We block creation up-front rather than half-creating a
+      // project and failing on the deduct.
+      if ((template.tokenCost ?? 0) > 0) {
+        if (!resolved) {
+          res.status(403).json({
+            error:
+              "This template requires a token balance, but your workspace has no organization configured.",
+            code: "no_organization",
+          });
+          return;
+        }
+        const balance = await getTokenBalance(resolved.organization.id);
+        if (balance < template.tokenCost) {
+          res.status(402).json({
+            error: `This template costs ${template.tokenCost} tokens. Your balance is ${balance}.`,
+            code: "insufficient_tokens",
+            tokenCost: template.tokenCost,
+            tokenBalance: balance,
+          });
+          return;
+        }
+      }
+    }
+
+    let row: typeof projectsTable.$inferSelect;
+    if (githubOwner && githubRepo) {
+      // GitHub origin — delegate to the shared importGithubAsProject
+      // service so the wizard and the admin /admin/projects/import-github
+      // endpoint share dedupe semantics, normalization, and the unique-
+      // index race handling.
+      const outcome = await importGithubAsProject({
         clientId: req.dbClient!.id,
-        title: parsed.data.title,
-        description: parsed.data.description,
-        summary: parsed.data.summary ?? "",
-        liveUrl: parsed.data.liveUrl?.trim() || null,
-        coverImageUrl: parsed.data.coverImageUrl?.trim() || null,
-        status: "draft",
-        heartbeatToken: generateHeartbeatToken(),
-      })
-      .returning();
+        owner: githubOwner,
+        repo: githubRepo,
+        defaultBranch: githubDefaultBranch,
+        title: data.title,
+        description: data.description,
+        summary: data.summary ?? "",
+      });
+      if (!outcome.ok) {
+        res.status(409).json({
+          error: outcome.message,
+          code: "github_repo_already_imported",
+          existingProjectId: outcome.existingProjectId,
+        });
+        return;
+      }
+      row = outcome.project;
+    } else {
+      [row] = await db
+        .insert(projectsTable)
+        .values({
+          clientId: req.dbClient!.id,
+          title: data.title,
+          description: data.description,
+          summary: data.summary ?? "",
+          liveUrl: data.liveUrl?.trim() || null,
+          coverImageUrl: data.coverImageUrl?.trim() || null,
+          status: "draft",
+          projectType: template?.projectType ?? "web_app",
+          framework: template?.framework ?? "react",
+          templateSlug: template?.slug ?? null,
+          healthcareMode: template?.isHealthcare ?? false,
+          // PHI capture stays disabled even for healthcare templates until
+          // the BAA flow (Phase 8) flips it on. We only mark BAA "required"
+          // so the UI prompts the operator.
+          phiAllowed: false,
+          baaStatus: template?.isHealthcare ? "required" : "not_required",
+          heartbeatToken: generateHeartbeatToken(),
+        })
+        .returning();
+    }
+
+    // Materialize starter files into project_files so the project opens
+    // with at least one row, regardless of origin:
+    //   - template origin: copy each templates.starterFiles entry
+    //   - blank origin:    seed a generated README.md
+    //   - github origin:   skipped (the repo IS the starter content)
+    // Each row's content is uploaded to object storage and recorded with a
+    // real `/objects/...` path so the existing files UI (which links
+    // straight at objectPath) and the /objects/* download route both work.
+    const storage = new ObjectStorageService();
+    type StarterFile = { path: string; contents: string; contentType?: string };
+    const filesToSeed: StarterFile[] = [];
+    if (template && Array.isArray(template.starterFiles) && template.starterFiles.length > 0) {
+      for (const f of template.starterFiles) {
+        filesToSeed.push({
+          path: f.path,
+          contents: f.contents ?? "",
+          contentType: "text/plain",
+        });
+      }
+    } else if (!template && !(githubOwner && githubRepo)) {
+      filesToSeed.push({
+        path: "README.md",
+        contents: `# ${row.title}\n\n${row.summary ?? row.description ?? "New Machinedog project."}\n`,
+        contentType: "text/markdown",
+      });
+    }
+    if (filesToSeed.length > 0) {
+      try {
+        const uploaded = await Promise.all(
+          filesToSeed.map(async (f) => {
+            const objectPath = await storage.uploadInlineObject({
+              contents: f.contents,
+              contentType: f.contentType ?? "text/plain",
+            });
+            return {
+              projectId: row.id,
+              uploadedByClientId: req.dbClient!.id,
+              name: f.path,
+              contentType: f.contentType ?? "text/plain",
+              sizeBytes: Buffer.byteLength(f.contents, "utf8"),
+              objectPath,
+            };
+          }),
+        );
+        await db.insert(projectFilesTable).values(uploaded);
+      } catch (err) {
+        // Best-effort: don't fail the create if storage hiccups — the
+        // project itself is fine and the user can re-add files via the UI.
+        logger.warn(
+          { err, projectId: row.id, templateSlug: template?.slug ?? null },
+          "Failed to seed starter project_files",
+        );
+      }
+    }
+
+    // Deduct the template's token cost (if any) AFTER the project row is
+    // committed so the ledger entry can reference projectId. The balance
+    // was preflighted above; if a concurrent deduction races us under the
+    // row lock and pushes us negative, we throw and 500 — the project row
+    // remains, and the operator can retry the deduct manually. This is
+    // acceptable for v1 because tokenCost is 0 for every seeded template
+    // today; premium-template introduction (Phase 4) will harden the path.
+    if (template && (template.tokenCost ?? 0) > 0) {
+      try {
+        const resolved = await resolveOrganizationForClient(req.dbClient!.id);
+        if (resolved) {
+          await deductTokens(
+            resolved.organization.id,
+            template.tokenCost,
+            "template",
+            {
+              userId: req.dbClient!.id,
+              projectId: row.id,
+              description: `Template "${template.slug}" creation: -${template.tokenCost}`,
+              metadata: { templateSlug: template.slug, templateName: template.name },
+            },
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          { err, projectId: row.id, templateSlug: template.slug },
+          "Token deduction for premium template failed after project create",
+        );
+      }
+    }
+
     res.status(201).json(GetProjectResponse.parse(withOwnerRole(row)));
   },
 );
