@@ -1191,6 +1191,209 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  # ─── Project secrets ───────────────────────────────────────────────────────
+
+  /projects/{id}/secrets:
+    get:
+      operationId: listProjectSecrets
+      tags: [projects]
+      summary: List a project's secrets (owner only). Values are never returned.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Secrets for this project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSecretList"
+    post:
+      operationId: createProjectSecret
+      tags: [projects]
+      summary: Create a project secret (owner only).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectSecretBody"
+      responses:
+        "201":
+          description: Created secret (no plaintext returned)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSecret"
+
+  /projects/{id}/secrets/{secretId}:
+    patch:
+      operationId: updateProjectSecret
+      tags: [projects]
+      summary: Update the value of an existing secret (owner only).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: secretId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectSecretBody"
+      responses:
+        "200":
+          description: Updated secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSecret"
+    delete:
+      operationId: deleteProjectSecret
+      tags: [projects]
+      summary: Delete a secret (owner only).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: secretId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /projects/{id}/secrets/{secretId}/rotate:
+    post:
+      operationId: rotateProjectSecret
+      tags: [projects]
+      summary: Rotate a secret with a new value (owner only). Bumps the version.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: secretId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectSecretBody"
+      responses:
+        "200":
+          description: Rotated secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSecret"
+
+  # ─── Audit log ─────────────────────────────────────────────────────────────
+
+  /projects/{id}/audit:
+    get:
+      operationId: listProjectAudit
+      tags: [projects]
+      summary: List audit events scoped to this project.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventList"
+
+  /admin/audit:
+    get:
+      operationId: listAdminAudit
+      tags: [admin]
+      summary: List all audit events with filters (admin only).
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: organizationId
+          schema:
+            type: integer
+        - in: query
+          name: projectId
+          schema:
+            type: integer
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: actor
+          schema:
+            type: string
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: until
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventList"
+
   /admin/orders:
     get:
       operationId: listAllBuildOrders
@@ -1494,6 +1697,169 @@ components:
           type: string
           format: date-time
       required: [id, clientId, title, description, summary, status, projectType, framework, healthcareMode, phiAllowed, baaStatus, workspaceProvider, workspaceStatus, githubDefaultBranch, viewerRole, createdAt, updatedAt]
+
+    ProjectSecret:
+      type: object
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+        projectId:
+          type: integer
+        name:
+          type: string
+        environment:
+          type: string
+          enum: [development, staging, production]
+        valuePreview:
+          type: string
+        version:
+          type: integer
+        createdBy:
+          type: ["string", "null"]
+        updatedBy:
+          type: ["string", "null"]
+        createdByEmail:
+          type: ["string", "null"]
+        updatedByEmail:
+          type: ["string", "null"]
+        lastUsedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, organizationId, projectId, name, environment, valuePreview, version, createdAt, updatedAt]
+
+    ProjectSecretList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSecret"
+      required: [data]
+
+    CreateProjectSecretBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        environment:
+          type: string
+          enum: [development, staging, production]
+          default: development
+        value:
+          type: string
+          minLength: 1
+      required: [name, value]
+
+    UpdateProjectSecretBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        environment:
+          type: string
+          enum: [development, staging, production]
+        value:
+          type: string
+          minLength: 1
+
+    AuditAction:
+      type: string
+      description: Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib/db/src/schema/audit-events.ts.
+      enum:
+        - signin
+        - signin_failed
+        - organization_created
+        - member_invited
+        - member_removed
+        - project_created
+        - project_updated
+        - project_archived
+        - file_created
+        - file_updated
+        - file_deleted
+        - ai_prompt_submitted
+        - ai_change_accepted
+        - ai_change_rejected
+        - phi_blocked
+        - secret_created
+        - secret_updated
+        - secret_deleted
+        - secret_rotated
+        - github_connected
+        - repo_imported
+        - repo_pulled
+        - repo_pushed
+        - build_started
+        - build_failed
+        - build_succeeded
+        - deployment_started
+        - deployment_live
+        - deployment_failed
+        - tokens_purchased
+        - tokens_used
+        - tokens_granted
+        - tokens_adjusted
+        - checkout_created
+        - subscription_changed
+        - payment_failed
+        - healthcare_mode_requested
+        - healthcare_gating_blocked
+        - insufficient_tokens
+        - baa_status_updated
+        - ai_provider_updated
+        - ai_model_updated
+
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: ["integer", "null"]
+        projectId:
+          type: ["integer", "null"]
+        actorOrganizationId:
+          type: ["integer", "null"]
+        actorEmail:
+          type: ["string", "null"]
+        actorUserId:
+          type: ["string", "null"]
+        category:
+          type: string
+        action:
+          $ref: "#/components/schemas/AuditAction"
+        targetType:
+          type: ["string", "null"]
+        targetId:
+          type: ["string", "null"]
+        metadata:
+          type: ["object", "null"]
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, category, action, createdAt]
+
+    AuditEventList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        total:
+          type: integer
+      required: [data, total]
 
     Template:
       type: object

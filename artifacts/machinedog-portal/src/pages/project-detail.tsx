@@ -24,6 +24,14 @@ import {
   getListProjectPromptsQueryKey,
   getListProjectFilesQueryKey,
   getGetMeQueryKey,
+  useListProjectSecrets,
+  useCreateProjectSecret,
+  useUpdateProjectSecret,
+  useRotateProjectSecret,
+  useDeleteProjectSecret,
+  useListProjectAudit,
+  getListProjectSecretsQueryKey,
+  getListProjectAuditQueryKey,
   type Project,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -1508,6 +1516,14 @@ export default function ProjectDetailPage() {
       <ProjectFilesPanel projectId={project.id} isOwner={isOwner} />
 
       {isOwner && (
+        <ProjectSecretsPanel
+          projectId={project.id}
+          healthcareMode={project.healthcareMode}
+        />
+      )}
+      <ProjectHistoryPanel projectId={project.id} />
+
+      {isOwner && (
         <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
@@ -2323,6 +2339,326 @@ function ProjectActionBarShell({ project }: { project: Project }) {
             </Button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ProjectSecretsPanel({
+  projectId,
+  healthcareMode,
+}: {
+  projectId: number;
+  healthcareMode?: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const list = useListProjectSecrets(projectId, {
+    query: { queryKey: getListProjectSecretsQueryKey(projectId) },
+  });
+  const create = useCreateProjectSecret();
+  const update = useUpdateProjectSecret();
+  const rotate = useRotateProjectSecret();
+  const del = useDeleteProjectSecret();
+
+  const [name, setName] = useState("");
+  const [environment, setEnvironment] = useState<"development" | "staging" | "production">("development");
+  const [value, setValue] = useState("");
+  const [editing, setEditing] = useState<Record<number, string>>({});
+  const [editMeta, setEditMeta] = useState<
+    Record<number, { name: string; environment: "development" | "staging" | "production" }>
+  >({});
+
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: getListProjectSecretsQueryKey(projectId) });
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !value) return;
+    try {
+      await create.mutateAsync({ id: projectId, data: { name, environment, value } });
+      setName("");
+      setValue("");
+      toast({ title: "Secret created", description: `${name} stored encrypted.` });
+      await refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create secret";
+      toast({ title: "Create failed", description: msg, variant: "destructive" });
+    }
+  };
+
+  const handleRotate = async (id: number, name: string) => {
+    const v = editing[id];
+    if (!v) return;
+    try {
+      await rotate.mutateAsync({ id: projectId, secretId: id, data: { value: v } });
+      setEditing((s) => ({ ...s, [id]: "" }));
+      toast({ title: "Rotated", description: `${name} now uses a new version.` });
+      await refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Rotation failed";
+      toast({ title: "Rotate failed", description: msg, variant: "destructive" });
+    }
+  };
+
+  const handleUpdate = async (id: number, prevName: string) => {
+    const meta = editMeta[id];
+    if (!meta) return;
+    const trimmed = meta.name.trim().toUpperCase();
+    if (!trimmed) return;
+    try {
+      await update.mutateAsync({
+        id: projectId,
+        secretId: id,
+        data: { name: trimmed, environment: meta.environment },
+      });
+      setEditMeta((s) => {
+        const next = { ...s };
+        delete next[id];
+        return next;
+      });
+      toast({ title: "Updated", description: `${prevName} → ${trimmed}` });
+      await refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Update failed";
+      toast({ title: "Update failed", description: msg, variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!window.confirm(`Delete secret ${name}? This cannot be undone.`)) return;
+    try {
+      await del.mutateAsync({ id: projectId, secretId: id });
+      toast({ title: "Deleted", description: `${name} removed.` });
+      await refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Delete failed";
+      toast({ title: "Delete failed", description: msg, variant: "destructive" });
+    }
+  };
+
+  const secrets = list.data?.data ?? [];
+
+  return (
+    <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-mono font-bold uppercase tracking-wider">Secrets</h2>
+        <span className="text-[10px] font-mono text-muted-foreground ml-2">
+          AES-256-GCM at rest · values never returned
+        </span>
+      </div>
+
+      {healthcareMode && (
+        <div
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-mono text-amber-700 dark:text-amber-300"
+          data-testid="banner-secrets-healthcare"
+        >
+          Healthcare mode is ON for this project. Do not store any PHI in
+          secret values — names, MRNs, dates of birth, addresses, or
+          identifiers will be rejected by the PHI guard. Use this vault for
+          API keys, tokens, and infrastructure credentials only.
+        </div>
+      )}
+
+      <form onSubmit={handleCreate} className="grid gap-2 sm:grid-cols-[1fr_140px_1fr_auto]">
+        <Input
+          placeholder="SECRET_NAME"
+          value={name}
+          onChange={(e) => setName(e.target.value.toUpperCase())}
+          className="font-mono text-xs"
+          data-testid="input-secret-name"
+        />
+        <select
+          value={environment}
+          onChange={(e) => setEnvironment(e.target.value as "development" | "staging" | "production")}
+          className="h-9 rounded-md border bg-background px-2 text-xs font-mono"
+          data-testid="select-secret-env"
+        >
+          <option value="development">development</option>
+          <option value="staging">staging</option>
+          <option value="production">production</option>
+        </select>
+        <Input
+          type="password"
+          placeholder="value"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="font-mono text-xs"
+          data-testid="input-secret-value"
+        />
+        <Button
+          type="submit"
+          size="sm"
+          disabled={create.isPending}
+          data-testid="button-create-secret"
+        >
+          {create.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+          ADD
+        </Button>
+      </form>
+
+      <div className="flex flex-col gap-2">
+        {list.isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {!list.isLoading && secrets.length === 0 && (
+          <p className="text-xs font-mono text-muted-foreground">No secrets yet.</p>
+        )}
+        {secrets.map((s) => (
+          <div
+            key={s.id}
+            className="rounded-md border bg-background/40 p-3 flex flex-col gap-2"
+            data-testid={`row-secret-${s.id}`}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs font-semibold">{s.name}</span>
+              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">
+                {s.environment}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground">v{s.version}</span>
+              <span className="font-mono text-[11px] text-muted-foreground">{s.valuePreview}</span>
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground">
+                {s.updatedByEmail ?? s.createdByEmail ?? ""}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="password"
+                placeholder="new value to rotate"
+                value={editing[s.id] ?? ""}
+                onChange={(e) => setEditing((m) => ({ ...m, [s.id]: e.target.value }))}
+                className="font-mono text-xs h-8"
+                data-testid={`input-rotate-${s.id}`}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleRotate(s.id, s.name)}
+                disabled={!editing[s.id] || rotate.isPending}
+                data-testid={`button-rotate-${s.id}`}
+              >
+                <RotateCw className="h-3 w-3 mr-1" /> ROTATE
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setEditMeta((m) =>
+                    m[s.id]
+                      ? (() => {
+                          const next = { ...m };
+                          delete next[s.id];
+                          return next;
+                        })()
+                      : { ...m, [s.id]: { name: s.name, environment: s.environment } },
+                  )
+                }
+                data-testid={`button-edit-secret-${s.id}`}
+              >
+                EDIT
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDelete(s.id, s.name)}
+                disabled={del.isPending}
+                data-testid={`button-delete-secret-${s.id}`}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+            {editMeta[s.id] && (
+              <div
+                className="flex items-center gap-2 pt-1"
+                data-testid={`row-edit-secret-${s.id}`}
+              >
+                <Input
+                  value={editMeta[s.id].name}
+                  onChange={(e) =>
+                    setEditMeta((m) => ({
+                      ...m,
+                      [s.id]: { ...m[s.id], name: e.target.value.toUpperCase() },
+                    }))
+                  }
+                  className="font-mono text-xs h-8"
+                  data-testid={`input-edit-name-${s.id}`}
+                />
+                <select
+                  value={editMeta[s.id].environment}
+                  onChange={(e) =>
+                    setEditMeta((m) => ({
+                      ...m,
+                      [s.id]: {
+                        ...m[s.id],
+                        environment: e.target
+                          .value as "development" | "staging" | "production",
+                      },
+                    }))
+                  }
+                  className="h-8 rounded-md border bg-background px-2 text-xs font-mono"
+                  data-testid={`select-edit-env-${s.id}`}
+                >
+                  <option value="development">development</option>
+                  <option value="staging">staging</option>
+                  <option value="production">production</option>
+                </select>
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdate(s.id, s.name)}
+                  disabled={update.isPending}
+                  data-testid={`button-save-edit-${s.id}`}
+                >
+                  SAVE
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProjectHistoryPanel({ projectId }: { projectId: number }) {
+  const list = useListProjectAudit(
+    projectId,
+    { limit: 100, offset: 0 },
+    { query: { queryKey: getListProjectAuditQueryKey(projectId, { limit: 100, offset: 0 }) } },
+  );
+  const events = list.data?.data ?? [];
+  return (
+    <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <History className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-mono font-bold uppercase tracking-wider">History</h2>
+        <span className="text-[10px] font-mono text-muted-foreground ml-2">
+          Most recent {events.length} of {list.data?.total ?? 0}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5 max-h-96 overflow-y-auto">
+        {list.isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {!list.isLoading && events.length === 0 && (
+          <p className="text-xs font-mono text-muted-foreground">No activity yet.</p>
+        )}
+        {events.map((e) => (
+          <div
+            key={e.id}
+            className="rounded border bg-background/40 px-3 py-1.5 text-[11px] font-mono flex items-center gap-2 flex-wrap"
+            data-testid={`row-audit-${e.id}`}
+          >
+            <span className="text-muted-foreground">
+              {format(new Date(e.createdAt), "MMM d HH:mm:ss")}
+            </span>
+            <span className="px-1.5 py-0.5 rounded bg-muted text-foreground/80">{e.category}</span>
+            <span className="text-primary">{e.action}</span>
+            {e.targetType && (
+              <span className="text-muted-foreground">
+                {e.targetType}
+                {e.targetId ? `#${e.targetId}` : ""}
+              </span>
+            )}
+            <span className="ml-auto text-muted-foreground">{e.actorEmail ?? "system"}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

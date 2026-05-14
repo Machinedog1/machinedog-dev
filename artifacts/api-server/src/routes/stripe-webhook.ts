@@ -16,7 +16,7 @@ import {
   applyTokenPackPurchase,
 } from "../lib/billing-service";
 import { planFromPriceId } from "../lib/plans";
-import { recordAuditEvent } from "../lib/audit";
+import { recordAuditEventAsync } from "../lib/audit";
 import type Stripe from "stripe";
 
 const router: IRouter = Router();
@@ -462,9 +462,9 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
       typeof (invoice as unknown as { subscription?: string | null }).subscription === "string"
         ? (invoice as unknown as { subscription: string }).subscription
         : null;
-    await recordAuditEvent({
+    recordAuditEventAsync({
       category: "billing",
-      action: "invoice.payment_failed",
+      action: "payment_failed",
       targetType: "stripe_invoice",
       targetId: invoice.id ?? null,
       metadata: {

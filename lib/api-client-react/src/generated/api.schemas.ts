@@ -239,6 +239,158 @@ export interface Project {
   updatedAt: string;
 }
 
+export type ProjectSecretEnvironment =
+  (typeof ProjectSecretEnvironment)[keyof typeof ProjectSecretEnvironment];
+
+export const ProjectSecretEnvironment = {
+  development: "development",
+  staging: "staging",
+  production: "production",
+} as const;
+
+export interface ProjectSecret {
+  id: number;
+  organizationId: number;
+  projectId: number;
+  name: string;
+  environment: ProjectSecretEnvironment;
+  valuePreview: string;
+  version: number;
+  /** @nullable */
+  createdBy?: string | null;
+  /** @nullable */
+  updatedBy?: string | null;
+  /** @nullable */
+  createdByEmail?: string | null;
+  /** @nullable */
+  updatedByEmail?: string | null;
+  /** @nullable */
+  lastUsedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectSecretList {
+  data: ProjectSecret[];
+}
+
+export type CreateProjectSecretBodyEnvironment =
+  (typeof CreateProjectSecretBodyEnvironment)[keyof typeof CreateProjectSecretBodyEnvironment];
+
+export const CreateProjectSecretBodyEnvironment = {
+  development: "development",
+  staging: "staging",
+  production: "production",
+} as const;
+
+export interface CreateProjectSecretBody {
+  /** @minLength 1 */
+  name: string;
+  environment?: CreateProjectSecretBodyEnvironment;
+  /** @minLength 1 */
+  value: string;
+}
+
+export type UpdateProjectSecretBodyEnvironment =
+  (typeof UpdateProjectSecretBodyEnvironment)[keyof typeof UpdateProjectSecretBodyEnvironment];
+
+export const UpdateProjectSecretBodyEnvironment = {
+  development: "development",
+  staging: "staging",
+  production: "production",
+} as const;
+
+export interface UpdateProjectSecretBody {
+  /** @minLength 1 */
+  name?: string;
+  environment?: UpdateProjectSecretBodyEnvironment;
+  /** @minLength 1 */
+  value?: string;
+}
+
+/**
+ * Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib/db/src/schema/audit-events.ts.
+ */
+export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
+
+export const AuditAction = {
+  signin: "signin",
+  signin_failed: "signin_failed",
+  organization_created: "organization_created",
+  member_invited: "member_invited",
+  member_removed: "member_removed",
+  project_created: "project_created",
+  project_updated: "project_updated",
+  project_archived: "project_archived",
+  file_created: "file_created",
+  file_updated: "file_updated",
+  file_deleted: "file_deleted",
+  ai_prompt_submitted: "ai_prompt_submitted",
+  ai_change_accepted: "ai_change_accepted",
+  ai_change_rejected: "ai_change_rejected",
+  phi_blocked: "phi_blocked",
+  secret_created: "secret_created",
+  secret_updated: "secret_updated",
+  secret_deleted: "secret_deleted",
+  secret_rotated: "secret_rotated",
+  github_connected: "github_connected",
+  repo_imported: "repo_imported",
+  repo_pulled: "repo_pulled",
+  repo_pushed: "repo_pushed",
+  build_started: "build_started",
+  build_failed: "build_failed",
+  build_succeeded: "build_succeeded",
+  deployment_started: "deployment_started",
+  deployment_live: "deployment_live",
+  deployment_failed: "deployment_failed",
+  tokens_purchased: "tokens_purchased",
+  tokens_used: "tokens_used",
+  tokens_granted: "tokens_granted",
+  tokens_adjusted: "tokens_adjusted",
+  checkout_created: "checkout_created",
+  subscription_changed: "subscription_changed",
+  payment_failed: "payment_failed",
+  healthcare_mode_requested: "healthcare_mode_requested",
+  healthcare_gating_blocked: "healthcare_gating_blocked",
+  insufficient_tokens: "insufficient_tokens",
+  baa_status_updated: "baa_status_updated",
+  ai_provider_updated: "ai_provider_updated",
+  ai_model_updated: "ai_model_updated",
+} as const;
+
+/**
+ * @nullable
+ */
+export type AuditEventMetadata = { [key: string]: unknown } | null;
+
+export interface AuditEvent {
+  id: number;
+  /** @nullable */
+  organizationId?: number | null;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  actorOrganizationId?: number | null;
+  /** @nullable */
+  actorEmail?: string | null;
+  /** @nullable */
+  actorUserId?: string | null;
+  category: string;
+  action: AuditAction;
+  /** @nullable */
+  targetType?: string | null;
+  /** @nullable */
+  targetId?: string | null;
+  /** @nullable */
+  metadata?: AuditEventMetadata;
+  createdAt: string;
+}
+
+export interface AuditEventList {
+  data: AuditEvent[];
+  total: number;
+}
+
 export type TemplateCategory =
   (typeof TemplateCategory)[keyof typeof TemplateCategory];
 
@@ -896,6 +1048,22 @@ export const ListTemplatesCategory = {
 export type ListClientsParams = {
   limit?: number;
   offset?: number;
+};
+
+export type ListProjectAuditParams = {
+  limit?: number;
+  offset?: number;
+};
+
+export type ListAdminAuditParams = {
+  limit?: number;
+  offset?: number;
+  organizationId?: number;
+  projectId?: number;
+  action?: string;
+  actor?: string;
+  since?: string;
+  until?: string;
 };
 
 export type ListAllBuildOrdersParams = {

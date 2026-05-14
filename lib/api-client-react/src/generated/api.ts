@@ -20,6 +20,7 @@ import type {
   AdjustBalanceBody,
   AdminStats,
   AgentThreadResponse,
+  AuditEventList,
   BuildOrderList,
   ChangeRequest,
   ChangeRequestDetail,
@@ -34,6 +35,7 @@ import type {
   CreateProjectBody,
   CreateProjectCommentBody,
   CreateProjectFileBody,
+  CreateProjectSecretBody,
   CreateTokenCheckoutBody,
   DeleteClientResponse,
   ErrorResponse,
@@ -42,10 +44,12 @@ import type {
   InviteClientBody,
   InviteProjectMemberBody,
   InviteResponse,
+  ListAdminAuditParams,
   ListAdminGithubReposResponse,
   ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
+  ListProjectAuditParams,
   ListTemplatesParams,
   Project,
   ProjectComment,
@@ -59,6 +63,8 @@ import type {
   ProjectMemberList,
   ProjectProdHeartbeatBody,
   ProjectProdHeartbeatResponse,
+  ProjectSecret,
+  ProjectSecretList,
   PromptSession,
   PromptSessionList,
   PublicCheckoutBody,
@@ -74,6 +80,7 @@ import type {
   TokenBundleList,
   TokenPurchaseList,
   UpdateProjectBody,
+  UpdateProjectSecretBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -4913,6 +4920,645 @@ export const useImportGithubProject = <
 > => {
   return useMutation(getImportGithubProjectMutationOptions(options));
 };
+
+/**
+ * @summary List a project's secrets (owner only). Values are never returned.
+ */
+export const getListProjectSecretsUrl = (id: number) => {
+  return `/api/projects/${id}/secrets`;
+};
+
+export const listProjectSecrets = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ProjectSecretList> => {
+  return customFetch<ProjectSecretList>(getListProjectSecretsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectSecretsQueryKey = (id: number) => {
+  return [`/api/projects/${id}/secrets`] as const;
+};
+
+export const getListProjectSecretsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectSecrets>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectSecrets>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectSecretsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectSecrets>>
+  > = ({ signal }) => listProjectSecrets(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectSecrets>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectSecretsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectSecrets>>
+>;
+export type ListProjectSecretsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List a project's secrets (owner only). Values are never returned.
+ */
+
+export function useListProjectSecrets<
+  TData = Awaited<ReturnType<typeof listProjectSecrets>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectSecrets>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectSecretsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a project secret (owner only).
+ */
+export const getCreateProjectSecretUrl = (id: number) => {
+  return `/api/projects/${id}/secrets`;
+};
+
+export const createProjectSecret = async (
+  id: number,
+  createProjectSecretBody: CreateProjectSecretBody,
+  options?: RequestInit,
+): Promise<ProjectSecret> => {
+  return customFetch<ProjectSecret>(getCreateProjectSecretUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createProjectSecretBody),
+  });
+};
+
+export const getCreateProjectSecretMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProjectSecret>>,
+    TError,
+    { id: number; data: BodyType<CreateProjectSecretBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createProjectSecret>>,
+  TError,
+  { id: number; data: BodyType<CreateProjectSecretBody> },
+  TContext
+> => {
+  const mutationKey = ["createProjectSecret"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createProjectSecret>>,
+    { id: number; data: BodyType<CreateProjectSecretBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return createProjectSecret(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateProjectSecretMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createProjectSecret>>
+>;
+export type CreateProjectSecretMutationBody = BodyType<CreateProjectSecretBody>;
+export type CreateProjectSecretMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a project secret (owner only).
+ */
+export const useCreateProjectSecret = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProjectSecret>>,
+    TError,
+    { id: number; data: BodyType<CreateProjectSecretBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createProjectSecret>>,
+  TError,
+  { id: number; data: BodyType<CreateProjectSecretBody> },
+  TContext
+> => {
+  return useMutation(getCreateProjectSecretMutationOptions(options));
+};
+
+/**
+ * @summary Update the value of an existing secret (owner only).
+ */
+export const getUpdateProjectSecretUrl = (id: number, secretId: number) => {
+  return `/api/projects/${id}/secrets/${secretId}`;
+};
+
+export const updateProjectSecret = async (
+  id: number,
+  secretId: number,
+  updateProjectSecretBody: UpdateProjectSecretBody,
+  options?: RequestInit,
+): Promise<ProjectSecret> => {
+  return customFetch<ProjectSecret>(getUpdateProjectSecretUrl(id, secretId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateProjectSecretBody),
+  });
+};
+
+export const getUpdateProjectSecretMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateProjectSecret>>,
+    TError,
+    { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateProjectSecret>>,
+  TError,
+  { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+  TContext
+> => {
+  const mutationKey = ["updateProjectSecret"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateProjectSecret>>,
+    { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> }
+  > = (props) => {
+    const { id, secretId, data } = props ?? {};
+
+    return updateProjectSecret(id, secretId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateProjectSecretMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateProjectSecret>>
+>;
+export type UpdateProjectSecretMutationBody = BodyType<UpdateProjectSecretBody>;
+export type UpdateProjectSecretMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update the value of an existing secret (owner only).
+ */
+export const useUpdateProjectSecret = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateProjectSecret>>,
+    TError,
+    { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateProjectSecret>>,
+  TError,
+  { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+  TContext
+> => {
+  return useMutation(getUpdateProjectSecretMutationOptions(options));
+};
+
+/**
+ * @summary Delete a secret (owner only).
+ */
+export const getDeleteProjectSecretUrl = (id: number, secretId: number) => {
+  return `/api/projects/${id}/secrets/${secretId}`;
+};
+
+export const deleteProjectSecret = async (
+  id: number,
+  secretId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteProjectSecretUrl(id, secretId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteProjectSecretMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProjectSecret>>,
+    TError,
+    { id: number; secretId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteProjectSecret>>,
+  TError,
+  { id: number; secretId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteProjectSecret"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteProjectSecret>>,
+    { id: number; secretId: number }
+  > = (props) => {
+    const { id, secretId } = props ?? {};
+
+    return deleteProjectSecret(id, secretId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteProjectSecretMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteProjectSecret>>
+>;
+
+export type DeleteProjectSecretMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a secret (owner only).
+ */
+export const useDeleteProjectSecret = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProjectSecret>>,
+    TError,
+    { id: number; secretId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteProjectSecret>>,
+  TError,
+  { id: number; secretId: number },
+  TContext
+> => {
+  return useMutation(getDeleteProjectSecretMutationOptions(options));
+};
+
+/**
+ * @summary Rotate a secret with a new value (owner only). Bumps the version.
+ */
+export const getRotateProjectSecretUrl = (id: number, secretId: number) => {
+  return `/api/projects/${id}/secrets/${secretId}/rotate`;
+};
+
+export const rotateProjectSecret = async (
+  id: number,
+  secretId: number,
+  updateProjectSecretBody: UpdateProjectSecretBody,
+  options?: RequestInit,
+): Promise<ProjectSecret> => {
+  return customFetch<ProjectSecret>(getRotateProjectSecretUrl(id, secretId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateProjectSecretBody),
+  });
+};
+
+export const getRotateProjectSecretMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rotateProjectSecret>>,
+    TError,
+    { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rotateProjectSecret>>,
+  TError,
+  { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+  TContext
+> => {
+  const mutationKey = ["rotateProjectSecret"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rotateProjectSecret>>,
+    { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> }
+  > = (props) => {
+    const { id, secretId, data } = props ?? {};
+
+    return rotateProjectSecret(id, secretId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RotateProjectSecretMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rotateProjectSecret>>
+>;
+export type RotateProjectSecretMutationBody = BodyType<UpdateProjectSecretBody>;
+export type RotateProjectSecretMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Rotate a secret with a new value (owner only). Bumps the version.
+ */
+export const useRotateProjectSecret = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rotateProjectSecret>>,
+    TError,
+    { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rotateProjectSecret>>,
+  TError,
+  { id: number; secretId: number; data: BodyType<UpdateProjectSecretBody> },
+  TContext
+> => {
+  return useMutation(getRotateProjectSecretMutationOptions(options));
+};
+
+/**
+ * @summary List audit events scoped to this project.
+ */
+export const getListProjectAuditUrl = (
+  id: number,
+  params?: ListProjectAuditParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/projects/${id}/audit?${stringifiedParams}`
+    : `/api/projects/${id}/audit`;
+};
+
+export const listProjectAudit = async (
+  id: number,
+  params?: ListProjectAuditParams,
+  options?: RequestInit,
+): Promise<AuditEventList> => {
+  return customFetch<AuditEventList>(getListProjectAuditUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectAuditQueryKey = (
+  id: number,
+  params?: ListProjectAuditParams,
+) => {
+  return [`/api/projects/${id}/audit`, ...(params ? [params] : [])] as const;
+};
+
+export const getListProjectAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectAudit>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ListProjectAuditParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListProjectAuditQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProjectAudit>>
+  > = ({ signal }) =>
+    listProjectAudit(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjectAudit>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectAudit>>
+>;
+export type ListProjectAuditQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List audit events scoped to this project.
+ */
+
+export function useListProjectAudit<
+  TData = Awaited<ReturnType<typeof listProjectAudit>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: ListProjectAuditParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProjectAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectAuditQueryOptions(id, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all audit events with filters (admin only).
+ */
+export const getListAdminAuditUrl = (params?: ListAdminAuditParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/audit?${stringifiedParams}`
+    : `/api/admin/audit`;
+};
+
+export const listAdminAudit = async (
+  params?: ListAdminAuditParams,
+  options?: RequestInit,
+): Promise<AuditEventList> => {
+  return customFetch<AuditEventList>(getListAdminAuditUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminAuditQueryKey = (params?: ListAdminAuditParams) => {
+  return [`/api/admin/audit`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminAudit>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminAuditParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAdminAuditQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminAudit>>> = ({
+    signal,
+  }) => listAdminAudit(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminAudit>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminAudit>>
+>;
+export type ListAdminAuditQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all audit events with filters (admin only).
+ */
+
+export function useListAdminAudit<
+  TData = Awaited<ReturnType<typeof listAdminAudit>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminAuditParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminAuditQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List paid build deposits and retainer subscriptions (admin only)

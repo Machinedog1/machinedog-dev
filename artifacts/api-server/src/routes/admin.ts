@@ -35,6 +35,7 @@ import {
 import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
 import { generateSecureToken } from "../lib/passwords";
 import { sendInviteEmail } from "../lib/mailer";
+import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { importGithubAsProject } from "../lib/github-import";
 import {
   getConnectedGithubUser,
@@ -206,11 +207,25 @@ router.post("/admin/clients/invite", async (req, res): Promise<void> => {
 
   // With Clerk handling auth, we just create an invited org record.
   // Actual user invitation happens via Clerk's invitation API.
-  await db.insert(organizationsTable).values({
-    name: email,
-    primaryEmail: email,
-    status: "invited",
-    tokenBalance: 50_000, // welcome credit
+  const [createdOrg] = await db
+    .insert(organizationsTable)
+    .values({
+      name: email,
+      primaryEmail: email,
+      status: "invited",
+      tokenBalance: 50_000, // welcome credit
+    })
+    .returning();
+  recordAuditEventAsync({
+    organizationId: createdOrg?.id ?? null,
+    actorOrganizationId: req.dbClient?.id ?? null,
+    actorEmail: req.dbClient?.email ?? null,
+    category: "organization",
+    action: "organization_created",
+    targetType: "organization",
+    targetId: String(createdOrg?.id ?? email),
+    metadata: { email, source: "admin_invite" },
+    ...reqAuditMeta(req),
   });
 
   await sendInviteEmail({
@@ -218,6 +233,17 @@ router.post("/admin/clients/invite", async (req, res): Promise<void> => {
     token: "",
     invitedByEmail: req.dbClient?.email,
     log: req.log,
+  });
+
+  recordAuditEventAsync({
+    actorOrganizationId: req.dbClient?.id ?? null,
+    actorEmail: req.dbClient?.email ?? null,
+    category: "organization",
+    action: "member_invited",
+    targetType: "organization",
+    targetId: email,
+    metadata: { email },
+    ...reqAuditMeta(req),
   });
 
   res.json(
@@ -571,6 +597,21 @@ router.post("/admin/projects/import-github", async (req, res): Promise<void> => 
     },
     "Admin imported GitHub repo as project",
   );
+  recordAuditEventAsync({
+    organizationId: outcome.project.organizationId,
+    projectId: outcome.project.id,
+    actorOrganizationId: req.dbClient!.id,
+    actorEmail: req.dbClient!.email,
+    category: "project",
+    action: "repo_imported",
+    targetType: "project",
+    targetId: String(outcome.project.id),
+    metadata: {
+      owner: outcome.project.githubOwner,
+      repo: outcome.project.githubRepo,
+    },
+    ...reqAuditMeta(req),
+  });
   res.status(201).json({ ...outcome.project, viewerRole: "owner" });
 });
 

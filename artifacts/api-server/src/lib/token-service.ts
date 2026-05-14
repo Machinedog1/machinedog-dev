@@ -5,7 +5,7 @@ import {
   tokenLedgerTable,
   type TokenLedger,
 } from "@workspace/db";
-import { recordAuditEvent } from "./audit";
+import { recordAuditEventAsync } from "./audit";
 
 export type TokenLedgerType = TokenLedger["type"];
 export type TokenLedgerSource = TokenLedger["source"];
@@ -116,11 +116,11 @@ export async function grantMonthly(
     ...opts,
     description: opts.description ?? `Monthly plan token grant: ${amount}`,
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
-    action: "grant.monthly",
+    action: "tokens_granted",
     targetType: "ledger",
     targetId: String(result.ledger.id),
     metadata: { amount, balanceAfter: result.balanceAfter, duplicate: result.duplicate },
@@ -137,11 +137,11 @@ export async function recordPurchase(
     ...opts,
     description: opts.description ?? `Token pack purchase: +${amount}`,
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
-    action: "purchase.completed",
+    action: "tokens_purchased",
     targetType: "ledger",
     targetId: String(result.ledger.id),
     metadata: { amount, balanceAfter: result.balanceAfter, duplicate: result.duplicate },
@@ -171,11 +171,11 @@ export async function deduct(
     ...opts,
     description: opts.description ?? `Token deduction (${category}): -${amount}`,
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
-    action: `deduct.${category}`,
+    action: "tokens_used",
     targetType: "ledger",
     targetId: String(result.ledger.id),
     metadata: { amount, balanceAfter: result.balanceAfter },
@@ -193,11 +193,11 @@ export async function adminAdjust(
     source: opts.source ?? "admin",
     description: opts.description ?? `Admin adjustment: ${amount}`,
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "tokens",
-    action: "admin.adjust",
+    action: "tokens_adjusted",
     targetType: "ledger",
     targetId: String(result.ledger.id),
     metadata: { amount, balanceAfter: result.balanceAfter },

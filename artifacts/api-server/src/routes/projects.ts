@@ -66,6 +66,7 @@ import {
   GitHubNotConfiguredError,
 } from "../lib/github";
 import { generateSecureToken } from "../lib/passwords";
+import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const PROJECT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -401,6 +402,51 @@ router.post(
       }
     }
 
+    recordAuditEventAsync({
+      organizationId: row.organizationId,
+      projectId: row.id,
+      actorOrganizationId: req.dbClient!.id,
+      actorEmail: req.dbClient!.email,
+      category: "project",
+      action: "project_created",
+      targetType: "project",
+      targetId: String(row.id),
+      metadata: {
+        title: row.title,
+        templateSlug,
+        githubOwner,
+        githubRepo,
+      },
+      ...reqAuditMeta(req),
+    });
+    if (row.healthcareMode) {
+      recordAuditEventAsync({
+        organizationId: row.organizationId,
+        projectId: row.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "healthcare",
+        action: "healthcare_mode_requested",
+        targetType: "project",
+        targetId: String(row.id),
+        metadata: { templateSlug, baaStatus: row.baaStatus },
+        ...reqAuditMeta(req),
+      });
+    }
+    if (githubOwner && githubRepo) {
+      recordAuditEventAsync({
+        organizationId: row.organizationId,
+        projectId: row.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "github",
+        action: "github_connected",
+        targetType: "project",
+        targetId: String(row.id),
+        metadata: { owner: githubOwner, repo: githubRepo },
+        ...reqAuditMeta(req),
+      });
+    }
     res.status(201).json(GetProjectResponse.parse(withOwnerRole(row)));
   },
 );
@@ -790,6 +836,41 @@ router.patch(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    const archived = body.data.status === "archived";
+    recordAuditEventAsync({
+      organizationId: row.organizationId,
+      projectId: row.id,
+      actorOrganizationId: req.dbClient!.id,
+      actorEmail: req.dbClient!.email,
+      category: "project",
+      action: archived ? "project_archived" : "project_updated",
+      targetType: "project",
+      targetId: String(row.id),
+      metadata: { fields: Object.keys(body.data) },
+      ...reqAuditMeta(req),
+    });
+    if (
+      (body.data.githubOwner !== undefined || body.data.githubRepo !== undefined) &&
+      row.githubOwner &&
+      row.githubRepo
+    ) {
+      recordAuditEventAsync({
+        organizationId: row.organizationId,
+        projectId: row.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "github",
+        action: "github_connected",
+        targetType: "project",
+        targetId: String(row.id),
+        metadata: {
+          owner: row.githubOwner,
+          repo: row.githubRepo,
+          defaultBranch: row.githubDefaultBranch,
+        },
+        ...reqAuditMeta(req),
+      });
+    }
     res.json(UpdateProjectResponse.parse(withOwnerRole(row)));
   },
 );
@@ -907,6 +988,18 @@ router.post(
     }
     const isClientActive = existingClient?.status === "active";
     let row;
+    recordAuditEventAsync({
+      organizationId: project.organizationId,
+      projectId: project.id,
+      actorOrganizationId: req.dbClient!.id,
+      actorEmail: req.dbClient!.email,
+      category: "project",
+      action: "member_invited",
+      targetType: "project_member",
+      targetId: email,
+      metadata: { email, isExistingClient: Boolean(existingClient) },
+      ...reqAuditMeta(req),
+    });
     if (existingMember) {
       [row] = await db
         .update(projectMembersTable)
@@ -986,6 +1079,17 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    recordAuditEventAsync({
+      organizationId: project.organizationId,
+      projectId: project.id,
+      actorOrganizationId: req.dbClient!.id,
+      actorEmail: req.dbClient!.email,
+      category: "project",
+      action: "member_removed",
+      targetType: "project_member",
+      targetId: String(params.data.memberId),
+      ...reqAuditMeta(req),
+    });
     res.status(204).end();
   },
 );
@@ -1222,6 +1326,18 @@ router.post(
       })
       .returning();
 
+    recordAuditEventAsync({
+      organizationId: project.organizationId,
+      projectId: project.id,
+      actorOrganizationId: client.id,
+      actorEmail: client.email,
+      category: "ai",
+      action: "ai_prompt_submitted",
+      targetType: "prompt_session",
+      targetId: String(session.id),
+      metadata: { tokensUsed, model: result.model },
+      ...reqAuditMeta(req),
+    });
     res.json(SubmitProjectPromptResponse.parse(session));
   },
 );
@@ -1312,6 +1428,18 @@ router.post(
         objectPath: body.data.objectPath,
       })
       .returning();
+    recordAuditEventAsync({
+      organizationId: project.organizationId,
+      projectId: project.id,
+      actorOrganizationId: req.dbClient!.id,
+      actorEmail: req.dbClient!.email,
+      category: "file",
+      action: "file_created",
+      targetType: "project_file",
+      targetId: String(row.id),
+      metadata: { name: row.name, sizeBytes: row.sizeBytes },
+      ...reqAuditMeta(req),
+    });
     res.status(201).json({
       id: row.id,
       projectId: row.projectId,
@@ -1366,6 +1494,18 @@ router.delete(
       return;
     }
     await db.delete(projectFilesTable).where(eq(projectFilesTable.id, file.id));
+    recordAuditEventAsync({
+      organizationId: project.organizationId,
+      projectId: project.id,
+      actorOrganizationId: req.dbClient!.id,
+      actorEmail: req.dbClient!.email,
+      category: "file",
+      action: "file_deleted",
+      targetType: "project_file",
+      targetId: String(file.id),
+      metadata: { name: file.name },
+      ...reqAuditMeta(req),
+    });
     res.status(204).end();
   },
 );
@@ -1577,6 +1717,22 @@ router.put(
         commitWarning = "GitHub repo not configured on this project.";
       }
 
+      recordAuditEventAsync({
+        organizationId: project.organizationId,
+        projectId: project.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "file",
+        action: "file_updated",
+        targetType: "project_file",
+        targetId: String(updated.id),
+        metadata: {
+          name: updated.name,
+          sizeBytes: updated.sizeBytes,
+          committed: !!commit,
+        },
+        ...reqAuditMeta(req),
+      });
       res.json({
         id: updated.id,
         name: updated.name,
@@ -1933,6 +2089,23 @@ router.post(
         `[Machinedog workspace] ${message}`,
         { force: branchExists ? false : true, deletions },
       );
+      recordAuditEventAsync({
+        organizationId: project.organizationId,
+        projectId: project.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "github",
+        action: "repo_pushed",
+        targetType: "project",
+        targetId: String(project.id),
+        metadata: {
+          branch: commit.branch,
+          commitSha: commit.commitSha,
+          fileCount: pushFiles.length,
+          deletionCount: deletions.length,
+        },
+        ...reqAuditMeta(req),
+      });
       res.json({
         ok: true,
         branch: commit.branch,
@@ -2230,6 +2403,25 @@ router.post(
           created += 1;
         }
       }
+      recordAuditEventAsync({
+        organizationId: project.organizationId,
+        projectId: project.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "github",
+        action: "repo_pulled",
+        targetType: "project",
+        targetId: String(project.id),
+        metadata: {
+          branch: result.branch,
+          sha: result.commitSha,
+          fetched: result.files.length,
+          created,
+          updated,
+          unchanged,
+        },
+        ...reqAuditMeta(req),
+      });
       res.json({
         ok: true,
         branch: result.branch,

@@ -39,6 +39,7 @@ import {
 } from "../lib/change-request-claude";
 import { sendChangeRequestPublishEmail } from "../lib/mailer";
 import { logger } from "../lib/logger";
+import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import {
   resolveBranchSha,
   createSnapshotTag,
@@ -733,6 +734,18 @@ router.post(
           client.id,
           { prNumber: cr.githubPrNumber, sha: result.sha },
         );
+        recordAuditEventAsync({
+          organizationId: project.organizationId,
+          projectId: project.id,
+          actorOrganizationId: client.id,
+          actorEmail: client.email,
+          category: "deployment",
+          action: "deployment_started",
+          targetType: "change_request",
+          targetId: String(cr.id),
+          metadata: { prNumber: cr.githubPrNumber, sha: result.sha },
+          ...reqAuditMeta(req),
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown merge error";
         logger.error({ err, changeRequestId: cr.id }, "PR merge failed");
@@ -742,6 +755,18 @@ router.post(
           `Could not auto-merge PR #${cr.githubPrNumber}: ${message}`,
           client.id,
         );
+        recordAuditEventAsync({
+          organizationId: project.organizationId,
+          projectId: project.id,
+          actorOrganizationId: client.id,
+          actorEmail: client.email,
+          category: "deployment",
+          action: "deployment_failed",
+          targetType: "change_request",
+          targetId: String(cr.id),
+          metadata: { prNumber: cr.githubPrNumber, error: message },
+          ...reqAuditMeta(req),
+        });
         // Keep CR at pr_open so the client (or operator) can retry.
         const emailsForFail = await lookupEmails([cr.organizationId]);
         res.status(409).json({
@@ -827,6 +852,18 @@ router.post(
       deployedAt: new Date(),
     });
     await appendEvent(cr.id, "deploy_marked", "Marked as deployed in production.", client.id);
+    recordAuditEventAsync({
+      organizationId: updated.organizationId,
+      projectId: updated.projectId,
+      actorOrganizationId: client.id,
+      actorEmail: client.email,
+      category: "deployment",
+      action: "deployment_live",
+      targetType: "change_request",
+      targetId: String(cr.id),
+      metadata: { source: "manual_mark" },
+      ...reqAuditMeta(req),
+    });
     const emails = await lookupEmails([updated.organizationId]);
     res.json(serializeChangeRequest(updated, emails));
   },
@@ -880,6 +917,7 @@ async function runAgentPipeline(
     return;
   }
 
+  let buildAuditCtx: { orgId: number; projectId: number } | null = null;
   try {
     await updateChangeRequest(changeRequestId, { status: "generating_patch" });
     await appendEvent(
@@ -895,6 +933,15 @@ async function runAgentPipeline(
     if (!crRow || !crRow.distilledSpec) {
       throw new Error("Distilled spec missing");
     }
+    buildAuditCtx = { orgId: crRow.organizationId, projectId: crRow.projectId };
+    recordAuditEventAsync({
+      organizationId: buildAuditCtx.orgId,
+      projectId: buildAuditCtx.projectId,
+      category: "build",
+      action: "build_started",
+      targetType: "change_request",
+      targetId: String(changeRequestId),
+    });
     const patch = await generateChangePatch(
       crRow.distilledSpec as unknown as DistilledSpec,
       projectContext,
@@ -914,6 +961,15 @@ async function runAgentPipeline(
         commitMessage: patch.commitMessage,
       },
     );
+    recordAuditEventAsync({
+      organizationId: buildAuditCtx.orgId,
+      projectId: buildAuditCtx.projectId,
+      category: "build",
+      action: "build_succeeded",
+      targetType: "change_request",
+      targetId: String(changeRequestId),
+      metadata: { fileCount: patch.fileChanges.length },
+    });
 
     // Reload the project so we have the latest GitHub config.
     const [latestProject] = await db
@@ -933,6 +989,17 @@ async function runAgentPipeline(
       `Couldn't draft the code: ${message}`,
       null,
     );
+    if (buildAuditCtx) {
+      recordAuditEventAsync({
+        organizationId: buildAuditCtx.orgId,
+        projectId: buildAuditCtx.projectId,
+        category: "build",
+        action: "build_failed",
+        targetType: "change_request",
+        targetId: String(changeRequestId),
+        metadata: { error: message },
+      });
+    }
   }
 }
 

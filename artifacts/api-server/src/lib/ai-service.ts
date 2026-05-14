@@ -24,7 +24,7 @@ import {
 } from "@workspace/db";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { logger } from "./logger";
-import { recordAuditEvent } from "./audit";
+import { recordAuditEventAsync } from "./audit";
 import { deduct, getBalance } from "./token-service";
 import {
   resolveCategoryModel,
@@ -376,7 +376,7 @@ export async function phiPreflight(
     errorMessage: "phi_blocked",
     metadata: { rules, stage: "preflight" },
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: deps.organizationId,
     actorOrganizationId: deps.userClientId,
     category: "ai",
@@ -437,7 +437,7 @@ export async function aiSend(
         errorMessage: "healthcare_gating_failed",
         metadata: { failedPreconditions: gate.failedPreconditions },
       });
-      await recordAuditEvent({
+      recordAuditEventAsync({
         organizationId: deps.organizationId,
         actorOrganizationId: deps.userClientId,
         category: "ai",
@@ -501,7 +501,7 @@ export async function aiSend(
         errorMessage: "phi_blocked",
         metadata: { rules: scan.hits.map((h) => h.rule) },
       });
-      await recordAuditEvent({
+      recordAuditEventAsync({
         organizationId: deps.organizationId,
         actorOrganizationId: deps.userClientId,
         category: "ai",
@@ -561,7 +561,7 @@ export async function aiSend(
         errorMessage: "insufficient_tokens",
         metadata: { balance, estimated },
       });
-      await recordAuditEvent({
+      recordAuditEventAsync({
         organizationId: deps.organizationId,
         actorOrganizationId: deps.userClientId,
         category: "ai",
@@ -757,7 +757,7 @@ export async function aiSend(
         errorMessage: "insufficient_tokens_post",
         metadata: { tokenCost, balance, error: message },
       });
-      await recordAuditEvent({
+      recordAuditEventAsync({
         organizationId: deps.organizationId,
         actorOrganizationId: deps.userClientId,
         category: "ai",
@@ -801,11 +801,11 @@ export async function aiSend(
     tokenCost: actualCost,
     status: "ok",
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: deps.organizationId,
     actorOrganizationId: deps.userClientId,
     category: "ai",
-    action: "prompt",
+    action: "ai_prompt_submitted",
     targetType: "project",
     targetId: String(deps.projectId),
     metadata: {

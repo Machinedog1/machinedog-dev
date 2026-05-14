@@ -1761,6 +1761,287 @@ export const ImportGithubProjectBody = zod.object({
 });
 
 /**
+ * @summary List a project's secrets (owner only). Values are never returned.
+ */
+export const ListProjectSecretsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectSecretsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      projectId: zod.number(),
+      name: zod.string(),
+      environment: zod.enum(["development", "staging", "production"]),
+      valuePreview: zod.string(),
+      version: zod.number(),
+      createdBy: zod.string().nullish(),
+      updatedBy: zod.string().nullish(),
+      createdByEmail: zod.string().nullish(),
+      updatedByEmail: zod.string().nullish(),
+      lastUsedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Create a project secret (owner only).
+ */
+export const CreateProjectSecretParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const createProjectSecretBodyEnvironmentDefault = `development`;
+
+export const CreateProjectSecretBody = zod.object({
+  name: zod.string().min(1),
+  environment: zod
+    .enum(["development", "staging", "production"])
+    .default(createProjectSecretBodyEnvironmentDefault),
+  value: zod.string().min(1),
+});
+
+/**
+ * @summary Update the value of an existing secret (owner only).
+ */
+export const UpdateProjectSecretParams = zod.object({
+  id: zod.coerce.number(),
+  secretId: zod.coerce.number(),
+});
+
+export const UpdateProjectSecretBody = zod.object({
+  name: zod.string().min(1).optional(),
+  environment: zod.enum(["development", "staging", "production"]).optional(),
+  value: zod.string().min(1).optional(),
+});
+
+export const UpdateProjectSecretResponse = zod.object({
+  id: zod.number(),
+  organizationId: zod.number(),
+  projectId: zod.number(),
+  name: zod.string(),
+  environment: zod.enum(["development", "staging", "production"]),
+  valuePreview: zod.string(),
+  version: zod.number(),
+  createdBy: zod.string().nullish(),
+  updatedBy: zod.string().nullish(),
+  createdByEmail: zod.string().nullish(),
+  updatedByEmail: zod.string().nullish(),
+  lastUsedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a secret (owner only).
+ */
+export const DeleteProjectSecretParams = zod.object({
+  id: zod.coerce.number(),
+  secretId: zod.coerce.number(),
+});
+
+/**
+ * @summary Rotate a secret with a new value (owner only). Bumps the version.
+ */
+export const RotateProjectSecretParams = zod.object({
+  id: zod.coerce.number(),
+  secretId: zod.coerce.number(),
+});
+
+export const RotateProjectSecretBody = zod.object({
+  name: zod.string().min(1).optional(),
+  environment: zod.enum(["development", "staging", "production"]).optional(),
+  value: zod.string().min(1).optional(),
+});
+
+export const RotateProjectSecretResponse = zod.object({
+  id: zod.number(),
+  organizationId: zod.number(),
+  projectId: zod.number(),
+  name: zod.string(),
+  environment: zod.enum(["development", "staging", "production"]),
+  valuePreview: zod.string(),
+  version: zod.number(),
+  createdBy: zod.string().nullish(),
+  updatedBy: zod.string().nullish(),
+  createdByEmail: zod.string().nullish(),
+  updatedByEmail: zod.string().nullish(),
+  lastUsedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List audit events scoped to this project.
+ */
+export const ListProjectAuditParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const listProjectAuditQueryLimitDefault = 100;
+export const listProjectAuditQueryOffsetDefault = 0;
+
+export const ListProjectAuditQueryParams = zod.object({
+  limit: zod.coerce.number().default(listProjectAuditQueryLimitDefault),
+  offset: zod.coerce.number().default(listProjectAuditQueryOffsetDefault),
+});
+
+export const ListProjectAuditResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number().nullish(),
+      projectId: zod.number().nullish(),
+      actorOrganizationId: zod.number().nullish(),
+      actorEmail: zod.string().nullish(),
+      actorUserId: zod.string().nullish(),
+      category: zod.string(),
+      action: zod
+        .enum([
+          "signin",
+          "signin_failed",
+          "organization_created",
+          "member_invited",
+          "member_removed",
+          "project_created",
+          "project_updated",
+          "project_archived",
+          "file_created",
+          "file_updated",
+          "file_deleted",
+          "ai_prompt_submitted",
+          "ai_change_accepted",
+          "ai_change_rejected",
+          "phi_blocked",
+          "secret_created",
+          "secret_updated",
+          "secret_deleted",
+          "secret_rotated",
+          "github_connected",
+          "repo_imported",
+          "repo_pulled",
+          "repo_pushed",
+          "build_started",
+          "build_failed",
+          "build_succeeded",
+          "deployment_started",
+          "deployment_live",
+          "deployment_failed",
+          "tokens_purchased",
+          "tokens_used",
+          "tokens_granted",
+          "tokens_adjusted",
+          "checkout_created",
+          "subscription_changed",
+          "payment_failed",
+          "healthcare_mode_requested",
+          "healthcare_gating_blocked",
+          "insufficient_tokens",
+          "baa_status_updated",
+          "ai_provider_updated",
+          "ai_model_updated",
+        ])
+        .describe(
+          "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
+        ),
+      targetType: zod.string().nullish(),
+      targetId: zod.string().nullish(),
+      metadata: zod.record(zod.string(), zod.unknown()).nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary List all audit events with filters (admin only).
+ */
+export const listAdminAuditQueryLimitDefault = 100;
+export const listAdminAuditQueryOffsetDefault = 0;
+
+export const ListAdminAuditQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminAuditQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminAuditQueryOffsetDefault),
+  organizationId: zod.coerce.number().optional(),
+  projectId: zod.coerce.number().optional(),
+  action: zod.coerce.string().optional(),
+  actor: zod.coerce.string().optional(),
+  since: zod.date().optional(),
+  until: zod.date().optional(),
+});
+
+export const ListAdminAuditResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number().nullish(),
+      projectId: zod.number().nullish(),
+      actorOrganizationId: zod.number().nullish(),
+      actorEmail: zod.string().nullish(),
+      actorUserId: zod.string().nullish(),
+      category: zod.string(),
+      action: zod
+        .enum([
+          "signin",
+          "signin_failed",
+          "organization_created",
+          "member_invited",
+          "member_removed",
+          "project_created",
+          "project_updated",
+          "project_archived",
+          "file_created",
+          "file_updated",
+          "file_deleted",
+          "ai_prompt_submitted",
+          "ai_change_accepted",
+          "ai_change_rejected",
+          "phi_blocked",
+          "secret_created",
+          "secret_updated",
+          "secret_deleted",
+          "secret_rotated",
+          "github_connected",
+          "repo_imported",
+          "repo_pulled",
+          "repo_pushed",
+          "build_started",
+          "build_failed",
+          "build_succeeded",
+          "deployment_started",
+          "deployment_live",
+          "deployment_failed",
+          "tokens_purchased",
+          "tokens_used",
+          "tokens_granted",
+          "tokens_adjusted",
+          "checkout_created",
+          "subscription_changed",
+          "payment_failed",
+          "healthcare_mode_requested",
+          "healthcare_gating_blocked",
+          "insufficient_tokens",
+          "baa_status_updated",
+          "ai_provider_updated",
+          "ai_model_updated",
+        ])
+        .describe(
+          "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
+        ),
+      targetType: zod.string().nullish(),
+      targetId: zod.string().nullish(),
+      metadata: zod.record(zod.string(), zod.unknown()).nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
  * @summary List paid build deposits and retainer subscriptions (admin only)
  */
 export const listAllBuildOrdersQueryLimitDefault = 100;

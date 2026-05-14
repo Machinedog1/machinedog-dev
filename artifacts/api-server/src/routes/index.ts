@@ -16,6 +16,8 @@ import storageRouter from "./storage";
 import billingRouter from "./billing";
 import aiRouter from "./ai";
 import adminAiRouter from "./admin-ai";
+import secretsRouter from "./secrets";
+import auditRouter from "./audit";
 
 const router: IRouter = Router();
 
@@ -36,5 +38,7 @@ router.use(storageRouter);
 router.use(billingRouter);
 router.use(aiRouter);
 router.use(adminAiRouter);
+router.use(secretsRouter);
+router.use(auditRouter);
 
 export default router;

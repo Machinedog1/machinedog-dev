@@ -25,7 +25,7 @@ import {
   hasEnabledProviders,
 } from "../lib/ai-registry";
 import { testProviderConnection } from "../lib/ai-service";
-import { recordAuditEvent, reqAuditMeta } from "../lib/audit";
+import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -67,11 +67,11 @@ router.patch("/admin/ai/providers/:id", ...adminGuards, async (req, res) => {
     .returning();
   if (!updated) return fail(res, 404, "not_found", "Provider not found");
   const meta = reqAuditMeta(req);
-  await recordAuditEvent({
+  recordAuditEventAsync({
     actorOrganizationId: req.dbClient!.id,
     actorEmail: req.dbClient!.email,
     category: "admin",
-    action: "ai.provider.updated",
+    action: "ai_provider_updated",
     targetType: "ai_provider",
     targetId: String(id),
     metadata: patch,
@@ -151,11 +151,11 @@ router.patch("/admin/ai/models/:id", ...adminGuards, async (req, res) => {
     .returning();
   if (!updated) return fail(res, 404, "not_found", "Model not found");
   const meta = reqAuditMeta(req);
-  await recordAuditEvent({
+  recordAuditEventAsync({
     actorOrganizationId: req.dbClient!.id,
     actorEmail: req.dbClient!.email,
     category: "admin",
-    action: "ai.model.updated",
+    action: "ai_model_updated",
     targetType: "ai_model",
     targetId: String(id),
     metadata: patch,

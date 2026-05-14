@@ -18,7 +18,7 @@ import {
   type BillingInterval,
   type PlanType,
 } from "./plans";
-import { recordAuditEvent } from "./audit";
+import { recordAuditEventAsync } from "./audit";
 import { grantMonthly, recordPurchase } from "./token-service";
 import { logger } from "./logger";
 
@@ -151,11 +151,11 @@ export async function createPlanCheckoutSession(
     cancel_url: opts.cancelUrl,
   });
 
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: opts.organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
-    action: "checkout.created",
+    action: "checkout_created",
     targetType: "stripe_checkout_session",
     targetId: session.id,
     metadata: { planType: plan.key, interval: opts.interval },
@@ -229,11 +229,11 @@ export async function createTokenPackCheckoutSession(
     cancel_url: opts.cancelUrl,
   });
 
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: opts.organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
-    action: "token_pack.checkout.created",
+    action: "checkout_created",
     targetType: "stripe_checkout_session",
     targetId: session.id,
     metadata: { packKey: pack.key, tokens: pack.tokens },
@@ -384,6 +384,10 @@ export async function syncSubscriptionFromStripe(
     planType === "healthcare"
       ? ("required" as const)
       : ("not_required" as const);
+  const [orgBefore] = await db
+    .select({ baaStatus: organizationsTable.baaStatus })
+    .from(organizationsTable)
+    .where(eq(organizationsTable.id, orgId));
   await db
     .update(organizationsTable)
     .set({
@@ -401,14 +405,24 @@ export async function syncSubscriptionFromStripe(
     })
     .where(eq(organizationsTable.id, orgId));
 
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: orgId,
     category: "billing",
-    action: "subscription.synced",
+    action: "subscription_changed",
     targetType: "stripe_subscription",
     targetId: sub.id,
     metadata: { planType, interval, status: safeStatus, cancelAtPeriodEnd },
   });
+  if (orgBefore && orgBefore.baaStatus !== baaStatus) {
+    recordAuditEventAsync({
+      organizationId: orgId,
+      category: "healthcare",
+      action: "baa_status_updated",
+      targetType: "organization",
+      targetId: String(orgId),
+      metadata: { from: orgBefore.baaStatus, to: baaStatus, planType, source: "stripe_sync" },
+    });
+  }
 }
 
 /**
@@ -505,11 +519,11 @@ async function mockPlanCheckout(opts: MockPlanArgs): Promise<{ url: string | nul
     actorOrganizationId: opts.actorOrganizationId ?? null,
     metadata: { interval: opts.interval, months },
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: opts.organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
-    action: "subscription.dev_mock",
+    action: "subscription_changed",
     targetType: "subscription",
     targetId: fakeSubId,
     metadata: { planType: opts.planType, interval: opts.interval },
@@ -528,11 +542,11 @@ async function mockTokenPackCheckout(opts: MockPackArgs): Promise<{ url: string 
     description: `[demo] ${opts.pack.name} purchase`,
     actorOrganizationId: opts.actorOrganizationId ?? null,
   });
-  await recordAuditEvent({
+  recordAuditEventAsync({
     organizationId: opts.organizationId,
     actorOrganizationId: opts.actorOrganizationId ?? null,
     category: "billing",
-    action: "token_pack.dev_mock",
+    action: "tokens_purchased",
     targetType: "checkout",
     targetId: fakeSessionId,
     metadata: { packKey: opts.pack.key, tokens: opts.pack.tokens },

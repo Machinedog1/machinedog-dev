@@ -19,6 +19,25 @@ import type { Request, Response, NextFunction } from "express";
 import { resolveOrganizationForClerkUser } from "@workspace/db";
 import type { Organization, OrganizationMember } from "@workspace/db";
 import { logger } from "./logger";
+import { recordAuditEventAsync, reqAuditMeta } from "./audit";
+
+// Per-process in-memory de-dup so we don't write a `signin` audit row on
+// every authenticated API request — only on the first resolved request for
+// a (clerk userId, organizationId) pair within the TTL window.
+const signinDedup = new Map<string, number>();
+const SIGNIN_DEDUP_TTL_MS = 30 * 60 * 1000;
+function shouldRecordSignin(key: string): boolean {
+  const now = Date.now();
+  const last = signinDedup.get(key);
+  if (last && now - last < SIGNIN_DEDUP_TTL_MS) return false;
+  signinDedup.set(key, now);
+  if (signinDedup.size > 5000) {
+    for (const [k, t] of signinDedup) {
+      if (now - t >= SIGNIN_DEDUP_TTL_MS) signinDedup.delete(k);
+    }
+  }
+  return true;
+}
 
 // Compat shape kept on `req.dbClient` so existing route code that reads
 // `req.dbClient.id` / `.email` / `.isAdmin` / `.tokenBalance` etc. keeps
@@ -122,6 +141,20 @@ export async function loadClerkAndOrganization(
         req.organization = tenant.organization;
         req.organizationMember = tenant.member;
         req.dbClient = buildDbClientCompat(tenant.organization, tenant.member);
+        const dedupKey = `${req.clerkAuth.userId}:${tenant.organization.id}`;
+        if (shouldRecordSignin(dedupKey)) {
+          recordAuditEventAsync({
+            organizationId: tenant.organization.id,
+            actorOrganizationId: tenant.organization.id,
+            actorEmail: tenant.member.email,
+            category: "auth",
+            action: "signin",
+            targetType: "organization_member",
+            targetId: String(tenant.member.id),
+            metadata: { clerkUserId: req.clerkAuth.userId },
+            ...reqAuditMeta(req),
+          });
+        }
       }
     } catch (err) {
       logger.warn(

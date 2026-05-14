@@ -38,6 +38,7 @@ import {
   organizationMembersTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { recordAuditEventAsync } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -132,13 +133,24 @@ async function handleOrganizationCreated(
     }
     return;
   }
-  await db.insert(organizationsTable).values({
-    clerkOrgId: org.id,
-    clerkOrgSlug: org.slug ?? null,
-    name: org.name ?? org.slug ?? org.id,
-    primaryEmail: "",
-  });
+  const [created] = await db
+    .insert(organizationsTable)
+    .values({
+      clerkOrgId: org.id,
+      clerkOrgSlug: org.slug ?? null,
+      name: org.name ?? org.slug ?? org.id,
+      primaryEmail: "",
+    })
+    .returning();
   logger.info({ clerkOrgId: org.id }, "[clerk-webhook] created organization");
+  recordAuditEventAsync({
+    organizationId: created?.id ?? null,
+    category: "organization",
+    action: "organization_created",
+    targetType: "organization",
+    targetId: String(created?.id ?? org.id),
+    metadata: { clerkOrgId: org.id, name: created?.name ?? null, source: "clerk_webhook" },
+  });
 }
 
 async function handleOrganizationDeleted(

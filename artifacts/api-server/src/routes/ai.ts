@@ -48,7 +48,7 @@ import {
 import { getBalance } from "../lib/token-service";
 import { applyProposedChanges } from "../lib/ai-apply-changes";
 import { pushPatchToGitHub, type PatchFileEntry } from "./change-requests";
-import { recordAuditEvent, reqAuditMeta } from "../lib/audit";
+import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -1010,11 +1010,11 @@ router.post(
         .where(eq(aiProposedChangesTable.id, pcId))
         .returning();
       const meta = reqAuditMeta(req);
-      await recordAuditEvent({
+      recordAuditEventAsync({
         organizationId: loaded.project.organizationId,
         actorOrganizationId: client.id,
         category: "ai",
-        action: "proposed_change.accepted_as_change_request",
+        action: "ai_change_accepted",
         targetType: "ai_proposed_change",
         targetId: String(pcId),
         metadata: {
@@ -1063,11 +1063,11 @@ router.post(
       .where(eq(aiProposedChangesTable.id, pcId))
       .returning();
     const meta = reqAuditMeta(req);
-    await recordAuditEvent({
+    recordAuditEventAsync({
       organizationId: loaded.project.organizationId,
       actorOrganizationId: client.id,
       category: "ai",
-      action: "proposed_change.accepted",
+      action: "ai_change_accepted",
       targetType: "ai_proposed_change",
       targetId: String(pcId),
       metadata: {
@@ -1116,11 +1116,11 @@ router.post(
       .where(eq(aiProposedChangesTable.id, pcId))
       .returning();
     const meta = reqAuditMeta(req);
-    await recordAuditEvent({
+    recordAuditEventAsync({
       organizationId: loaded.project.organizationId,
       actorOrganizationId: client.id,
       category: "ai",
-      action: "proposed_change.rejected",
+      action: "ai_change_rejected",
       targetType: "ai_proposed_change",
       targetId: String(pcId),
       ...meta,

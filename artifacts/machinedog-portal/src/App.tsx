@@ -29,6 +29,7 @@ import AdminDashboard from "@/pages/admin/index";
 import AdminClients from "@/pages/admin/clients";
 import AdminProjects from "@/pages/admin/projects";
 import AdminOrders from "@/pages/admin/orders";
+import AdminAuditPage from "@/pages/admin/audit";
 import AdminAiModelsPage from "@/pages/admin/ai-models";
 import SettingsPage from "@/pages/settings";
 
@@ -169,6 +170,12 @@ function AuthedRoutes() {
       <Route path="/projects/:id/workspace">
         <AuthGuard><ProjectWorkspacePage /></AuthGuard>
       </Route>
+      <Route path="/projects/:id/secrets">
+        <AuthGuard><ProjectDetailPage /></AuthGuard>
+      </Route>
+      <Route path="/projects/:id/history">
+        <AuthGuard><ProjectDetailPage /></AuthGuard>
+      </Route>
       <Route path="/projects/:id">
         <AuthGuard><ProjectDetailPage /></AuthGuard>
       </Route>
@@ -190,6 +197,9 @@ function AuthedRoutes() {
       </Route>
       <Route path="/admin/ai-models">
         <AuthGuard><AdminGuard><AdminAiModelsPage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/audit">
+        <AuthGuard><AdminGuard><AdminAuditPage /></AdminGuard></AuthGuard>
       </Route>
       <Route path="/admin/orders">
         <AuthGuard><AdminGuard><AdminOrders /></AdminGuard></AuthGuard>
