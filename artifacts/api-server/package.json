@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.15",
     "@google-cloud/storage": "^7.19.0",
     "@node-rs/argon2": "^2.0.2",
     "@replit/connectors-sdk": "^0.4.0",

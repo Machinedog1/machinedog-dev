@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
 import { clientsTable } from "./clients";
+import { organizationsTable } from "./organizations";
 
 export const projectMembersTable = pgTable(
   "project_members",
@@ -13,6 +14,8 @@ export const projectMembersTable = pgTable(
       .references(() => projectsTable.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     clientId: integer("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
+    // Phase 0 foundation: nullable organization scope (mirrors project.organizationId).
+    organizationId: integer("organization_id").references(() => organizationsTable.id),
     role: text("role", { enum: ["owner", "collaborator"] })
       .notNull()
       .default("collaborator"),

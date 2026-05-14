@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
 import { clientsTable } from "./clients";
+import { organizationsTable } from "./organizations";
 
 export const CHANGE_REQUEST_STATUSES = [
   "draft",
@@ -27,6 +28,9 @@ export const changeRequestsTable = pgTable(
     id: serial("id").primaryKey(),
     projectId: integer("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
     requesterClientId: integer("requester_client_id").notNull().references(() => clientsTable.id),
+    // Phase 0 foundation: nullable organization scope (mirrors project.organizationId).
+    // New code should filter on this; legacy code uses requesterClientId via the project.
+    organizationId: integer("organization_id").references(() => organizationsTable.id),
     status: text("status", { enum: CHANGE_REQUEST_STATUSES }).notNull().default("draft"),
     title: text("title").notNull().default(""),
     rawRequest: text("raw_request").notNull(),

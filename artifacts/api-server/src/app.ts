@@ -6,6 +6,7 @@ import router from "./routes";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import { logger } from "./lib/logger";
 import { loadSessionAndClient } from "./lib/auth";
+import { loadClerkAndOrganization } from "./lib/clerk";
 
 const app: Express = express();
 
@@ -41,6 +42,10 @@ app.use(cookieParser());
 // session cookie or bearer token is present. Routes opt-in to authentication
 // via the requireAuth / requireActiveClient / requireAdmin guards.
 app.use(loadSessionAndClient);
+// Phase 0 parallel auth: resolve Clerk session (if configured) and attach
+// the active organization to every request. Runs AFTER the legacy session
+// middleware so it can use `req.dbClient` as a fallback bridge.
+app.use(loadClerkAndOrganization);
 
 app.use("/api", router);
 

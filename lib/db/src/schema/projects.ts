@@ -3,10 +3,15 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { clientsTable } from "./clients";
+import { organizationsTable } from "./organizations";
 
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
   clientId: integer("client_id").notNull().references(() => clientsTable.id),
+  // Phase 0 foundation: nullable mirror of clientId pointing at the new
+  // organizations table. Backfilled 1:1 from clientId. New code MUST prefer
+  // this column; legacy code keeps using clientId until Phase 0 follow-ups.
+  organizationId: integer("organization_id").references(() => organizationsTable.id),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   summary: text("summary").notNull().default(""),

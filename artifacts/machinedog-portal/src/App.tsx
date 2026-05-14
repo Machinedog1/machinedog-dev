@@ -32,6 +32,8 @@ import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { ClerkProviderWrapper } from "@/lib/clerk";
+import { DemoAuthBanner } from "@/components/DemoAuthBanner";
 
 const queryClient = new QueryClient();
 
@@ -194,16 +196,19 @@ function RoutedApp() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <RoutedApp />
-          </AuthProvider>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ClerkProviderWrapper>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthProvider>
+              <DemoAuthBanner />
+              <RoutedApp />
+            </AuthProvider>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProviderWrapper>
   );
 }
 

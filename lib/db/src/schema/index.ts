@@ -1,4 +1,6 @@
 export * from "./clients";
+export * from "./organizations";
+export * from "./organization-members";
 export * from "./sessions";
 export * from "./prompt-sessions";
 export * from "./token-purchases";
