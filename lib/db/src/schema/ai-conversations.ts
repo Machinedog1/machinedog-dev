@@ -11,7 +11,6 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
 import { projectsTable } from "./projects";
-import { clientsTable } from "./clients";
 import { AI_MODEL_CATEGORIES } from "./ai-models";
 
 /**
@@ -32,7 +31,7 @@ export const aiConversationsTable = pgTable(
       .references(() => projectsTable.id, { onDelete: "cascade" }),
     createdByClientId: integer("created_by_client_id")
       .notNull()
-      .references(() => clientsTable.id),
+      .references(() => organizationsTable.id),
     title: text("title").notNull().default("New conversation"),
     /** Last category used in this conversation — drives the mode selector
      *  default when the user re-opens the thread. */
@@ -159,7 +158,7 @@ export const aiProposedChangesTable = pgTable(
      *  (`commit` = direct workspace commit, `change_request` = routed through
      *  the canonical CR pipeline). */
     appliedByClientId: integer("applied_by_client_id").references(
-      () => clientsTable.id,
+      () => organizationsTable.id,
     ),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
     appliedAs: text("applied_as", { enum: ["commit", "change_request"] }),

@@ -1949,7 +1949,11 @@ function ProjectFilesPanel({
     setUploading(true);
     try {
       const reservation = await requestUpload.mutateAsync({
-        data: { contentType: file.type || "application/octet-stream" },
+        data: {
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "application/octet-stream",
+        },
       });
       const putRes = await fetch(reservation.uploadURL, {
         method: "PUT",

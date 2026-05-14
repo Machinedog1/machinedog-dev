@@ -378,7 +378,7 @@ export async function phiPreflight(
   });
   await recordAuditEvent({
     organizationId: deps.organizationId,
-    actorClientId: deps.userClientId,
+    actorOrganizationId: deps.userClientId,
     category: "ai",
     action: "phi_blocked",
     targetType: "project",
@@ -439,7 +439,7 @@ export async function aiSend(
       });
       await recordAuditEvent({
         organizationId: deps.organizationId,
-        actorClientId: deps.userClientId,
+        actorOrganizationId: deps.userClientId,
         category: "ai",
         action: "healthcare_gating_blocked",
         targetType: "project",
@@ -503,7 +503,7 @@ export async function aiSend(
       });
       await recordAuditEvent({
         organizationId: deps.organizationId,
-        actorClientId: deps.userClientId,
+        actorOrganizationId: deps.userClientId,
         category: "ai",
         action: "phi_blocked",
         targetType: "project",
@@ -563,7 +563,7 @@ export async function aiSend(
       });
       await recordAuditEvent({
         organizationId: deps.organizationId,
-        actorClientId: deps.userClientId,
+        actorOrganizationId: deps.userClientId,
         category: "ai",
         action: "insufficient_tokens",
         targetType: "project",
@@ -729,7 +729,7 @@ export async function aiSend(
   if (deps.organizationId) {
     try {
       await deduct(deps.organizationId, tokenCost, "ai", {
-        userId: deps.userClientId,
+        actorOrganizationId: deps.organizationId,
         projectId: deps.projectId,
         description: `AI call (${concreteCategory}, ${resolved.model.modelKey})`,
         metadata: { inputTokens, outputTokens },
@@ -759,7 +759,7 @@ export async function aiSend(
       });
       await recordAuditEvent({
         organizationId: deps.organizationId,
-        actorClientId: deps.userClientId,
+        actorOrganizationId: deps.userClientId,
         category: "ai",
         action: "insufficient_tokens",
         targetType: "project",
@@ -803,7 +803,7 @@ export async function aiSend(
   });
   await recordAuditEvent({
     organizationId: deps.organizationId,
-    actorClientId: deps.userClientId,
+    actorOrganizationId: deps.userClientId,
     category: "ai",
     action: "prompt",
     targetType: "project",

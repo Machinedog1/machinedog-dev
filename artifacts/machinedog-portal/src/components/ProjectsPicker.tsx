@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-const STATUS_ICON: Record<string, JSX.Element> = {
+const STATUS_ICON: Record<string, React.ReactNode> = {
   draft: <FolderGit2 className="h-3 w-3" />,
   active: <Activity className="h-3 w-3" />,
   completed: <CheckCircle2 className="h-3 w-3" />,

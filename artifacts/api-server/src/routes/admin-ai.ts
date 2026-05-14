@@ -68,7 +68,7 @@ router.patch("/admin/ai/providers/:id", ...adminGuards, async (req, res) => {
   if (!updated) return fail(res, 404, "not_found", "Provider not found");
   const meta = reqAuditMeta(req);
   await recordAuditEvent({
-    actorClientId: req.dbClient!.id,
+    actorOrganizationId: req.dbClient!.id,
     actorEmail: req.dbClient!.email,
     category: "admin",
     action: "ai.provider.updated",
@@ -152,7 +152,7 @@ router.patch("/admin/ai/models/:id", ...adminGuards, async (req, res) => {
   if (!updated) return fail(res, 404, "not_found", "Model not found");
   const meta = reqAuditMeta(req);
   await recordAuditEvent({
-    actorClientId: req.dbClient!.id,
+    actorOrganizationId: req.dbClient!.id,
     actorEmail: req.dbClient!.email,
     category: "admin",
     action: "ai.model.updated",

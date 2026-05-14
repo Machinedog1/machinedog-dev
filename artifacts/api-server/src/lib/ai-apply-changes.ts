@@ -73,7 +73,7 @@ export interface ApplyChangesResult {
  */
 export async function applyProposedChanges(
   project: Project,
-  uploadedByClientId: number,
+  uploadedByOrganizationId: number,
   changes: AiProposedChange[],
 ): Promise<ApplyChangesResult> {
   const storage = new ObjectStorageService();
@@ -108,7 +108,7 @@ export async function applyProposedChanges(
         } else {
           await db.insert(projectFilesTable).values({
             projectId: project.id,
-            uploadedByClientId,
+            uploadedByOrganizationId,
             name: c.path,
             contentType: "text/plain",
             sizeBytes,

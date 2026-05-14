@@ -12,7 +12,6 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
 import { projectsTable } from "./projects";
-import { clientsTable } from "./clients";
 import { aiProvidersTable } from "./ai-providers";
 import { aiModelsTable } from "./ai-models";
 import { AI_MODEL_CATEGORIES } from "./ai-models";
@@ -32,7 +31,7 @@ export const aiUsageTable = pgTable(
     projectId: integer("project_id").references(() => projectsTable.id, {
       onDelete: "set null",
     }),
-    userClientId: integer("user_client_id").references(() => clientsTable.id, {
+    userClientId: integer("user_client_id").references(() => organizationsTable.id, {
       onDelete: "set null",
     }),
     providerId: integer("provider_id").references(() => aiProvidersTable.id, {
