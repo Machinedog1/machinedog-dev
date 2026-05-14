@@ -47,3 +47,21 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Env files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+build
+out
+.next
+logs
+*.log
+
+# Test
+coverage
+
+# Screenshots/temp captures
+screenshots/
