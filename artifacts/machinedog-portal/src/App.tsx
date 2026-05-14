@@ -17,6 +17,7 @@ import PromptConsole from "@/pages/index";
 import { getGetMeQueryKey } from "@workspace/api-client-react";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
+import BillingPage from "@/pages/billing";
 import ProjectsPage from "@/pages/projects";
 import ProjectDetailPage from "@/pages/project-detail";
 import WorkPage from "@/pages/work";
@@ -148,6 +149,9 @@ function AuthedRoutes() {
       </Route>
       <Route path="/tokens">
         <AuthGuard><TokensPage /></AuthGuard>
+      </Route>
+      <Route path="/billing">
+        <AuthGuard><BillingPage /></AuthGuard>
       </Route>
       <Route path="/projects">
         <AuthGuard><ProjectsPage /></AuthGuard>

@@ -10,6 +10,14 @@ import {
 import { getStripe } from "../lib/stripe";
 import { loadMailerConfig, getTransporter } from "../lib/mailer";
 import { logger } from "../lib/logger";
+import {
+  syncSubscriptionFromStripe,
+  grantPlanRenewalTokens,
+  applyTokenPackPurchase,
+} from "../lib/billing-service";
+import { planFromPriceId } from "../lib/plans";
+import { recordAuditEvent } from "../lib/audit";
+import type Stripe from "stripe";
 
 const router: IRouter = Router();
 
@@ -232,6 +240,45 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
       return;
     }
 
+    // Phase 1 flows are org-scoped (no legacy clientId in metadata) — handle
+    // them before the legacy clientId requirement so token-pack purchases
+    // and plan subscriptions are fulfilled correctly.
+    if (kind === "token_pack") {
+      const orgId = Number(session.metadata?.organizationId);
+      const packKey = session.metadata?.packKey;
+      if (orgId && !Number.isNaN(orgId) && packKey) {
+        try {
+          await applyTokenPackPurchase({
+            organizationId: orgId,
+            packKey,
+            sessionId: session.id,
+          });
+        } catch (err) {
+          // Surface the failure to Stripe so it retries the webhook. The
+          // ledger insert is idempotent on session.id so retries are safe.
+          req.log.error({ err, orgId, packKey, sessionId: session.id }, "Token pack credit failed");
+          res.status(500).json({ error: "token_pack_credit_failed" });
+          return;
+        }
+      } else {
+        req.log.warn({ sessionId: session.id }, "token_pack checkout missing org/pack metadata");
+      }
+      res.json({ received: true });
+      return;
+    }
+
+    if (kind === "plan_subscription") {
+      // Subscription create event will sync the subscriptions table; nothing
+      // to do here besides logging — the sub event is the source of truth.
+      req.log.info(
+        { sessionId: session.id, planType: session.metadata?.planType },
+        "Plan subscription checkout completed",
+      );
+      res.json({ received: true });
+      return;
+    }
+
+    // Legacy flows below all require clientId metadata.
     const clientId = Number(session.metadata?.clientId);
     if (!clientId || Number.isNaN(clientId)) {
       req.log.warn({ sessionId: session.id }, "Missing clientId in metadata");
@@ -285,6 +332,21 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
   ) {
     const sub = event.data.object;
     const kind = sub.metadata?.kind;
+
+    if (kind === "plan_subscription") {
+      try {
+        await syncSubscriptionFromStripe(sub as Stripe.Subscription);
+      } catch (err) {
+        // Surface failures so Stripe retries; sync is upserted by
+        // stripeSubscriptionId so retries are safe.
+        req.log.error({ err, subId: sub.id }, "Plan subscription sync failed");
+        res.status(500).json({ error: "plan_subscription_sync_failed" });
+        return;
+      }
+      res.json({ received: true });
+      return;
+    }
+
     if (kind === "portal") {
       const clientId = Number(sub.metadata?.clientId);
       const customerId = typeof sub.customer === "string" ? sub.customer : null;
@@ -299,10 +361,9 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
       const portalStatus = allowedStatuses.includes(status as (typeof allowedStatuses)[number])
         ? (status as (typeof allowedStatuses)[number])
         : "incomplete";
+      const subAny = sub as unknown as { current_period_end?: number };
       const periodEndUnix =
-        typeof (sub as { current_period_end?: number }).current_period_end === "number"
-          ? (sub as { current_period_end: number }).current_period_end
-          : null;
+        typeof subAny.current_period_end === "number" ? subAny.current_period_end : null;
       const periodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
 
       const updateValues = {
@@ -326,6 +387,93 @@ router.post("/", raw({ type: "application/json", limit: "2mb" }), async (req, re
         "Portal subscription state synced",
       );
     }
+  }
+
+  // Plan renewals: invoice.paid grants the org's monthly token allotment.
+  // Idempotent on the invoice id via the ledger's stripeEventId unique constraint.
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const billingReason = invoice.billing_reason ?? "";
+    const subId =
+      typeof (invoice as unknown as { subscription?: string | null }).subscription === "string"
+        ? (invoice as unknown as { subscription: string }).subscription
+        : null;
+    // Only grant on the initial creation invoice and on true cycle renewals.
+    // `subscription_update` fires on mid-cycle plan changes / proration and
+    // must NOT mint another monthly allotment.
+    if (subId && (billingReason === "subscription_create" || billingReason === "subscription_cycle")) {
+      try {
+        const stripeClient = getStripe()!;
+        const sub = await stripeClient.subscriptions.retrieve(subId);
+        if (sub.metadata?.kind === "plan_subscription") {
+          const orgId = Number(sub.metadata.organizationId);
+          // Resolve plan from the live Stripe price (source of truth) instead
+          // of metadata, which is not rewritten by customer-portal plan
+          // changes. Falling back to metadata only if the price is unknown
+          // keeps demo/legacy paths working.
+          const livePriceId = sub.items.data[0]?.price?.id ?? null;
+          const resolved = livePriceId ? planFromPriceId(livePriceId) : null;
+          const planType =
+            resolved?.plan.key ??
+            (sub.metadata.planType as
+              | "starter"
+              | "pro"
+              | "business"
+              | "healthcare"
+              | "enterprise"
+              | undefined);
+          // Interval is needed to size the grant correctly: annual invoices
+          // fire once per year so they must credit 12× the monthly allotment.
+          // Prefer the live price's resolved interval; fall back to metadata.
+          const interval =
+            resolved?.interval ??
+            (sub.metadata.billingInterval === "annual" ? "annual" : "monthly");
+          if (orgId && !Number.isNaN(orgId) && planType) {
+            await grantPlanRenewalTokens({
+              organizationId: orgId,
+              planType,
+              interval,
+              invoiceId: invoice.id ?? `${subId}-${invoice.created}`,
+            });
+            req.log.info(
+              { orgId, planType, interval, invoiceId: invoice.id, priceId: livePriceId },
+              "Plan renewal grant credited",
+            );
+          } else {
+            req.log.warn(
+              { subId, livePriceId, metadataPlan: sub.metadata.planType },
+              "Plan renewal: could not resolve plan type, skipping grant",
+            );
+          }
+        }
+      } catch (err) {
+        // Surface failures so Stripe retries; grantPlanRenewalTokens is
+        // idempotent on invoice.id so retries are safe.
+        req.log.error({ err, subId }, "Plan renewal grant failed");
+        res.status(500).json({ error: "plan_renewal_grant_failed" });
+        return;
+      }
+    }
+  }
+
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subId =
+      typeof (invoice as unknown as { subscription?: string | null }).subscription === "string"
+        ? (invoice as unknown as { subscription: string }).subscription
+        : null;
+    await recordAuditEvent({
+      category: "billing",
+      action: "invoice.payment_failed",
+      targetType: "stripe_invoice",
+      targetId: invoice.id ?? null,
+      metadata: {
+        subscriptionId: subId,
+        amountDue: invoice.amount_due,
+        attemptCount: invoice.attempt_count,
+      },
+    });
+    req.log.warn({ invoiceId: invoice.id, subId }, "Invoice payment failed");
   }
 
   res.json({ received: true });

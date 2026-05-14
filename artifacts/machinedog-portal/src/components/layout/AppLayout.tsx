@@ -6,6 +6,7 @@ import {
   Terminal,
   History,
   Coins,
+  CreditCard,
   Briefcase,
   Settings,
   ShieldAlert,
@@ -55,6 +56,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/", label: "Console", icon: Terminal },
     { href: "/history", label: "History", icon: History },
     { href: "/tokens", label: "Tokens", icon: Coins },
+    { href: "/billing", label: "Billing", icon: CreditCard },
     { href: "/consulting", label: "Consulting", icon: Briefcase },
   ];
 

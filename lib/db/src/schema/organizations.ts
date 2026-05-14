@@ -31,7 +31,7 @@ export const organizationsTable = pgTable(
     primaryEmail: text("primary_email").notNull(),
     // Plan tier / billing — placeholders for Phase 1.
     planType: text("plan_type", {
-      enum: ["free", "starter", "pro", "team", "enterprise", "healthcare"],
+      enum: ["free", "starter", "pro", "business", "team", "enterprise", "healthcare"],
     })
       .notNull()
       .default("free"),
@@ -42,7 +42,7 @@ export const organizationsTable = pgTable(
       .default("none"),
     // Healthcare / BAA tracking — placeholder until Phase 8.
     baaStatus: text("baa_status", {
-      enum: ["not_required", "pending", "active", "expired"],
+      enum: ["not_required", "required", "pending", "active", "expired"],
     })
       .notNull()
       .default("not_required"),

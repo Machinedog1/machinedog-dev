@@ -12,6 +12,7 @@ import intakeRouter from "./intake";
 import leadsRouter from "./leads";
 import checkoutRouter from "./checkout";
 import storageRouter from "./storage";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(adminRouter);
 router.use(leadsRouter);
 router.use(checkoutRouter);
 router.use(storageRouter);
+router.use(billingRouter);
 
 export default router;
