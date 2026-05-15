@@ -55,7 +55,6 @@ OPERATOR_EMAIL = "tom@machinedog.com"
 PUBLIC_APP_URL = "https://machinedog.dev"
 
 [userenv.development]
-VITE_CLERK_PUBLISHABLE_KEY = "pk_test_ZXhjaXRlZC1jcmF5ZmlzaC05Ny5jbGVyay5hY2NvdW50cy5kZXYk"
 
 [nix]
 channel = "stable-25_05"
