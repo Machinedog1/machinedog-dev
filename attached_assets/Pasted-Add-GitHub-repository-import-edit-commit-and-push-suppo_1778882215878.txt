@@ -1,0 +1,115 @@
+Add GitHub repository import, edit, commit, and push support to Machinedog.dev.
+
+Objective:
+Machinedog.dev should allow a signed-in user to connect GitHub, import a repository, edit files in the browser IDE, review changes, commit changes, push a branch back to GitHub, and optionally create a pull request.
+
+Important:
+Do not push directly to main by default.
+Default workflow should be:
+Import repo → create working branch → edit files → review diff → commit → push branch → create pull request.
+
+Build this as an MVP first.
+
+Required features:
+
+1. GitHub connection
+- Add GitHub OAuth or GitHub App integration.
+- Store access tokens securely.
+- Do not expose tokens to the frontend.
+- Add .env.example placeholders for required GitHub keys.
+
+2. Repo import screen
+- Create a page where the user can enter a GitHub repo URL or select from authorized repos.
+- Validate the repo URL.
+- Clone the repo into a workspace folder assigned to the user/project.
+- Save the imported repo metadata to the database.
+
+3. Workspace Git model
+Add or update Prisma models for:
+- GitConnection
+- Repository
+- Workspace
+- GitBranch
+- GitCommitLog
+
+Track:
+- userId
+- projectId
+- repo owner
+- repo name
+- default branch
+- active branch
+- clone path
+- remote URL
+- last synced timestamp
+
+4. Git service
+Create a backend git service that can:
+- clone repository
+- checkout branch
+- create branch
+- get git status
+- get git diff
+- stage files
+- commit changes
+- push branch
+- pull latest changes
+
+Use child_process safely.
+Never allow arbitrary shell commands from the frontend.
+Only allow predefined git operations.
+
+5. Pull request support
+Add a backend API route that can create a GitHub pull request from the pushed branch into the default branch.
+
+6. IDE integration
+In the workspace screen:
+- Show the imported repo file tree.
+- Allow opening and editing files.
+- Save file changes to the workspace.
+- Show Git status in a side panel.
+- Show changed files.
+- Show a diff viewer.
+- Add a commit message input.
+- Add buttons:
+  - Create branch
+  - Commit changes
+  - Push branch
+  - Create pull request
+
+7. AI patch flow
+When the AI modifies code:
+- Do not push automatically.
+- Save AI changes as local file edits.
+- Show a review diff.
+- User must approve.
+- User must commit manually.
+
+8. Security
+- Sanitize file paths.
+- Prevent access outside the workspace directory.
+- Never expose GitHub tokens.
+- Never commit .env files.
+- Add .gitignore protections.
+- Block pushing secrets.
+- Add confirmation before pushing changes.
+
+9. Test flow
+Create a documented test using a simple GitHub repo:
+- Import repo
+- Edit README.md
+- Create branch machinedog/test-edit
+- Commit change
+- Push branch
+- Create pull request
+
+10. Documentation
+Create /handoff/GITHUB_INTEGRATION.md explaining:
+- Required env vars
+- Setup steps
+- Test steps
+- Known limitations
+- Next improvements
+
+Do not refactor unrelated parts of the app.
+Focus only on GitHub import, edit, commit, push, and pull request workflow.
