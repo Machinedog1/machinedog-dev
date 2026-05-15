@@ -12,8 +12,9 @@
 
 import { lazy, Suspense, type ReactNode } from "react";
 
-const PUBLISHABLE_KEY = (import.meta as unknown as { env: Record<string, string | undefined> }).env
-  .VITE_CLERK_PUBLISHABLE_KEY;
+const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+const PUBLISHABLE_KEY = env.VITE_CLERK_PUBLISHABLE_KEY;
+const CLERK_PROXY_URL = env.VITE_CLERK_PROXY_URL;
 
 export function isClerkEnabled(): boolean {
   return !!PUBLISHABLE_KEY;
@@ -30,7 +31,11 @@ const LazyClerkProvider = lazy(async () => {
   const mod = await import("@clerk/clerk-react");
   return {
     default: ({ children }: { children: ReactNode }) => (
-      <mod.ClerkProvider publishableKey={PUBLISHABLE_KEY!} afterSignOutUrl="/sign-in">
+      <mod.ClerkProvider
+        publishableKey={PUBLISHABLE_KEY!}
+        proxyUrl={CLERK_PROXY_URL || undefined}
+        afterSignOutUrl="/sign-in"
+      >
         {children}
       </mod.ClerkProvider>
     ),
