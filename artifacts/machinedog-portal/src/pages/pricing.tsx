@@ -39,16 +39,71 @@ function scrollToId(id: string) {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-const premiumFeatures: Array<{ icon: React.ElementType; label: string }> = [
-  { icon: Rocket, label: "Custom app or website (fully built)" },
-  { icon: Database, label: "Backend + database integration" },
-  { icon: Shield, label: "User authentication system" },
-  { icon: Workflow, label: "Admin dashboard" },
-  { icon: Sparkles, label: "AI-powered workflows (Machinedog AI integration)" },
-  { icon: CreditCard, label: "Payment system integration (Stripe or equivalent)" },
-  { icon: Zap, label: "Automation workflows (lead → conversion → fulfillment)" },
-  { icon: Smartphone, label: "Mobile + desktop optimized UI" },
-  { icon: Rocket, label: "Deployment + launch support" },
+type Tier = {
+  id: "good" | "better" | "best";
+  name: string;
+  tagline: string;
+  price: string;
+  cadence: string;
+  badge?: string;
+  highlight?: boolean;
+  cta: string;
+  features: string[];
+};
+
+const tiers: Tier[] = [
+  {
+    id: "good",
+    name: "Starter",
+    tagline: "For solo builders shipping side projects.",
+    price: "$99",
+    cadence: "/mo",
+    cta: "START FREE TRIAL",
+    features: [
+      "1 active workspace",
+      "5M tokens / month included",
+      "GitHub repo connect (1 repo)",
+      "Plain-English → PR workflow",
+      "Snapshot, preview, publish",
+      "Community support",
+    ],
+  },
+  {
+    id: "better",
+    name: "Pro",
+    tagline: "For teams replacing manual coding with AI PRs.",
+    price: "$349",
+    cadence: "/mo",
+    badge: "MOST POPULAR",
+    highlight: true,
+    cta: "START PRO TRIAL",
+    features: [
+      "Up to 10 workspaces",
+      "30M tokens / month included",
+      "Unlimited GitHub repos",
+      "Multi-step agent runs",
+      "Custom AI prompt tuning",
+      "Team seats & role-based access",
+      "Priority email support",
+    ],
+  },
+  {
+    id: "best",
+    name: "Healthcare",
+    tagline: "HIPAA-grade infrastructure with BAA.",
+    price: "$1,499",
+    cadence: "/mo",
+    cta: "TALK TO SALES",
+    features: [
+      "Everything in Pro",
+      "BAA + HIPAA-compliant mode",
+      "No-PHI gateway enforced by default",
+      "Private cloud / VPC deployment option",
+      "SSO, SCIM & audit logs",
+      "Named solutions engineer",
+      "99.9% SLA",
+    ],
+  },
 ];
 
 const retainerFeatures = [
