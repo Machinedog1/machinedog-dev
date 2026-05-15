@@ -76,23 +76,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     },
   });
 
-  // Phase 9: redirect first-time members into the onboarding wizard until
-  // *their* membership has `onboardingCompletedAt` set. Stored per-member
-  // so existing teammates aren't pulled back into the wizard when a new
-  // member joins. Owners/admins go through the wizard too — they're the
-  // ones who fill in the org profile fields. Auth-flow and "not invited"
-  // routes are explicitly skipped so the wizard never hijacks them.
-  useEffect(() => {
-    if (!me) return;
-    const member = me.member;
-    if (!member) return;
-    if (member.status && member.status !== "active") return;
-    if (member.onboardingCompletedAt) return;
-    if (location === "/onboarding") return;
-    if (location.startsWith("/sign-in") || location.startsWith("/sign-up")) return;
-    if (location === "/not-invited") return;
-    setLocation("/onboarding");
-  }, [me, location, setLocation]);
+  // Onboarding is opt-in via the dashboard — we no longer force-redirect new
+  // members into the wizard after sign-in. Login and sign-up land users on
+  // the home page (or wherever Clerk's fallbackRedirectUrl points) so the
+  // first-run experience is the marketing/landing surface, not a wizard.
 
   const { data: myProjects } = useListMyProjects({
     query: {

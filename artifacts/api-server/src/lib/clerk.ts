@@ -62,20 +62,8 @@ let cachedClerkMiddleware: ((req: Request, res: Response, next: NextFunction) =>
 async function getClerkMiddleware() {
   if (cachedClerkMiddleware) return cachedClerkMiddleware;
   try {
-    const [mod, sharedKeys] = await Promise.all([
-      import("@clerk/express"),
-      import("@clerk/shared/keys"),
-    ]);
-    // Canonical wiring per clerk-auth/setup-and-customization.md: pass the
-    // publishable key resolved from the incoming request host so multi-domain
-    // / custom-domain setups work, and so testing tokens (which are scoped
-    // per publishable key) validate correctly.
-    cachedClerkMiddleware = mod.clerkMiddleware((req) => ({
-      publishableKey: sharedKeys.publishableKeyFromHost(
-        getClerkProxyHost(req) ?? "",
-        process.env.CLERK_PUBLISHABLE_KEY,
-      ),
-    }));
+    const mod = await import("@clerk/express");
+    cachedClerkMiddleware = mod.clerkMiddleware();
     return cachedClerkMiddleware;
   } catch (err) {
     logger.warn(
