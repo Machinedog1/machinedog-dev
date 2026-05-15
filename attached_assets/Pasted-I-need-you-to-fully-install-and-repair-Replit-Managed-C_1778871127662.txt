@@ -1,0 +1,87 @@
+I need you to fully install and repair Replit Managed Clerk Auth in this app so I can log in.
+
+Important: Use Replit Managed Clerk Auth, not regular manual Clerk setup and not Replit Auth. Replit’s managed Clerk should provision the Clerk tenant, store the credentials as Replit secrets/environment variables, configure auth routes, add middleware, and wire the frontend login flow.
+
+The current problem is that Clerk cannot provision for some reason. Your job is to diagnose and fix whatever is preventing Replit Managed Clerk from provisioning and then complete the installation.
+
+Do the following:
+
+1. Inspect the full project structure first.
+   - Identify the framework: Next.js, Vite React, Express, Node, or other.
+   - Identify package manager: npm, pnpm, yarn, or bun.
+   - Identify all existing auth code, middleware, session code, protected routes, login pages, and user tables.
+   - Do not delete working app features.
+
+2. Attempt to enable Replit Managed Clerk Auth properly.
+   - Use Replit’s built-in Managed Clerk Auth integration.
+   - Do not create a separate external Clerk account unless Replit Managed Clerk is impossible.
+   - Do not hardcode Clerk keys.
+   - Do not ask me to manually paste Clerk keys unless Replit’s managed provisioning is completely blocked.
+
+3. If provisioning fails, diagnose the cause.
+   Check for:
+   - Missing or corrupted Replit Auth/Clerk integration state.
+   - Missing secrets or environment variables.
+   - Conflicting old auth implementation.
+   - Broken package install.
+   - Invalid framework configuration.
+   - Middleware conflicts.
+   - Route conflicts such as existing /sign-in, /sign-up, /login, /auth, or /callback routes.
+   - Build errors preventing Agent from completing auth setup.
+   - Incorrect Replit deployment/domain configuration.
+
+4. Install the correct Clerk packages for this app’s framework.
+   - If this is Next.js, use the correct @clerk/nextjs setup.
+   - If this is Vite React, use the correct @clerk/clerk-react setup.
+   - If this app has an Express backend, use the correct server-side Clerk middleware where needed.
+   - Keep the package manager consistent with the existing lockfile.
+
+5. Wire the frontend auth flow.
+   Add or repair:
+   - Clerk provider at the app root.
+   - Sign-in page.
+   - Sign-up page.
+   - Sign-out functionality.
+   - User button/account menu.
+   - Redirect after login to the main dashboard.
+   - Redirect unauthenticated users to sign in.
+   - A simple visible login/logout test area so I can confirm auth works.
+
+6. Wire protected routes correctly.
+   - Protect dashboard/app/private routes.
+   - Leave public marketing/home pages public.
+   - Protect API routes that require a logged-in user.
+   - Make sure the backend can identify the authenticated Clerk user.
+
+7. Fix environment variable usage.
+   - Use Replit-managed Clerk environment variables/secrets.
+   - Use the correct public/frontend variable names for this framework.
+   - Use secret/backend variables only on the server.
+   - Never expose secret keys to the client.
+   - Add safe checks with clear error messages if a required Clerk variable is missing.
+
+8. Remove or disable conflicting auth code only if needed.
+   - Do not remove user data.
+   - Do not drop database tables.
+   - If there is an existing users table, keep it and add a safe mapping strategy between app users and Clerk users.
+   - Do not break existing database relationships.
+
+9. Make the app run.
+   - Install dependencies.
+   - Fix TypeScript errors.
+   - Fix lint/build errors caused by the Clerk install.
+   - Start the dev server.
+   - Test that the sign-in page loads.
+   - Test that protected pages redirect properly.
+   - Test that an authenticated user can access the dashboard.
+
+10. At the end, give me a concise report:
+   - What framework this app uses.
+   - What files you changed.
+   - What packages you installed.
+   - Whether Replit Managed Clerk successfully provisioned.
+   - Which auth routes now exist.
+   - The exact URL/path I should open to log in.
+   - Any remaining manual step inside the Replit Auth pane if provisioning is still blocked.
+
+Do not stop after only adding packages. The goal is complete working login through Replit Managed Clerk Auth.
