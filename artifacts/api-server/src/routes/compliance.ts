@@ -9,26 +9,9 @@
  */
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import {
-  db,
-  organizationsTable,
-  projectsTable,
-  complianceProfilesTable,
-  type ComplianceProfile,
-  type Organization,
-} from "@workspace/db";
-import {
-  GetMyComplianceProfileResponse,
-  UpdateMyComplianceProfileBody,
-  RequestComplianceReviewBody,
-  RequestComplianceReviewResponse,
-} from "@workspace/api-zod";
-import {
-  requireAuth,
-  loadOrCreateClient,
-  requireActiveClient,
-  requireOrgOwnerOrAdmin,
-} from "../lib/auth";
+import { db, organizationsTable, projectsTable, complianceProfilesTable, type ComplianceProfile, type Organization } from "@workspace/db";
+import { GetMyComplianceProfileResponse, UpdateMyComplianceProfileBody, RequestComplianceReviewBody, RequestComplianceReviewResponse } from "@workspace/api-zod";
+import { requireAuth, requireActiveClient, requireOrgOwnerOrAdmin } from "../lib/auth";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { PHI_MODE_LOCKED_WARNING } from "../lib/compliance-warnings";
 
@@ -113,10 +96,9 @@ function serializeProfile(org: Organization, profile: ComplianceProfile) {
 router.get(
   "/compliance/me",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
-    const organizationId = req.dbClient!.id;
+    const organizationId = req.organization!.id;
     const [org] = await db
       .select()
       .from(organizationsTable)
@@ -150,7 +132,6 @@ router.get(
 router.patch(
   "/compliance/me",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   requireOrgOwnerOrAdmin,
   async (req, res): Promise<void> => {
@@ -159,7 +140,7 @@ router.patch(
       res.status(400).json({ error: body.error.message });
       return;
     }
-    const organizationId = req.dbClient!.id;
+    const organizationId = req.organization!.id;
     const [org] = await db
       .select()
       .from(organizationsTable)
@@ -171,7 +152,7 @@ router.patch(
     const profile = await getOrCreateProfile(organizationId);
     const update: Partial<ComplianceProfile> = {
       lastReviewedAt: new Date(),
-      lastReviewedByEmail: req.dbClient!.email,
+      lastReviewedByEmail: req.organizationMember!.email,
     };
     if (body.data.riskAnalysisStatus !== undefined)
       update.riskAnalysisStatus = body.data.riskAnalysisStatus;
@@ -194,7 +175,7 @@ router.patch(
     recordAuditEventAsync({
       organizationId,
       actorOrganizationId: organizationId,
-      actorEmail: req.dbClient!.email,
+      actorEmail: req.organizationMember!.email,
       category: "compliance",
       action: "compliance_updated",
       targetType: "organization",
@@ -210,7 +191,6 @@ router.patch(
 router.post(
   "/compliance/me/request-review",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   requireOrgOwnerOrAdmin,
   async (req, res): Promise<void> => {
@@ -219,11 +199,11 @@ router.post(
       res.status(400).json({ error: body.error.message });
       return;
     }
-    const organizationId = req.dbClient!.id;
+    const organizationId = req.organization!.id;
     recordAuditEventAsync({
       organizationId,
       actorOrganizationId: organizationId,
-      actorEmail: req.dbClient!.email,
+      actorEmail: req.organizationMember!.email,
       category: "compliance",
       action: "healthcare_mode_requested",
       targetType: "organization",

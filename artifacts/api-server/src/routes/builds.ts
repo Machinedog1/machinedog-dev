@@ -1,24 +1,8 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, sql, type SQL } from "drizzle-orm";
-import {
-  db,
-  buildJobsTable,
-  deploymentsTable,
-  projectsTable,
-  projectMembersTable,
-  type BuildJob,
-  type Deployment,
-} from "@workspace/db";
-import { requireAuth, loadOrCreateClient, requireActiveClient, requireAdmin } from "../lib/auth";
-import {
-  createBuildJob,
-  chargeBuildTokens,
-  chargeDeployTokens,
-  listBuildsForProject,
-  listDeploymentsForProject,
-  upsertDeployment,
-  updateBuildJob,
-} from "../lib/build-deploy-service";
+import { db, buildJobsTable, deploymentsTable, projectsTable, projectMembersTable, type BuildJob, type Deployment } from "@workspace/db";
+import { requireAuth, requireActiveClient, requireAdmin } from "../lib/auth";
+import { createBuildJob, chargeBuildTokens, chargeDeployTokens, listBuildsForProject, listDeploymentsForProject, upsertDeployment, updateBuildJob } from "../lib/build-deploy-service";
 import { getHostAdapter } from "../lib/hosts";
 import { loadProjectSecretValue } from "../lib/build-deploy-service";
 import { encryptSecret } from "../lib/encryption";
@@ -97,7 +81,6 @@ async function loadVisibleProject(projectId: number, clientId: number, email: st
 router.get(
   "/projects/:id/builds",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -105,7 +88,7 @@ router.get(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadVisibleProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadVisibleProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -119,7 +102,6 @@ router.get(
 router.post(
   "/projects/:id/builds",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -127,12 +109,12 @@ router.post(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadVisibleProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadVisibleProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    if (project.organizationId !== req.dbClient!.id) {
+    if (project.organizationId !== req.organization!.id) {
       res.status(403).json({ error: "Owner only" });
       return;
     }
@@ -196,7 +178,7 @@ router.post(
       environment,
       branch,
       commitSha,
-      triggeredByEmail: req.dbClient!.email,
+      triggeredByEmail: req.organizationMember!.email,
     });
     // Authoritative billing: if the org cannot afford the build, mark the
     // job failed and stop before triggering any host work. Webhook callbacks
@@ -234,7 +216,7 @@ router.post(
           commitSha,
           environment,
           changeRequestId,
-          triggeredByEmail: req.dbClient!.email,
+          triggeredByEmail: req.organizationMember!.email,
         },
         {
           apiToken: apiToken ?? undefined,
@@ -323,7 +305,6 @@ router.post(
 router.get(
   "/projects/:id/deployments",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -331,7 +312,7 @@ router.get(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadVisibleProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadVisibleProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -348,7 +329,6 @@ router.get(
 router.get(
   "/projects/:id/builds/:buildId/logs/stream",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -357,7 +337,7 @@ router.get(
       res.status(400).end();
       return;
     }
-    const project = await loadVisibleProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadVisibleProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).end();
       return;
@@ -452,7 +432,6 @@ router.get(
 router.post(
   "/projects/:id/hosting/credentials",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -460,8 +439,8 @@ router.post(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadVisibleProject(projectId, req.dbClient!.id, req.dbClient!.email);
-    if (!project || project.organizationId !== req.dbClient!.id) {
+    const project = await loadVisibleProject(projectId, req.organization!.id, req.organizationMember!.email);
+    if (!project || project.organizationId !== req.organization!.id) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -508,8 +487,8 @@ router.post(
           authTag: enc.authTag,
           valuePreview: preview,
           version: 1,
-          createdByEmail: req.dbClient!.email,
-          updatedByEmail: req.dbClient!.email,
+          createdByEmail: req.organizationMember!.email,
+          updatedByEmail: req.organizationMember!.email,
         })
         .onConflictDoUpdate({
           target: [
@@ -523,7 +502,7 @@ router.post(
             authTag: enc.authTag,
             valuePreview: preview,
             version: sql`${projectSecretsTable.version} + 1`,
-            updatedByEmail: req.dbClient!.email,
+            updatedByEmail: req.organizationMember!.email,
           },
         });
     };
@@ -549,8 +528,8 @@ router.post(
       recordAuditEventAsync({
         organizationId: project.organizationId,
         projectId: project.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "secret",
         action: "secret_created",
         targetType: "project",
@@ -567,7 +546,6 @@ router.post(
 router.post(
   "/projects/:id/hosting/test",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -575,8 +553,8 @@ router.post(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadVisibleProject(projectId, req.dbClient!.id, req.dbClient!.email);
-    if (!project || project.organizationId !== req.dbClient!.id) {
+    const project = await loadVisibleProject(projectId, req.organization!.id, req.organizationMember!.email);
+    if (!project || project.organizationId !== req.organization!.id) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -602,7 +580,6 @@ router.post(
 router.get(
   "/admin/builds",
   requireAuth,
-  loadOrCreateClient,
   requireAdmin,
   async (req, res): Promise<void> => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
@@ -655,7 +632,6 @@ router.get(
 router.get(
   "/admin/deployments",
   requireAuth,
-  loadOrCreateClient,
   requireAdmin,
   async (req, res): Promise<void> => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);

@@ -4,32 +4,15 @@
  */
 import { Router, type IRouter } from "express";
 import { and, desc, eq, sql } from "drizzle-orm";
-import {
-  db,
-  aiProvidersTable,
-  aiModelsTable,
-  aiUsageTable,
-  AI_MODEL_CATEGORIES,
-  type AiModelCategory,
-} from "@workspace/db";
-import {
-  requireAuth,
-  loadOrCreateClient,
-  requireActiveClient,
-  requirePlatformAdmin,
-} from "../lib/auth";
-import {
-  listProviders,
-  listModels,
-  usageByProviderModel,
-  hasEnabledProviders,
-} from "../lib/ai-registry";
+import { db, aiProvidersTable, aiModelsTable, aiUsageTable, AI_MODEL_CATEGORIES, type AiModelCategory } from "@workspace/db";
+import { requireAuth, requireActiveClient, requirePlatformAdmin } from "../lib/auth";
+import { listProviders, listModels, usageByProviderModel, hasEnabledProviders } from "../lib/ai-registry";
 import { testProviderConnection } from "../lib/ai-service";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 
 const router: IRouter = Router();
 
-const adminGuards = [requireAuth, loadOrCreateClient, requireActiveClient, requirePlatformAdmin];
+const adminGuards = [requireAuth, requireActiveClient, requirePlatformAdmin];
 
 function fail(
   res: Parameters<Parameters<typeof router.post>[1]>[1] & {
@@ -68,8 +51,8 @@ router.patch("/admin/ai/providers/:id", ...adminGuards, async (req, res) => {
   if (!updated) return fail(res, 404, "not_found", "Provider not found");
   const meta = reqAuditMeta(req);
   recordAuditEventAsync({
-    actorOrganizationId: req.dbClient!.id,
-    actorEmail: req.dbClient!.email,
+    actorOrganizationId: req.organization!.id,
+    actorEmail: req.organizationMember!.email,
     category: "admin",
     action: "ai_provider_updated",
     targetType: "ai_provider",
@@ -152,8 +135,8 @@ router.patch("/admin/ai/models/:id", ...adminGuards, async (req, res) => {
   if (!updated) return fail(res, 404, "not_found", "Model not found");
   const meta = reqAuditMeta(req);
   recordAuditEventAsync({
-    actorOrganizationId: req.dbClient!.id,
-    actorEmail: req.dbClient!.email,
+    actorOrganizationId: req.organization!.id,
+    actorEmail: req.organizationMember!.email,
     category: "admin",
     action: "ai_model_updated",
     targetType: "ai_model",

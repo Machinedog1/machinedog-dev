@@ -44,8 +44,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Single auth path: validate Clerk session, resolve organization +
-// organization_member, populate req.dbClient compat shim. Routes opt-in via
-// requireAuth / requireActiveClient / requireAdmin / requireOrganization.
+// organization_member. Routes opt-in via requireAuth /
+// requireActiveClient / requireAdmin / requireOrganization.
 app.use(loadClerkAndOrganization);
 
 app.use("/api", router);

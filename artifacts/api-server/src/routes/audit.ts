@@ -1,13 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
-import {
-  db,
-  auditEventsTable,
-  projectsTable,
-  projectMembersTable,
-  AUDIT_ACTION_VALUES,
-} from "@workspace/db";
-import { requireAuth, loadOrCreateClient, requireActiveClient, requireAdmin } from "../lib/auth";
+import { db, auditEventsTable, projectsTable, projectMembersTable, AUDIT_ACTION_VALUES } from "@workspace/db";
+import { requireAuth, requireActiveClient, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -32,7 +26,6 @@ function serializeRow(r: typeof auditEventsTable.$inferSelect) {
 router.get(
   "/projects/:id/audit",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -51,7 +44,7 @@ router.get(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isOwner = project.organizationId === req.dbClient!.id;
+    const isOwner = project.organizationId === req.organization!.id;
     if (!isOwner) {
       const [member] = await db
         .select()
@@ -60,7 +53,7 @@ router.get(
           and(
             eq(projectMembersTable.projectId, projectId),
             eq(projectMembersTable.status, "active"),
-            eq(projectMembersTable.email, req.dbClient!.email.toLowerCase()),
+            eq(projectMembersTable.email, req.organizationMember!.email.toLowerCase()),
           ),
         );
       if (!member) {
@@ -89,7 +82,6 @@ router.get(
 router.get(
   "/admin/audit",
   requireAuth,
-  loadOrCreateClient,
   requireAdmin,
   async (req, res): Promise<void> => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);

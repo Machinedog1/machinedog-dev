@@ -1,19 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, tokenPurchasesTable, organizationsTable } from "@workspace/db";
-import {
-  ListTokenBundlesResponse,
-  ListMyTokenPurchasesResponse,
-  CreateTokenCheckoutBody,
-  CreateTokenCheckoutResponse,
-} from "@workspace/api-zod";
-import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
+import { ListTokenBundlesResponse, ListMyTokenPurchasesResponse, CreateTokenCheckoutBody, CreateTokenCheckoutResponse } from "@workspace/api-zod";
+import { requireAuth, requireActiveClient } from "../lib/auth";
 import { TOKEN_BUNDLES, findTokenBundle } from "../lib/bundles";
 import { getStripe, publicOrigin } from "../lib/stripe";
 
 const router: IRouter = Router();
 
-router.get("/tokens/bundles", requireAuth, loadOrCreateClient, async (_req, res): Promise<void> => {
+router.get("/tokens/bundles", requireAuth, async (_req, res): Promise<void> => {
   const data = TOKEN_BUNDLES.map((b) => ({
     key: b.key,
     name: b.name,
@@ -25,16 +20,16 @@ router.get("/tokens/bundles", requireAuth, loadOrCreateClient, async (_req, res)
   res.json(ListTokenBundlesResponse.parse({ data }));
 });
 
-router.get("/tokens/purchases", requireAuth, loadOrCreateClient, requireActiveClient, async (req, res): Promise<void> => {
+router.get("/tokens/purchases", requireAuth, requireActiveClient, async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(tokenPurchasesTable)
-    .where(eq(tokenPurchasesTable.organizationId, req.dbClient!.id))
+    .where(eq(tokenPurchasesTable.organizationId, req.organization!.id))
     .orderBy(desc(tokenPurchasesTable.createdAt));
   res.json(ListMyTokenPurchasesResponse.parse({ data: rows }));
 });
 
-router.post("/tokens/checkout", requireAuth, loadOrCreateClient, requireActiveClient, async (req, res): Promise<void> => {
+router.post("/tokens/checkout", requireAuth, requireActiveClient, async (req, res): Promise<void> => {
   const parsed = CreateTokenCheckoutBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -68,11 +63,11 @@ router.post("/tokens/checkout", requireAuth, loadOrCreateClient, requireActiveCl
         },
       },
     ],
-    customer_email: req.dbClient!.email,
-    client_reference_id: String(req.dbClient!.id),
+    customer_email: req.organizationMember!.email,
+    client_reference_id: String(req.organization!.id),
     metadata: {
       kind: "tokens",
-      clientId: String(req.dbClient!.id),
+      clientId: String(req.organization!.id),
       bundleKey: bundle.key,
       tokens: String(bundle.tokens),
     },
@@ -82,7 +77,7 @@ router.post("/tokens/checkout", requireAuth, loadOrCreateClient, requireActiveCl
 
   // Pre-record a pending purchase so the user sees it in history immediately
   await db.insert(tokenPurchasesTable).values({
-    organizationId: req.dbClient!.id,
+    organizationId: req.organization!.id,
     bundleKey: bundle.key,
     tokensAdded: bundle.tokens,
     amountCents: Math.round(bundle.priceUsd * 100),

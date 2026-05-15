@@ -1,20 +1,10 @@
 import { Router, type IRouter, raw } from "express";
 import { eq, sql } from "drizzle-orm";
-import {
-  db,
-  organizationsTable,
-  tokenPurchasesTable,
-  consultingBookingsTable,
-  buildOrdersTable,
-} from "@workspace/db";
+import { db, organizationsTable, tokenPurchasesTable, consultingBookingsTable, buildOrdersTable } from "@workspace/db";
 import { getStripe } from "../lib/stripe";
 import { loadMailerConfig, getTransporter } from "../lib/mailer";
 import { logger } from "../lib/logger";
-import {
-  syncSubscriptionFromStripe,
-  grantPlanRenewalTokens,
-  applyTokenPackPurchase,
-} from "../lib/billing-service";
+import { syncSubscriptionFromStripe, grantPlanRenewalTokens, applyTokenPackPurchase } from "../lib/billing-service";
 import { planFromPriceId } from "../lib/plans";
 import { recordAuditEventAsync } from "../lib/audit";
 import type Stripe from "stripe";

@@ -9,47 +9,14 @@
  */
 import { Router, type IRouter } from "express";
 import { and, desc, eq, gte, lte, ilike, or, sql, type SQL } from "drizzle-orm";
-import {
-  db,
-  organizationsTable,
-  organizationMembersTable,
-  projectsTable,
-  buildJobsTable,
-  deploymentsTable,
-  buildOrdersTable,
-  subscriptionsTable,
-  tokenLedgerTable,
-  tokenPurchasesTable,
-  auditEventsTable,
-  type Organization,
-} from "@workspace/db";
-import {
-  GetAdminMetricsResponse,
-  ListAdminOrganizationsQueryParams,
-  ListAdminOrganizationsResponse,
-  SetAdminOrganizationStatusBody,
-  SetAdminOrganizationStatusResponse,
-  SetAdminOrganizationPlanBody,
-  SetAdminOrganizationPlanResponse,
-  SetAdminOrganizationComplianceBody,
-  SetAdminOrganizationComplianceResponse,
-  ListAdminUsersQueryParams,
-  ListAdminUsersResponse,
-  ListAdminTokensQueryParams,
-  ListAdminTokensResponse,
-  ListAdminComplianceQueryParams,
-  ListAdminComplianceResponse,
-} from "@workspace/api-zod";
-import {
-  requireAuth,
-  loadOrCreateClient,
-  requirePlatformAdmin,
-} from "../lib/auth";
+import { db, organizationsTable, organizationMembersTable, projectsTable, buildJobsTable, deploymentsTable, buildOrdersTable, subscriptionsTable, tokenLedgerTable, tokenPurchasesTable, auditEventsTable, type Organization } from "@workspace/db";
+import { GetAdminMetricsResponse, ListAdminOrganizationsQueryParams, ListAdminOrganizationsResponse, SetAdminOrganizationStatusBody, SetAdminOrganizationStatusResponse, SetAdminOrganizationPlanBody, SetAdminOrganizationPlanResponse, SetAdminOrganizationComplianceBody, SetAdminOrganizationComplianceResponse, ListAdminUsersQueryParams, ListAdminUsersResponse, ListAdminTokensQueryParams, ListAdminTokensResponse, ListAdminComplianceQueryParams, ListAdminComplianceResponse } from "@workspace/api-zod";
+import { requireAuth, requirePlatformAdmin } from "../lib/auth";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 
 const router: IRouter = Router();
 
-router.use("/admin", requireAuth, loadOrCreateClient, requirePlatformAdmin);
+router.use("/admin", requireAuth, requirePlatformAdmin);
 
 // ---------- Helpers ----------------------------------------------------------
 
@@ -315,7 +282,7 @@ router.patch("/admin/organizations/:id/status", async (req, res): Promise<void> 
     res.status(400).json({ error: body.error.message });
     return;
   }
-  if (req.dbClient && req.dbClient.id === id && body.data.status === "suspended") {
+  if (req.organization && req.organization!.id === id && body.data.status === "suspended") {
     res.status(400).json({ error: "Cannot suspend your own organization." });
     return;
   }
@@ -331,8 +298,8 @@ router.patch("/admin/organizations/:id/status", async (req, res): Promise<void> 
 
   recordAuditEventAsync({
     organizationId: id,
-    actorOrganizationId: req.dbClient?.id ?? null,
-    actorEmail: req.dbClient?.email ?? null,
+    actorOrganizationId: req.organization?.id ?? null,
+    actorEmail: req.organizationMember?.email ?? null,
     category: "organization",
     action: body.data.status === "suspended" ? "organization_suspended" : "organization_reactivated",
     targetType: "organization",
@@ -394,8 +361,8 @@ router.patch("/admin/organizations/:id/plan", async (req, res): Promise<void> =>
 
   recordAuditEventAsync({
     organizationId: id,
-    actorOrganizationId: req.dbClient?.id ?? null,
-    actorEmail: req.dbClient?.email ?? null,
+    actorOrganizationId: req.organization?.id ?? null,
+    actorEmail: req.organizationMember?.email ?? null,
     category: "organization",
     action: "plan_changed",
     targetType: "organization",
@@ -448,8 +415,8 @@ router.patch("/admin/organizations/:id/compliance", async (req, res): Promise<vo
 
   recordAuditEventAsync({
     organizationId: id,
-    actorOrganizationId: req.dbClient?.id ?? null,
-    actorEmail: req.dbClient?.email ?? null,
+    actorOrganizationId: req.organization?.id ?? null,
+    actorEmail: req.organizationMember?.email ?? null,
     category: "organization",
     action: "compliance_updated",
     targetType: "organization",
@@ -479,8 +446,8 @@ router.patch("/admin/organizations/:id/compliance", async (req, res): Promise<vo
   if (body.data.baaStatus !== undefined && body.data.baaStatus !== existing.baaStatus) {
     recordAuditEventAsync({
       organizationId: id,
-      actorOrganizationId: req.dbClient?.id ?? null,
-      actorEmail: req.dbClient?.email ?? null,
+      actorOrganizationId: req.organization?.id ?? null,
+      actorEmail: req.organizationMember?.email ?? null,
       category: "compliance",
       action: "baa_status_updated",
       targetType: "organization",
@@ -523,8 +490,8 @@ router.post(
       .where(eq(organizationsTable.id, id));
     recordAuditEventAsync({
       organizationId: id,
-      actorOrganizationId: req.dbClient?.id ?? null,
-      actorEmail: req.dbClient?.email ?? null,
+      actorOrganizationId: req.organization?.id ?? null,
+      actorEmail: req.organizationMember?.email ?? null,
       category: "compliance",
       action: "hipaa_deployment_approved",
       targetType: "organization",
@@ -569,8 +536,8 @@ router.post(
       .where(eq(projectsTable.id, id));
     recordAuditEventAsync({
       organizationId: existing.organizationId,
-      actorOrganizationId: req.dbClient?.id ?? null,
-      actorEmail: req.dbClient?.email ?? null,
+      actorOrganizationId: req.organization?.id ?? null,
+      actorEmail: req.organizationMember?.email ?? null,
       category: "compliance",
       action: "phi_mode_enabled",
       targetType: "project",

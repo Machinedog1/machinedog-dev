@@ -1,15 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, buildOrdersTable, organizationsTable } from "@workspace/db";
-import {
-  CreateBuildCheckoutBody,
-  CreateBuildCheckoutResponse,
-  CreateRetainerCheckoutBody,
-  CreateRetainerCheckoutResponse,
-  CreatePortalCheckoutResponse,
-} from "@workspace/api-zod";
+import { CreateBuildCheckoutBody, CreateBuildCheckoutResponse, CreateRetainerCheckoutBody, CreateRetainerCheckoutResponse, CreatePortalCheckoutResponse } from "@workspace/api-zod";
 import { getStripe, publicOrigin } from "../lib/stripe";
-import { requireAuth, loadOrCreateClient } from "../lib/auth";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -219,9 +213,8 @@ router.post("/checkout/retainer", async (req, res): Promise<void> => {
 router.post(
   "/checkout/portal",
   requireAuth,
-  loadOrCreateClient,
   async (req, res): Promise<void> => {
-    if (!req.dbClient) {
+    if (!req.organization) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -242,9 +235,9 @@ router.post(
     const origin = publicOrigin(req);
     const amountCents = Math.round(PORTAL_PRICE_USD * 100);
     const explicitPriceId = process.env.STRIPE_PRICE_PORTAL?.trim();
-    const customerArgs = req.dbClient.stripeCustomerId
-      ? { customer: req.dbClient.stripeCustomerId }
-      : { customer_email: req.dbClient.email };
+    const customerArgs = req.organization!.stripeCustomerId
+      ? { customer: req.organization!.stripeCustomerId }
+      : { customer_email: req.organizationMember!.email };
 
     try {
       const session = await stripe.checkout.sessions.create({
@@ -272,12 +265,12 @@ router.post(
         allow_promotion_codes: true,
         metadata: {
           kind: "portal",
-          clientId: String(req.dbClient.id),
+          clientId: String(req.organization!.id),
         },
         subscription_data: {
           metadata: {
             kind: "portal",
-            clientId: String(req.dbClient.id),
+            clientId: String(req.organization!.id),
           },
         },
         success_url: `${origin}/thank-you?kind=portal&session_id={CHECKOUT_SESSION_ID}`,

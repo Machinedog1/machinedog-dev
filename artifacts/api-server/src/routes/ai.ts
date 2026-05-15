@@ -12,39 +12,10 @@
  */
 import { Router, type IRouter } from "express";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import {
-  db,
-  projectsTable,
-  projectMembersTable,
-  changeRequestsTable,
-  changeRequestEventsTable,
-  aiConversationsTable,
-  aiMessagesTable,
-  aiProposedChangesTable,
-  organizationsTable,
-  AI_MODEL_CATEGORIES,
-  type AiConversation,
-  type AiMessage,
-  type AiProposedChange,
-  type AiModelCategory,
-  type Project,
-} from "@workspace/db";
-import {
-  requireAuth,
-  loadOrCreateClient,
-  requireActiveClient,
-} from "../lib/auth";
-import {
-  aiSend,
-  phiPreflight,
-  loadProjectAndOrg,
-  checkHealthcareGating,
-} from "../lib/ai-service";
-import {
-  resolveCategoryModel,
-  computeTokenCost,
-  hasEnabledProviders,
-} from "../lib/ai-registry";
+import { db, projectsTable, projectMembersTable, changeRequestsTable, changeRequestEventsTable, aiConversationsTable, aiMessagesTable, aiProposedChangesTable, organizationsTable, AI_MODEL_CATEGORIES, type AiConversation, type AiMessage, type AiProposedChange, type AiModelCategory, type Project } from "@workspace/db";
+import { requireAuth, requireActiveClient, reqClient } from "../lib/auth";
+import { aiSend, phiPreflight, loadProjectAndOrg, checkHealthcareGating } from "../lib/ai-service";
+import { resolveCategoryModel, computeTokenCost, hasEnabledProviders } from "../lib/ai-registry";
 import { getBalance } from "../lib/token-service";
 import { applyProposedChanges } from "../lib/ai-apply-changes";
 import { pushPatchToGitHub, type PatchFileEntry } from "./change-requests";
@@ -162,7 +133,6 @@ function serializeProposedChange(c: AiProposedChange) {
 router.get(
   "/ai/categories",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (_req, res): Promise<void> => {
     const out: Array<{
@@ -239,13 +209,12 @@ function descriptionFor(id: AiModelCategory): string {
 router.get(
   "/projects/:id/ai/conversations",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
     if (!Number.isFinite(projectId))
       return fail(res, 400, "bad_request", "Invalid project id");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewable(projectId, client.id, client.email);
     if (!access) return fail(res, 404, "not_found", "Project not found");
     const rows = await db
@@ -261,13 +230,12 @@ router.get(
 router.post(
   "/projects/:id/ai/conversations",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
     if (!Number.isFinite(projectId))
       return fail(res, 400, "bad_request", "Invalid project id");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewable(projectId, client.id, client.email);
     if (!access) return fail(res, 404, "not_found", "Project not found");
     const title =
@@ -290,7 +258,6 @@ router.post(
 router.get(
   "/ai/conversations/:cid",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const cid = Number(req.params.cid);
@@ -301,7 +268,7 @@ router.get(
       .from(aiConversationsTable)
       .where(eq(aiConversationsTable.id, cid));
     if (!conv) return fail(res, 404, "not_found", "Conversation not found");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewable(conv.projectId, client.id, client.email);
     if (!access) return fail(res, 404, "not_found", "Conversation not found");
     const messages = await db
@@ -333,7 +300,6 @@ router.get(
 router.post(
   "/ai/conversations/:cid/messages",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const cid = Number(req.params.cid);
@@ -357,7 +323,7 @@ router.post(
       .from(aiConversationsTable)
       .where(eq(aiConversationsTable.id, cid));
     if (!conv) return fail(res, 404, "not_found", "Conversation not found");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewable(conv.projectId, client.id, client.email);
     if (!access) return fail(res, 404, "not_found", "Conversation not found");
     const loaded = await loadProjectAndOrg(conv.projectId);
@@ -589,7 +555,6 @@ router.post(
 router.post(
   "/ai/conversations/:cid/messages/stream",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const cid = Number(req.params.cid);
@@ -611,7 +576,7 @@ router.post(
       .from(aiConversationsTable)
       .where(eq(aiConversationsTable.id, cid));
     if (!conv) return fail(res, 404, "not_found", "Conversation not found");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewable(conv.projectId, client.id, client.email);
     if (!access) return fail(res, 404, "not_found", "Conversation not found");
     const loaded = await loadProjectAndOrg(conv.projectId);
@@ -902,13 +867,12 @@ async function loadProposedChangeForViewer(
 router.post(
   "/ai/proposed-changes/:pcId/accept",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const pcId = Number(req.params.pcId);
     if (!Number.isFinite(pcId))
       return fail(res, 400, "bad_request", "Invalid id");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadProposedChangeForViewer(
       pcId,
       client.id,
@@ -1089,13 +1053,12 @@ router.post(
 router.post(
   "/ai/proposed-changes/:pcId/reject",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const pcId = Number(req.params.pcId);
     if (!Number.isFinite(pcId))
       return fail(res, 400, "bad_request", "Invalid id");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadProposedChangeForViewer(
       pcId,
       client.id,
@@ -1134,13 +1097,12 @@ router.post(
 router.get(
   "/projects/:id/ai/healthcare-gate",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
     if (!Number.isFinite(projectId))
       return fail(res, 400, "bad_request", "Invalid project id");
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewable(projectId, client.id, client.email);
     if (!access) return fail(res, 404, "not_found", "Project not found");
     const loaded = await loadProjectAndOrg(projectId);

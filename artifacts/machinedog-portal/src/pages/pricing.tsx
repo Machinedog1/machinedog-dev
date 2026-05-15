@@ -1036,8 +1036,8 @@ export default function PricingPage() {
 }
 
 function PortalCheckoutButton() {
-  const { client, isLoading } = useAuth();
-  const isSignedIn = !!client;
+  const { member, isLoading } = useAuth();
+  const isSignedIn = !!member;
   const isLoaded = !isLoading;
   const { data: me } = useGetMe({
     query: { queryKey: getGetMeQueryKey(), enabled: !!isSignedIn, retry: false },

@@ -70,7 +70,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const adminItems = [
     { href: "/admin", label: "Dashboard", icon: ShieldAlert },
     { href: "/admin/organizations", label: "Organizations", icon: ShieldAlert },
-    { href: "/admin/clients", label: "Clients", icon: ShieldAlert },
     { href: "/admin/users", label: "Users", icon: ShieldAlert },
     { href: "/admin/projects", label: "All Projects", icon: ShieldAlert },
     { href: "/admin/orders", label: "Orders", icon: ShieldAlert },

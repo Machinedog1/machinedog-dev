@@ -9,24 +9,8 @@ import type { Organization } from "@workspace/db";
 // missing-module issue). Local alias keeps the route handlers fully typed.
 type OrgRequest = Request & { organization: Organization };
 import { publicOrigin } from "../lib/stripe";
-import {
-  PLANS,
-  TOKEN_PACKS,
-  findPlan,
-  findTokenPack,
-  planPriceId,
-  tokenPackPriceId,
-  type BillingInterval,
-} from "../lib/plans";
-import {
-  isStripeConfigured,
-  fetchCurrentSubscription,
-  createPlanCheckoutSession,
-  createTokenPackCheckoutSession,
-  BillingNotConfiguredError,
-  customerPortalLink,
-  listInvoices,
-} from "../lib/billing-service";
+import { PLANS, TOKEN_PACKS, findPlan, findTokenPack, planPriceId, tokenPackPriceId, type BillingInterval } from "../lib/plans";
+import { isStripeConfigured, fetchCurrentSubscription, createPlanCheckoutSession, createTokenPackCheckoutSession, BillingNotConfiguredError, customerPortalLink, listInvoices } from "../lib/billing-service";
 import { getBalance, listLedger, usageByCategory } from "../lib/token-service";
 
 const router: IRouter = Router();
@@ -140,12 +124,12 @@ router.post(
     try {
       const result = await createPlanCheckoutSession({
         organizationId: (req as OrgRequest).organization.id,
-        email: req.dbClient!.email,
+        email: req.organizationMember!.email,
         planType: parsed.data.planType,
         interval: parsed.data.interval as BillingInterval,
         successUrl: `${origin}/billing?status=success&plan=${plan.key}`,
         cancelUrl: `${origin}/billing?status=cancelled`,
-        actorOrganizationId: req.dbClient!.id,
+        actorOrganizationId: req.organization!.id,
       });
       res.json({ url: result.url, mock: result.mock });
     } catch (err) {
@@ -180,11 +164,11 @@ router.post(
     try {
       const result = await createTokenPackCheckoutSession({
         organizationId: (req as OrgRequest).organization.id,
-        email: req.dbClient!.email,
+        email: req.organizationMember!.email,
         packKey: parsed.data.packKey,
         successUrl: `${origin}/tokens?status=success&pack=${pack.key}`,
         cancelUrl: `${origin}/tokens?status=cancelled`,
-        actorOrganizationId: req.dbClient!.id,
+        actorOrganizationId: req.organization!.id,
       });
       res.json({ url: result.url, mock: result.mock });
     } catch (err) {

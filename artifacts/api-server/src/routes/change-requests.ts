@@ -1,59 +1,13 @@
 import { Router, type IRouter, type Request } from "express";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
-import {
-  db,
-  projectsTable,
-  projectMembersTable,
-  changeRequestsTable,
-  changeRequestEventsTable,
-  organizationsTable,
-  type Project,
-  type ChangeRequest,
-  type ChangeRequestEvent,
-  type ChangeRequestEventKind,
-  type ChangeRequestStatus,
-} from "@workspace/db";
-import {
-  CreateChangeRequestBody,
-  CreateChangeRequestParams,
-  ListProjectChangeRequestsParams,
-  GetChangeRequestParams,
-  DistillChangeRequestParams,
-  GenerateChangePatchParams,
-  RequestChangePublishParams,
-  MarkChangeDeployedParams,
-  RollbackChangeRequestParams,
-  SubmitAgentChangeRequestParams,
-  GetProjectAgentThreadParams,
-} from "@workspace/api-zod";
-import {
-  requireAuth,
-  loadOrCreateClient,
-  requireActiveClient,
-} from "../lib/auth";
-import {
-  distillChangeRequest,
-  generateChangePatch,
-  type DistilledSpec,
-  type GeneratedPatch,
-} from "../lib/change-request-claude";
+import { db, projectsTable, projectMembersTable, changeRequestsTable, changeRequestEventsTable, organizationsTable, type Project, type ChangeRequest, type ChangeRequestEvent, type ChangeRequestEventKind, type ChangeRequestStatus } from "@workspace/db";
+import { CreateChangeRequestBody, CreateChangeRequestParams, ListProjectChangeRequestsParams, GetChangeRequestParams, DistillChangeRequestParams, GenerateChangePatchParams, RequestChangePublishParams, MarkChangeDeployedParams, RollbackChangeRequestParams, SubmitAgentChangeRequestParams, GetProjectAgentThreadParams } from "@workspace/api-zod";
+import { requireAuth, requireActiveClient, reqClient } from "../lib/auth";
+import { distillChangeRequest, generateChangePatch, type DistilledSpec, type GeneratedPatch } from "../lib/change-request-claude";
 import { sendChangeRequestPublishEmail } from "../lib/mailer";
 import { logger } from "../lib/logger";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
-import {
-  resolveBranchSha,
-  createSnapshotTag,
-  pushBranchWithFiles,
-  openPullRequest,
-  mergePullRequest,
-  openRevertPr,
-  computePreviewUrl,
-  buildBranchName,
-  buildSnapshotTag,
-  buildRevertBranchName,
-  GitHubNotConfiguredError,
-  GitHubApiError,
-} from "../lib/github";
+import { resolveBranchSha, createSnapshotTag, pushBranchWithFiles, openPullRequest, mergePullRequest, openRevertPr, computePreviewUrl, buildBranchName, buildSnapshotTag, buildRevertBranchName, GitHubNotConfiguredError, GitHubApiError } from "../lib/github";
 
 const router: IRouter = Router();
 
@@ -393,7 +347,6 @@ function fail(
 router.get(
   "/projects/:id/change-requests",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = ListProjectChangeRequestsParams.safeParse(req.params);
@@ -401,7 +354,7 @@ router.get(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid project id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewableProject(params.data.id, client.id, client.email);
     if (!access) {
       res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
@@ -420,7 +373,6 @@ router.get(
 router.post(
   "/projects/:id/change-requests",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = CreateChangeRequestParams.safeParse(req.params);
@@ -443,7 +395,7 @@ router.post(
       });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewableProject(params.data.id, client.id, client.email);
     if (!access) {
       res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
@@ -471,7 +423,6 @@ router.post(
 router.get(
   "/change-requests/:id",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = GetChangeRequestParams.safeParse(req.params);
@@ -479,7 +430,7 @@ router.get(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid change request id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadChangeRequestForViewer(params.data.id, client.id, client.email);
     if (!loaded) {
       res.status(404).json({ error: { code: "not_found", message: "Change request not found" } });
@@ -526,7 +477,6 @@ router.get(
 router.post(
   "/change-requests/:id/distill",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = DistillChangeRequestParams.safeParse(req.params);
@@ -534,7 +484,7 @@ router.post(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid change request id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadChangeRequestForViewer(params.data.id, client.id, client.email);
     if (!loaded) {
       res.status(404).json({ error: { code: "not_found", message: "Change request not found" } });
@@ -591,7 +541,6 @@ router.post(
 router.post(
   "/change-requests/:id/generate-patch",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = GenerateChangePatchParams.safeParse(req.params);
@@ -599,7 +548,7 @@ router.post(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid change request id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadChangeRequestForViewer(params.data.id, client.id, client.email);
     if (!loaded) {
       res.status(404).json({ error: { code: "not_found", message: "Change request not found" } });
@@ -664,7 +613,6 @@ router.post(
 router.post(
   "/change-requests/:id/request-publish",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = RequestChangePublishParams.safeParse(req.params);
@@ -672,7 +620,7 @@ router.post(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid change request id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadChangeRequestForViewer(params.data.id, client.id, client.email);
     if (!loaded) {
       res.status(404).json({ error: { code: "not_found", message: "Change request not found" } });
@@ -830,7 +778,6 @@ router.post(
 router.post(
   "/change-requests/:id/mark-deployed",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = MarkChangeDeployedParams.safeParse(req.params);
@@ -838,7 +785,7 @@ router.post(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid change request id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadChangeRequestForViewer(params.data.id, client.id, client.email);
     if (!loaded) {
       res.status(404).json({ error: { code: "not_found", message: "Change request not found" } });
@@ -1010,7 +957,6 @@ async function runAgentPipeline(
 router.post(
   "/projects/:id/change-requests/agent",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = SubmitAgentChangeRequestParams.safeParse(req.params);
@@ -1033,7 +979,7 @@ router.post(
       });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewableProject(params.data.id, client.id, client.email);
     if (!access) {
       res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
@@ -1102,7 +1048,6 @@ router.post(
 router.get(
   "/projects/:id/agent-thread",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = GetProjectAgentThreadParams.safeParse(req.params);
@@ -1110,7 +1055,7 @@ router.get(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid project id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const access = await loadViewableProject(params.data.id, client.id, client.email);
     if (!access) {
       res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
@@ -1178,7 +1123,6 @@ router.get(
 router.post(
   "/change-requests/:id/rollback",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = RollbackChangeRequestParams.safeParse(req.params);
@@ -1186,7 +1130,7 @@ router.post(
       res.status(400).json({ error: { code: "bad_request", message: "Invalid change request id" } });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const loaded = await loadChangeRequestForViewer(params.data.id, client.id, client.email);
     if (!loaded) {
       res.status(404).json({ error: { code: "not_found", message: "Change request not found" } });

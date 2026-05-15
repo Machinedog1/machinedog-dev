@@ -1,11 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import {
-  db,
-  intakeSubmissionsTable,
-  TIMELINE_OPTIONS,
-  BUDGET_OPTIONS,
-} from "@workspace/db";
+import { db, intakeSubmissionsTable, TIMELINE_OPTIONS, BUDGET_OPTIONS } from "@workspace/db";
 
 const router: IRouter = Router();
 

@@ -20,16 +20,11 @@ import {
   type Organization,
   type OrganizationMember,
 } from "@workspace/db";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, isOrgAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
-function isOrgAdmin(member: OrganizationMember): boolean {
-  return member.role === "owner" || member.role === "admin";
-}
-
 function meResponse(org: Organization, member: OrganizationMember) {
-  const isAdmin = isOrgAdmin(member);
   return {
     organization: {
       id: org.id,
@@ -52,24 +47,11 @@ function meResponse(org: Organization, member: OrganizationMember) {
       id: member.id,
       email: member.email,
       role: member.role,
-      isAdmin,
+      isAdmin: isOrgAdmin(member),
       status: member.status,
       onboardingStep: member.onboardingStep ?? 0,
       onboardingState: member.onboardingState ?? null,
       onboardingCompletedAt: member.onboardingCompletedAt,
-    },
-    // Legacy "client" alias for compatibility with not-yet-migrated portal
-    // pages; remove once frontend cutover lands.
-    client: {
-      id: org.id,
-      email: member.email,
-      isAdmin,
-      status: org.status,
-      tokenBalance: org.tokenBalance,
-      totalTokensUsed: org.totalTokensUsed,
-      stripeCustomerId: org.stripeCustomerId,
-      portalSubscriptionStatus: org.portalSubscriptionStatus,
-      portalCurrentPeriodEnd: org.portalCurrentPeriodEnd,
     },
   };
 }

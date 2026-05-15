@@ -1,24 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db, promptSessionsTable, organizationsTable } from "@workspace/db";
-import {
-  ListMyPromptsQueryParams,
-  ListMyPromptsResponse,
-  SubmitPromptBody,
-  SubmitPromptResponse,
-  GetPromptParams,
-  GetPromptResponse,
-  PublishPromptParams,
-  PublishPromptBody,
-  PublishPromptResponse,
-} from "@workspace/api-zod";
-import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
+import { ListMyPromptsQueryParams, ListMyPromptsResponse, SubmitPromptBody, SubmitPromptResponse, GetPromptParams, GetPromptResponse, PublishPromptParams, PublishPromptBody, PublishPromptResponse } from "@workspace/api-zod";
+import { requireAuth, requireActiveClient, reqClient } from "../lib/auth";
 import { runClaudePrompt } from "../lib/anthropic";
 import { computeChargedTokens } from "../lib/billing";
 
 const router: IRouter = Router();
 
-router.get("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, async (req, res): Promise<void> => {
+router.get("/prompts", requireAuth, requireActiveClient, async (req, res): Promise<void> => {
   const params = ListMyPromptsQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -28,24 +18,24 @@ router.get("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, asy
   const rows = await db
     .select()
     .from(promptSessionsTable)
-    .where(eq(promptSessionsTable.organizationId, req.dbClient!.id))
+    .where(eq(promptSessionsTable.organizationId, req.organization!.id))
     .orderBy(desc(promptSessionsTable.createdAt))
     .limit(limit)
     .offset(offset);
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(promptSessionsTable)
-    .where(eq(promptSessionsTable.organizationId, req.dbClient!.id));
+    .where(eq(promptSessionsTable.organizationId, req.organization!.id));
   res.json(ListMyPromptsResponse.parse({ data: rows, total: Number(count) }));
 });
 
-router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, async (req, res): Promise<void> => {
+router.post("/prompts", requireAuth, requireActiveClient, async (req, res): Promise<void> => {
   const parsed = SubmitPromptBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const client = req.dbClient!;
+  const client = reqClient(req);
   if (client.tokenBalance <= 0) {
     res.status(402).json({ error: "Insufficient tokens. Please purchase a bundle.", tokenBalance: client.tokenBalance });
     return;
@@ -96,7 +86,7 @@ router.post("/prompts", requireAuth, loadOrCreateClient, requireActiveClient, as
   res.json(SubmitPromptResponse.parse(session));
 });
 
-router.get("/prompts/:id", requireAuth, loadOrCreateClient, async (req, res): Promise<void> => {
+router.get("/prompts/:id", requireAuth, async (req, res): Promise<void> => {
   const params = GetPromptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -105,7 +95,7 @@ router.get("/prompts/:id", requireAuth, loadOrCreateClient, async (req, res): Pr
   const [row] = await db
     .select()
     .from(promptSessionsTable)
-    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.organizationId, req.dbClient!.id)));
+    .where(and(eq(promptSessionsTable.id, params.data.id), eq(promptSessionsTable.organizationId, req.organization!.id)));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -116,7 +106,6 @@ router.get("/prompts/:id", requireAuth, loadOrCreateClient, async (req, res): Pr
 router.post(
   "/prompts/:id/publish",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = PublishPromptParams.safeParse(req.params);
@@ -137,7 +126,7 @@ router.post(
       .where(
         and(
           eq(promptSessionsTable.id, params.data.id),
-          eq(promptSessionsTable.organizationId, req.dbClient!.id),
+          eq(promptSessionsTable.organizationId, req.organization!.id),
         ),
       );
 
@@ -159,7 +148,7 @@ router.post(
       .where(
         and(
           eq(promptSessionsTable.id, params.data.id),
-          eq(promptSessionsTable.organizationId, req.dbClient!.id),
+          eq(promptSessionsTable.organizationId, req.organization!.id),
         ),
       )
       .returning();

@@ -2,14 +2,13 @@ import { Router, type IRouter } from "express";
 import { eq, asc } from "drizzle-orm";
 import { db, templatesTable } from "@workspace/db";
 import { ListTemplatesQueryParams, ListTemplatesResponse } from "@workspace/api-zod";
-import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
+import { requireAuth, requireActiveClient } from "../lib/auth";
 
 const router: IRouter = Router();
 
 router.get(
   "/templates",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = ListTemplatesQueryParams.safeParse(req.query);

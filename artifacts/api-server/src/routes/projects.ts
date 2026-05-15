@@ -1,71 +1,16 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, and, inArray, or, ne, isNotNull, sql } from "drizzle-orm";
-import {
-  db,
-  projectsTable,
-  projectMembersTable,
-  projectCommentsTable,
-  projectFilesTable,
-  promptSessionsTable,
-  organizationsTable,
-  changeRequestsTable,
-  changeRequestEventsTable,
-  templatesTable,
-  complianceProfilesTable,
-  type Project,
-} from "@workspace/db";
-import {
-  ListMyProjectsResponse,
-  CreateProjectBody,
-  GetProjectParams,
-  GetProjectResponse,
-  UpdateProjectParams,
-  UpdateProjectBody,
-  UpdateProjectResponse,
-  ListProjectMembersParams,
-  ListProjectMembersResponse,
-  InviteProjectMemberParams,
-  InviteProjectMemberBody,
-  RemoveProjectMemberParams,
-  ListProjectCommentsParams,
-  ListProjectCommentsResponse,
-  AddProjectCommentParams,
-  AddProjectCommentBody,
-  DeleteProjectCommentParams,
-  ListProjectPromptsParams,
-  ListProjectPromptsResponse,
-  SubmitProjectPromptParams,
-  SubmitProjectPromptBody,
-  SubmitProjectPromptResponse,
-  ListProjectFilesParams,
-  ListProjectFilesResponse,
-  AddProjectFileParams,
-  AddProjectFileBody,
-  DeleteProjectFileParams,
-  ProjectHeartbeatBody,
-  ProjectHeartbeatResponse,
-  ProjectProdHeartbeatBody,
-  ProjectProdHeartbeatResponse,
-  RotateProjectHeartbeatTokenParams,
-  RotateProjectHeartbeatTokenResponse,
-} from "@workspace/api-zod";
+import { db, projectsTable, projectMembersTable, projectCommentsTable, projectFilesTable, promptSessionsTable, organizationsTable, changeRequestsTable, changeRequestEventsTable, templatesTable, complianceProfilesTable, type Project } from "@workspace/db";
+import { ListMyProjectsResponse, CreateProjectBody, GetProjectParams, GetProjectResponse, UpdateProjectParams, UpdateProjectBody, UpdateProjectResponse, ListProjectMembersParams, ListProjectMembersResponse, InviteProjectMemberParams, InviteProjectMemberBody, RemoveProjectMemberParams, ListProjectCommentsParams, ListProjectCommentsResponse, AddProjectCommentParams, AddProjectCommentBody, DeleteProjectCommentParams, ListProjectPromptsParams, ListProjectPromptsResponse, SubmitProjectPromptParams, SubmitProjectPromptBody, SubmitProjectPromptResponse, ListProjectFilesParams, ListProjectFilesResponse, AddProjectFileParams, AddProjectFileBody, DeleteProjectFileParams, ProjectHeartbeatBody, ProjectHeartbeatResponse, ProjectProdHeartbeatBody, ProjectProdHeartbeatResponse, RotateProjectHeartbeatTokenParams, RotateProjectHeartbeatTokenResponse } from "@workspace/api-zod";
 import { randomBytes } from "node:crypto";
-import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
+import { requireAuth, requireActiveClient, reqClient, isOrgAdmin } from "../lib/auth";
 import { sendProjectInviteEmail } from "../lib/project-invites";
 import { logger } from "../lib/logger";
 import { runClaudePrompt } from "../lib/anthropic";
 import { computeChargedTokens } from "../lib/billing";
 import { deduct as deductTokens, getBalance as getTokenBalance } from "../lib/token-service";
 import { importGithubAsProject } from "../lib/github-import";
-import {
-  resolveBranchSha,
-  pushBranchWithFiles,
-  fetchBranchTreeFiles,
-  listBranchTreePaths,
-  GitHubApiError,
-  GitHubConflictError,
-  GitHubNotConfiguredError,
-} from "../lib/github";
+import { resolveBranchSha, pushBranchWithFiles, fetchBranchTreeFiles, listBranchTreePaths, GitHubApiError, GitHubConflictError, GitHubNotConfiguredError } from "../lib/github";
 import { generateSecureToken } from "../lib/passwords";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -134,10 +79,9 @@ async function getViewableProject(
 router.get(
   "/projects",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
-    const client = req.dbClient!;
+    const client = reqClient(req);
     const owned = await db
       .select()
       .from(projectsTable)
@@ -183,7 +127,6 @@ router.get(
 router.post(
   "/projects",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const parsed = CreateProjectBody.safeParse(req.body);
@@ -276,7 +219,7 @@ router.post(
       // endpoint share dedupe semantics, normalization, and the unique-
       // index race handling.
       const outcome = await importGithubAsProject({
-        organizationId: req.dbClient!.id,
+        organizationId: req.organization!.id,
         owner: githubOwner,
         repo: githubRepo,
         defaultBranch: githubDefaultBranch,
@@ -297,7 +240,7 @@ router.post(
       [row] = await db
         .insert(projectsTable)
         .values({
-          organizationId: req.dbClient!.id,
+          organizationId: req.organization!.id,
           title: data.title,
           description: data.description,
           summary: data.summary ?? "",
@@ -359,7 +302,7 @@ router.post(
             });
             return {
               projectId: row.id,
-              uploadedByOrganizationId: req.dbClient!.id,
+              uploadedByOrganizationId: req.organization!.id,
               name: f.path,
               contentType: f.contentType ?? "text/plain",
               sizeBytes: Buffer.byteLength(f.contents, "utf8"),
@@ -394,7 +337,7 @@ router.post(
             template.tokenCost,
             "template",
             {
-              actorOrganizationId: req.dbClient!.id,
+              actorOrganizationId: req.organization!.id,
               projectId: row.id,
               description: `Template "${template.slug}" creation: -${template.tokenCost}`,
               metadata: { templateSlug: template.slug, templateName: template.name },
@@ -412,8 +355,8 @@ router.post(
     recordAuditEventAsync({
       organizationId: row.organizationId,
       projectId: row.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "project",
       action: "project_created",
       targetType: "project",
@@ -430,8 +373,8 @@ router.post(
       recordAuditEventAsync({
         organizationId: row.organizationId,
         projectId: row.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "healthcare",
         action: "healthcare_mode_requested",
         targetType: "project",
@@ -444,8 +387,8 @@ router.post(
       recordAuditEventAsync({
         organizationId: row.organizationId,
         projectId: row.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "github",
         action: "github_connected",
         targetType: "project",
@@ -733,7 +676,6 @@ router.post("/projects/prod-heartbeat", async (req, res): Promise<void> => {
 router.post(
   "/projects/:id/heartbeat-token",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = RotateProjectHeartbeatTokenParams.safeParse(req.params);
@@ -743,8 +685,8 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: { code: "not_found", message: "Project not found" } });
@@ -766,7 +708,6 @@ router.post(
 router.get(
   "/projects/:id",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = GetProjectParams.safeParse(req.params);
@@ -776,8 +717,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -790,7 +731,6 @@ router.get(
 router.patch(
   "/projects/:id",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = UpdateProjectParams.safeParse(req.params);
@@ -816,7 +756,7 @@ router.patch(
         .where(
           and(
             eq(projectsTable.id, params.data.id),
-            eq(projectsTable.organizationId, req.dbClient!.id),
+            eq(projectsTable.organizationId, req.organization!.id),
           ),
         );
       if (!existingProject) {
@@ -834,15 +774,15 @@ router.patch(
         const [org] = await db
           .select({ planType: organizationsTable.planType })
           .from(organizationsTable)
-          .where(eq(organizationsTable.id, req.dbClient!.id))
+          .where(eq(organizationsTable.id, req.organization!.id))
           .limit(1);
         const planType = org?.planType ?? "free";
         if (planType !== "healthcare" && planType !== "enterprise") {
           recordAuditEventAsync({
             organizationId: existingProject.organizationId,
             projectId: existingProject.id,
-            actorOrganizationId: req.dbClient!.id,
-            actorEmail: req.dbClient!.email,
+            actorOrganizationId: req.organization!.id,
+            actorEmail: req.organizationMember!.email,
             category: "compliance",
             action: "healthcare_gating_blocked",
             targetType: "project",
@@ -870,14 +810,14 @@ router.patch(
         const [org] = await db
           .select()
           .from(organizationsTable)
-          .where(eq(organizationsTable.id, req.dbClient!.id))
+          .where(eq(organizationsTable.id, req.organization!.id))
           .limit(1);
         const [profile] = await db
           .select({
             auditLoggingEnabled: complianceProfilesTable.auditLoggingEnabled,
           })
           .from(complianceProfilesTable)
-          .where(eq(complianceProfilesTable.organizationId, req.dbClient!.id))
+          .where(eq(complianceProfilesTable.organizationId, req.organization!.id))
           .limit(1);
         const failed: string[] = [];
         const planType = org?.planType ?? "free";
@@ -910,8 +850,8 @@ router.patch(
           recordAuditEventAsync({
             organizationId: existingProject.organizationId,
             projectId: existingProject.id,
-            actorOrganizationId: req.dbClient!.id,
-            actorEmail: req.dbClient!.email,
+            actorOrganizationId: req.organization!.id,
+            actorEmail: req.organizationMember!.email,
             category: "compliance",
             action: "healthcare_gating_blocked",
             targetType: "project",
@@ -940,7 +880,7 @@ router.patch(
         .where(
           and(
             eq(projectsTable.id, params.data.id),
-            eq(projectsTable.organizationId, req.dbClient!.id),
+            eq(projectsTable.organizationId, req.organization!.id),
           ),
         );
       priorPhiAllowed = existingProject?.phiAllowed ?? null;
@@ -999,7 +939,7 @@ router.patch(
             : null,
         }),
       })
-      .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.dbClient!.id)))
+      .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.organization!.id)))
       .returning();
     if (!row) {
       res.status(404).json({ error: "Not found" });
@@ -1009,8 +949,8 @@ router.patch(
     recordAuditEventAsync({
       organizationId: row.organizationId,
       projectId: row.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "project",
       action: archived ? "project_archived" : "project_updated",
       targetType: "project",
@@ -1029,8 +969,8 @@ router.patch(
       recordAuditEventAsync({
         organizationId: row.organizationId,
         projectId: row.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "compliance",
         action: body.data.phiAllowed ? "phi_mode_enabled" : "phi_mode_disabled",
         targetType: "project",
@@ -1047,8 +987,8 @@ router.patch(
       recordAuditEventAsync({
         organizationId: row.organizationId,
         projectId: row.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "github",
         action: "github_connected",
         targetType: "project",
@@ -1092,7 +1032,6 @@ async function ensureOwnerOrAdmin(
 router.get(
   "/projects/:id/members",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = ListProjectMembersParams.safeParse(req.params);
@@ -1102,8 +1041,8 @@ router.get(
     }
     // Admins can audit collaboration on any project; otherwise only the owner.
     const project = await ensureOwnerOrAdmin(params.data.id, {
-      id: req.dbClient!.id,
-      isAdmin: req.dbClient!.isAdmin,
+      id: req.organization!.id,
+      isAdmin: isOrgAdmin(req.organizationMember!),
     });
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1126,7 +1065,6 @@ router.get(
 router.post(
   "/projects/:id/members",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = InviteProjectMemberParams.safeParse(req.params);
@@ -1142,8 +1080,8 @@ router.post(
     // Admins can attach collaborators to any project; otherwise only the
     // project owner may invite.
     const project = await ensureOwnerOrAdmin(params.data.id, {
-      id: req.dbClient!.id,
-      isAdmin: req.dbClient!.isAdmin,
+      id: req.organization!.id,
+      isAdmin: isOrgAdmin(req.organizationMember!),
     });
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1181,8 +1119,8 @@ router.post(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "project",
       action: "member_invited",
       targetType: "project_member",
@@ -1223,7 +1161,7 @@ router.post(
       await sendProjectInviteEmail({
         to: email,
         projectTitle: project.title,
-        invitedByEmail: req.dbClient!.email,
+        invitedByEmail: req.organizationMember!.email,
         alreadyHasAccount: Boolean(existingClient && existingClient.status === "active"),
         inviteToken: null,
       });
@@ -1238,7 +1176,6 @@ router.post(
 router.delete(
   "/projects/:id/members/:memberId",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = RemoveProjectMemberParams.safeParse(req.params);
@@ -1248,8 +1185,8 @@ router.delete(
     }
     // Admins can remove collaborators on any project for incident response.
     const project = await ensureOwnerOrAdmin(params.data.id, {
-      id: req.dbClient!.id,
-      isAdmin: req.dbClient!.isAdmin,
+      id: req.organization!.id,
+      isAdmin: isOrgAdmin(req.organizationMember!),
     });
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1272,8 +1209,8 @@ router.delete(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "project",
       action: "member_removed",
       targetType: "project_member",
@@ -1289,7 +1226,6 @@ router.delete(
 router.get(
   "/projects/:id/comments",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = ListProjectCommentsParams.safeParse(req.params);
@@ -1299,8 +1235,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1330,7 +1266,6 @@ router.get(
 router.post(
   "/projects/:id/comments",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = AddProjectCommentParams.safeParse(req.params);
@@ -1345,8 +1280,8 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1361,7 +1296,7 @@ router.post(
       .insert(projectCommentsTable)
       .values({
         projectId: project.id,
-        organizationId: req.dbClient!.id,
+        organizationId: req.organization!.id,
         body: trimmed,
       })
       .returning();
@@ -1369,7 +1304,7 @@ router.post(
       id: row.id,
       projectId: row.projectId,
       clientId: row.organizationId,
-      clientEmail: req.dbClient!.email,
+      clientEmail: req.organizationMember!.email,
       body: row.body,
       createdAt: row.createdAt,
     });
@@ -1379,7 +1314,6 @@ router.post(
 router.delete(
   "/projects/:id/comments/:commentId",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = DeleteProjectCommentParams.safeParse(req.params);
@@ -1389,8 +1323,8 @@ router.delete(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1409,7 +1343,7 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isAuthor = comment.organizationId === req.dbClient!.id;
+    const isAuthor = comment.organizationId === req.organization!.id;
     const isOwner = project.viewerRole === "owner";
     if (!isAuthor && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
@@ -1425,7 +1359,6 @@ router.delete(
 router.get(
   "/projects/:id/prompts",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = ListProjectPromptsParams.safeParse(req.params);
@@ -1435,8 +1368,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1455,7 +1388,6 @@ router.get(
 router.post(
   "/projects/:id/prompts",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = SubmitProjectPromptParams.safeParse(req.params);
@@ -1470,14 +1402,14 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const client = req.dbClient!;
+    const client = reqClient(req);
     if (client.tokenBalance <= 0) {
       res.status(402).json({
         error: "Insufficient tokens. Please purchase a bundle.",
@@ -1537,7 +1469,6 @@ router.post(
 router.get(
   "/projects/:id/files",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = ListProjectFilesParams.safeParse(req.params);
@@ -1547,8 +1478,8 @@ router.get(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1581,7 +1512,6 @@ router.get(
 router.post(
   "/projects/:id/files",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = AddProjectFileParams.safeParse(req.params);
@@ -1596,8 +1526,8 @@ router.post(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1611,7 +1541,7 @@ router.post(
       .insert(projectFilesTable)
       .values({
         projectId: project.id,
-        uploadedByOrganizationId: req.dbClient!.id,
+        uploadedByOrganizationId: req.organization!.id,
         name: body.data.name,
         contentType: body.data.contentType,
         sizeBytes: body.data.sizeBytes,
@@ -1621,8 +1551,8 @@ router.post(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "file",
       action: "file_created",
       targetType: "project_file",
@@ -1634,7 +1564,7 @@ router.post(
       id: row.id,
       projectId: row.projectId,
       uploadedByOrganizationId: row.uploadedByOrganizationId,
-      uploadedByEmail: req.dbClient!.email,
+      uploadedByEmail: req.organizationMember!.email,
       name: row.name,
       contentType: row.contentType,
       sizeBytes: row.sizeBytes,
@@ -1647,7 +1577,6 @@ router.post(
 router.delete(
   "/projects/:id/files/:fileId",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const params = DeleteProjectFileParams.safeParse(req.params);
@@ -1657,8 +1586,8 @@ router.delete(
     }
     const project = await getViewableProject(
       params.data.id,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1677,7 +1606,7 @@ router.delete(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const isUploader = file.uploadedByOrganizationId === req.dbClient!.id;
+    const isUploader = file.uploadedByOrganizationId === req.organization!.id;
     const isOwner = project.viewerRole === "owner";
     if (!isUploader && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
@@ -1687,8 +1616,8 @@ router.delete(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "file",
       action: "file_deleted",
       targetType: "project_file",
@@ -1755,7 +1684,6 @@ async function readFileText(objectPath: string): Promise<string> {
 router.get(
   "/projects/:id/files/:fileId/content",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -1766,8 +1694,8 @@ router.get(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1811,7 +1739,6 @@ router.get(
 router.put(
   "/projects/:id/files/:fileId/content",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -1827,8 +1754,8 @@ router.put(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -1857,8 +1784,8 @@ router.put(
         recordAuditEventAsync({
           organizationId: project.organizationId,
           projectId: project.id,
-          actorOrganizationId: req.dbClient!.id,
-          actorEmail: req.dbClient!.email,
+          actorOrganizationId: req.organization!.id,
+          actorEmail: req.organizationMember!.email,
           category: "phi",
           action: "phi_blocked",
           targetType: "project_file",
@@ -1943,8 +1870,8 @@ router.put(
       recordAuditEventAsync({
         organizationId: project.organizationId,
         projectId: project.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "file",
         action: "file_updated",
         targetType: "project_file",
@@ -1978,7 +1905,6 @@ router.put(
 router.post(
   "/projects/:id/files/inline",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -1998,8 +1924,8 @@ router.post(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2024,8 +1950,8 @@ router.post(
         recordAuditEventAsync({
           organizationId: project.organizationId,
           projectId: project.id,
-          actorOrganizationId: req.dbClient!.id,
-          actorEmail: req.dbClient!.email,
+          actorOrganizationId: req.organization!.id,
+          actorEmail: req.organizationMember!.email,
           category: "phi",
           action: "phi_blocked",
           targetType: "project_file",
@@ -2054,7 +1980,7 @@ router.post(
         .insert(projectFilesTable)
         .values({
           projectId,
-          uploadedByOrganizationId: req.dbClient!.id,
+          uploadedByOrganizationId: req.organization!.id,
           name,
           contentType,
           sizeBytes: Buffer.byteLength(content, "utf8"),
@@ -2077,7 +2003,6 @@ router.post(
 router.post(
   "/projects/:id/files/folder",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2094,8 +2019,8 @@ router.post(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2172,7 +2097,6 @@ router.post(
 router.patch(
   "/projects/:id/files/:fileId",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2188,8 +2112,8 @@ router.patch(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2241,7 +2165,6 @@ router.patch(
 router.post(
   "/projects/:id/files/commit",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2258,8 +2181,8 @@ router.post(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2344,8 +2267,8 @@ router.post(
       recordAuditEventAsync({
         organizationId: project.organizationId,
         projectId: project.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "github",
         action: "repo_pushed",
         targetType: "project",
@@ -2401,7 +2324,6 @@ router.post(
 router.get(
   "/projects/:id/events",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2415,8 +2337,8 @@ router.get(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2476,7 +2398,6 @@ router.get(
 router.get(
   "/projects/:id/preview-url",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2486,8 +2407,8 @@ router.get(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2521,7 +2442,6 @@ router.get(
 router.get(
   "/projects/:id/files/pull-status",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2531,8 +2451,8 @@ router.get(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2571,7 +2491,6 @@ router.get(
 router.post(
   "/projects/:id/files/pull",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -2581,8 +2500,8 @@ router.post(
     }
     const project = await getViewableProject(
       projectId,
-      req.dbClient!.id,
-      req.dbClient!.email,
+      req.organization!.id,
+      req.organizationMember!.email,
     );
     if (!project) {
       res.status(404).json({ error: "Not found" });
@@ -2646,7 +2565,7 @@ router.post(
           });
           await db.insert(projectFilesTable).values({
             projectId,
-            uploadedByOrganizationId: req.dbClient!.id,
+            uploadedByOrganizationId: req.organization!.id,
             name: f.path,
             contentType: "text/plain",
             sizeBytes: Buffer.byteLength(f.contents, "utf8"),
@@ -2658,8 +2577,8 @@ router.post(
       recordAuditEventAsync({
         organizationId: project.organizationId,
         projectId: project.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "github",
         action: "repo_pulled",
         targetType: "project",

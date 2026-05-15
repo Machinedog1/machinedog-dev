@@ -1,17 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
-import {
-  db,
-  projectsTable,
-  projectMembersTable,
-  projectSecretsTable,
-  type ProjectSecret,
-} from "@workspace/db";
-import { requireAuth, loadOrCreateClient, requireActiveClient } from "../lib/auth";
-import {
-  encryptSecret,
-  maskedPreview,
-} from "../lib/encryption";
+import { db, projectsTable, projectMembersTable, projectSecretsTable, type ProjectSecret } from "@workspace/db";
+import { requireAuth, requireActiveClient } from "../lib/auth";
+import { encryptSecret, maskedPreview } from "../lib/encryption";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { scanForPhi } from "../lib/ai-phi-guard";
 
@@ -76,7 +67,6 @@ function toApiSecret(row: ProjectSecret) {
 router.get(
   "/projects/:id/secrets",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -84,7 +74,7 @@ router.get(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadOwnerProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadOwnerProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -101,7 +91,6 @@ router.get(
 router.post(
   "/projects/:id/secrets",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -109,7 +98,7 @@ router.post(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    const project = await loadOwnerProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadOwnerProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -137,8 +126,8 @@ router.post(
         recordAuditEventAsync({
           organizationId: project.organizationId,
           projectId: project.id,
-          actorOrganizationId: req.dbClient!.id,
-          actorEmail: req.dbClient!.email,
+          actorOrganizationId: req.organization!.id,
+          actorEmail: req.organizationMember!.email,
           category: "phi",
           action: "phi_blocked",
           targetType: "project_secret",
@@ -177,15 +166,15 @@ router.post(
           version: 1,
           createdBy: req.clerkAuth?.userId ?? null,
           updatedBy: req.clerkAuth?.userId ?? null,
-          createdByEmail: req.dbClient!.email,
-          updatedByEmail: req.dbClient!.email,
+          createdByEmail: req.organizationMember!.email,
+          updatedByEmail: req.organizationMember!.email,
         })
         .returning();
       recordAuditEventAsync({
         organizationId: project.organizationId,
         projectId: project.id,
-        actorOrganizationId: req.dbClient!.id,
-        actorEmail: req.dbClient!.email,
+        actorOrganizationId: req.organization!.id,
+        actorEmail: req.organizationMember!.email,
         category: "secret",
         action: "secret_created",
         targetType: "project_secret",
@@ -212,7 +201,6 @@ router.post(
 router.patch(
   "/projects/:id/secrets/:secretId",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -221,7 +209,7 @@ router.patch(
       res.status(400).json({ error: "Invalid id" });
       return;
     }
-    const project = await loadOwnerProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadOwnerProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -263,8 +251,8 @@ router.patch(
         recordAuditEventAsync({
           organizationId: project.organizationId,
           projectId: project.id,
-          actorOrganizationId: req.dbClient!.id,
-          actorEmail: req.dbClient!.email,
+          actorOrganizationId: req.organization!.id,
+          actorEmail: req.organizationMember!.email,
           category: "phi",
           action: "phi_blocked",
           targetType: "project_secret",
@@ -288,7 +276,7 @@ router.patch(
     }
     const setPatch: Record<string, unknown> = {
       updatedBy: req.clerkAuth?.userId ?? null,
-      updatedByEmail: req.dbClient!.email,
+      updatedByEmail: req.organizationMember!.email,
     };
     if (newName) setPatch.name = newName;
     if (newEnv) setPatch.environment = newEnv;
@@ -308,8 +296,8 @@ router.patch(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "secret",
       action: "secret_updated",
       targetType: "project_secret",
@@ -324,7 +312,6 @@ router.patch(
 router.post(
   "/projects/:id/secrets/:secretId/rotate",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -333,7 +320,7 @@ router.post(
       res.status(400).json({ error: "Invalid id" });
       return;
     }
-    const project = await loadOwnerProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadOwnerProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -349,8 +336,8 @@ router.post(
         recordAuditEventAsync({
           organizationId: project.organizationId,
           projectId: project.id,
-          actorOrganizationId: req.dbClient!.id,
-          actorEmail: req.dbClient!.email,
+          actorOrganizationId: req.organization!.id,
+          actorEmail: req.organizationMember!.email,
           category: "phi",
           action: "phi_blocked",
           targetType: "project_secret",
@@ -381,7 +368,7 @@ router.post(
         valuePreview: maskedPreview(value),
         version: sql`${projectSecretsTable.version} + 1`,
         updatedBy: req.clerkAuth?.userId ?? null,
-        updatedByEmail: req.dbClient!.email,
+        updatedByEmail: req.organizationMember!.email,
       })
       .where(
         and(
@@ -397,8 +384,8 @@ router.post(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "secret",
       action: "secret_rotated",
       targetType: "project_secret",
@@ -413,7 +400,6 @@ router.post(
 router.delete(
   "/projects/:id/secrets/:secretId",
   requireAuth,
-  loadOrCreateClient,
   requireActiveClient,
   async (req, res): Promise<void> => {
     const projectId = Number(req.params.id);
@@ -422,7 +408,7 @@ router.delete(
       res.status(400).json({ error: "Invalid id" });
       return;
     }
-    const project = await loadOwnerProject(projectId, req.dbClient!.id, req.dbClient!.email);
+    const project = await loadOwnerProject(projectId, req.organization!.id, req.organizationMember!.email);
     if (!project) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -444,8 +430,8 @@ router.delete(
     recordAuditEventAsync({
       organizationId: project.organizationId,
       projectId: project.id,
-      actorOrganizationId: req.dbClient!.id,
-      actorEmail: req.dbClient!.email,
+      actorOrganizationId: req.organization!.id,
+      actorEmail: req.organizationMember!.email,
       category: "secret",
       action: "secret_deleted",
       targetType: "project_secret",

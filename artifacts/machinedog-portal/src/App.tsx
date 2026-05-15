@@ -7,8 +7,6 @@ import NotFound from "@/pages/not-found";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import AcceptInvitePage from "@/pages/accept-invite";
-import ForgotPasswordPage from "@/pages/forgot-password";
-import ResetPasswordPage from "@/pages/reset-password";
 import NotInvitedPage from "@/pages/not-invited";
 import PricingPage from "@/pages/pricing";
 import ThankYouPage from "@/pages/thank-you";
@@ -29,7 +27,6 @@ import ProjectPublishPage from "@/pages/project-publish";
 import WorkPage from "@/pages/work";
 import ConsultingPage from "@/pages/consulting";
 import AdminDashboard from "@/pages/admin/index";
-import AdminClients from "@/pages/admin/clients";
 import AdminProjects from "@/pages/admin/projects";
 import AdminOrders from "@/pages/admin/orders";
 import AdminAuditPage from "@/pages/admin/audit";
@@ -69,13 +66,13 @@ function LoadingScreen() {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { client: authClient, isLoading: authLoading } = useAuth();
+  const { member: authMember, isLoading: authLoading } = useAuth();
   const [location, setLocation] = useLocation();
 
   const { data: me, isLoading } = useGetMe({
     query: {
       queryKey: getGetMeQueryKey(),
-      enabled: !!authClient,
+      enabled: !!authMember,
       retry: false,
     },
   });
@@ -117,13 +114,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!authClient) {
+    if (!authMember) {
       setLocation("/sign-in");
     }
-  }, [authLoading, authClient, setLocation]);
+  }, [authLoading, authMember, setLocation]);
 
-  if (authLoading || (authClient && isLoading)) return <LoadingScreen />;
-  if (!authClient) return null;
+  if (authLoading || (authMember && isLoading)) return <LoadingScreen />;
+  if (!authMember) return null;
   if (!me) {
     if (location !== "/not-invited") setLocation("/not-invited");
     return null;
@@ -154,8 +151,6 @@ function PublicOnlyRoutes() {
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/accept-invite" component={AcceptInvitePage} />
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/intake" component={IntakePage} />
       <Route path="/work" component={WorkPage} />
@@ -171,8 +166,6 @@ function AuthedRoutes() {
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/accept-invite" component={AcceptInvitePage} />
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/thank-you" component={ThankYouPage} />
@@ -241,9 +234,6 @@ function AuthedRoutes() {
       <Route path="/admin">
         <AuthGuard><AdminGuard><AdminDashboard /></AdminGuard></AuthGuard>
       </Route>
-      <Route path="/admin/clients">
-        <AuthGuard><AdminGuard><AdminClients /></AdminGuard></AuthGuard>
-      </Route>
       <Route path="/admin/projects">
         <AuthGuard><AdminGuard><AdminProjects /></AdminGuard></AuthGuard>
       </Route>
@@ -287,17 +277,17 @@ function AuthedRoutes() {
 }
 
 function RoutedApp() {
-  const { client, isLoading } = useAuth();
+  const { member, isLoading } = useAuth();
   const qc = useQueryClient();
 
   // When the auth identity changes, blow away cached server data so that
   // sign-in / sign-out switches user context cleanly.
   useEffect(() => {
     qc.invalidateQueries();
-  }, [client?.id, qc]);
+  }, [member?.id, qc]);
 
   if (isLoading) return <LoadingScreen />;
-  return client ? <AuthedRoutes /> : <PublicOnlyRoutes />;
+  return member ? <AuthedRoutes /> : <PublicOnlyRoutes />;
 }
 
 function App() {

@@ -32,11 +32,7 @@
 import { Router, type IRouter, type Request, type Response, raw } from "express";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { Webhook } from "svix";
-import {
-  db,
-  organizationsTable,
-  organizationMembersTable,
-} from "@workspace/db";
+import { db, organizationsTable, organizationMembersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { recordAuditEventAsync } from "../lib/audit";
 

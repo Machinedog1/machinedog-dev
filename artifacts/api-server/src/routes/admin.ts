@@ -1,60 +1,20 @@
 import { Router, type IRouter } from "express";
 import { randomBytes } from "node:crypto";
 import { eq, desc, sql, and, or, ilike, isNull, isNotNull } from "drizzle-orm";
-import {
-  db,
-  organizationsTable,
-  promptSessionsTable,
-  tokenPurchasesTable,
-  projectsTable,
-  consultingBookingsTable,
-  buildOrdersTable,
-  leadsTable,
-} from "@workspace/db";
-import {
-  GetAdminStatsResponse,
-  ListClientsQueryParams,
-  ListClientsResponse,
-  InviteClientBody,
-  InviteClientResponse,
-  GetClientByIdParams,
-  GetClientByIdResponse,
-  AdjustClientBalanceParams,
-  AdjustClientBalanceBody,
-  AdjustClientBalanceResponse,
-  DeleteClientParams,
-  DeleteClientResponse,
-  ResendClientInviteParams,
-  ResendClientInviteResponse,
-  ListAllProjectsResponse,
-  ReassignProjectOwnerBody,
-  ListAllBuildOrdersQueryParams,
-  ListAllBuildOrdersResponse,
-  ListAdminGithubReposResponse,
-  ImportGithubProjectBody,
-  ListAdminLeadsQueryParams,
-  ListAdminLeadsResponse,
-  UpdateAdminLeadParams,
-  UpdateAdminLeadBody,
-  UpdateAdminLeadResponse,
-} from "@workspace/api-zod";
-import { requireAuth, loadOrCreateClient, requirePlatformAdmin } from "../lib/auth";
+import { db, organizationsTable, promptSessionsTable, tokenPurchasesTable, projectsTable, consultingBookingsTable, buildOrdersTable, leadsTable } from "@workspace/db";
+import { GetAdminStatsResponse, ListClientsQueryParams, ListClientsResponse, InviteClientBody, InviteClientResponse, GetClientByIdParams, GetClientByIdResponse, AdjustClientBalanceParams, AdjustClientBalanceBody, AdjustClientBalanceResponse, DeleteClientParams, DeleteClientResponse, ResendClientInviteParams, ResendClientInviteResponse, ListAllProjectsResponse, ReassignProjectOwnerBody, ListAllBuildOrdersQueryParams, ListAllBuildOrdersResponse, ListAdminGithubReposResponse, ImportGithubProjectBody, ListAdminLeadsQueryParams, ListAdminLeadsResponse, UpdateAdminLeadParams, UpdateAdminLeadBody, UpdateAdminLeadResponse } from "@workspace/api-zod";
+import { requireAuth, requirePlatformAdmin } from "../lib/auth";
 import { generateSecureToken } from "../lib/passwords";
 import { sendInviteEmail } from "../lib/mailer";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { importGithubAsProject } from "../lib/github-import";
 import * as tokenService from "../lib/token-service";
 import { invalidateMetricsCache } from "./admin-platform";
-import {
-  getConnectedGithubUser,
-  listConnectedUserRepos,
-  GitHubNotConfiguredError,
-  GitHubApiError,
-} from "../lib/github";
+import { getConnectedGithubUser, listConnectedUserRepos, GitHubNotConfiguredError, GitHubApiError } from "../lib/github";
 
 const router: IRouter = Router();
 
-router.use("/admin", requireAuth, loadOrCreateClient, requirePlatformAdmin);
+router.use("/admin", requireAuth, requirePlatformAdmin);
 
 router.get("/admin/stats", async (_req, res): Promise<void> => {
   const [{ totalClients }] = await db
@@ -226,8 +186,8 @@ router.post("/admin/clients/invite", async (req, res): Promise<void> => {
     .returning();
   recordAuditEventAsync({
     organizationId: createdOrg?.id ?? null,
-    actorOrganizationId: req.dbClient?.id ?? null,
-    actorEmail: req.dbClient?.email ?? null,
+    actorOrganizationId: req.organization?.id ?? null,
+    actorEmail: req.organizationMember?.email ?? null,
     category: "organization",
     action: "organization_created",
     targetType: "organization",
@@ -239,13 +199,13 @@ router.post("/admin/clients/invite", async (req, res): Promise<void> => {
   await sendInviteEmail({
     to: email,
     token: "",
-    invitedByEmail: req.dbClient?.email,
+    invitedByEmail: req.organizationMember?.email,
     log: req.log,
   });
 
   recordAuditEventAsync({
-    actorOrganizationId: req.dbClient?.id ?? null,
-    actorEmail: req.dbClient?.email ?? null,
+    actorOrganizationId: req.organization?.id ?? null,
+    actorEmail: req.organizationMember?.email ?? null,
     category: "organization",
     action: "member_invited",
     targetType: "organization",
@@ -288,7 +248,7 @@ router.delete("/admin/clients/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  if (req.dbClient && req.dbClient.id === id) {
+  if (req.organization && req.organization!.id === id) {
     res.status(400).json({ error: "Cannot delete your own account." });
     return;
   }
@@ -385,7 +345,7 @@ router.post("/admin/clients/:id/resend-invite", async (req, res): Promise<void> 
   await sendInviteEmail({
     to: target.primaryEmail,
     token: "",
-    invitedByEmail: req.dbClient?.email,
+    invitedByEmail: req.organizationMember?.email,
     log: req.log,
   });
 
@@ -428,7 +388,7 @@ router.patch("/admin/clients/:id/balance", async (req, res): Promise<void> => {
     description: body.data.reason
       ? `Admin adjustment: ${body.data.reason}`
       : undefined,
-    actorOrganizationId: req.dbClient?.id ?? null,
+    actorOrganizationId: req.organization?.id ?? null,
   });
   // Token-balance changes affect totalTokensUsed/grants surfaced in
   // /admin/metrics; flush the 60s cache so the dashboard reflects the
@@ -635,7 +595,7 @@ router.post("/admin/projects/import-github", async (req, res): Promise<void> => 
   // wizard create-from-github path share identical dedupe semantics and
   // normalization.
   const outcome = await importGithubAsProject({
-    organizationId: req.dbClient!.id,
+    organizationId: req.organization!.id,
     owner: body.data.owner,
     repo: body.data.repo,
     defaultBranch: body.data.defaultBranch,
@@ -651,15 +611,15 @@ router.post("/admin/projects/import-github", async (req, res): Promise<void> => 
       owner: outcome.project.githubOwner,
       repo: outcome.project.githubRepo,
       defaultBranch: outcome.project.githubDefaultBranch,
-      adminClientId: req.dbClient!.id,
+      adminClientId: req.organization!.id,
     },
     "Admin imported GitHub repo as project",
   );
   recordAuditEventAsync({
     organizationId: outcome.project.organizationId,
     projectId: outcome.project.id,
-    actorOrganizationId: req.dbClient!.id,
-    actorEmail: req.dbClient!.email,
+    actorOrganizationId: req.organization!.id,
+    actorEmail: req.organizationMember!.email,
     category: "project",
     action: "repo_imported",
     targetType: "project",
@@ -773,7 +733,7 @@ router.patch("/admin/leads/:id", async (req, res): Promise<void> => {
   if (body.data.operatorNotes !== undefined) patch.operatorNotes = body.data.operatorNotes;
   if (body.data.contacted === true) {
     patch.contactedAt = new Date();
-    patch.contactedByEmail = req.dbClient?.email ?? null;
+    patch.contactedByEmail = req.organizationMember?.email ?? null;
   } else if (body.data.contacted === false) {
     patch.contactedAt = null;
     patch.contactedByEmail = null;
@@ -795,7 +755,7 @@ router.patch("/admin/leads/:id", async (req, res): Promise<void> => {
       contacted: body.data.contacted ?? null,
     },
     actorUserId: null,
-    actorEmail: req.dbClient?.email ?? null,
+    actorEmail: req.organizationMember?.email ?? null,
     organizationId: null,
     projectId: null,
     ...reqAuditMeta(req),

@@ -1,9 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
-import {
-  RequestUploadUrlBody,
-  RequestUploadUrlResponse,
-} from "@workspace/api-zod";
+import { RequestUploadUrlBody, RequestUploadUrlResponse } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 

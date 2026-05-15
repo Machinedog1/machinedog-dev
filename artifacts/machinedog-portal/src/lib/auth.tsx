@@ -12,14 +12,6 @@ import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { isClerkEnabled } from "./clerk";
 
-export interface AuthClient {
-  id: number;
-  email: string;
-  isAdmin: boolean;
-  status: string;
-  tokenBalance: number;
-}
-
 export interface AuthOrganization {
   id: number;
   name: string;
@@ -38,12 +30,10 @@ export interface AuthMember {
 }
 
 interface AuthContextValue {
-  client: AuthClient | null;
   organization: AuthOrganization | null;
   member: AuthMember | null;
   isLoading: boolean;
   isSignedIn: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -51,7 +41,6 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 interface MeResponse {
-  client?: AuthClient | null;
   organization?: AuthOrganization | null;
   member?: AuthMember | null;
 }
@@ -138,13 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [clerkEnabled, clerk?.isLoaded, clerk?.isSignedIn, userHook?.isLoaded, userHook?.user?.id, refresh]);
 
-  const signIn = useCallback(async () => {
-    return {
-      error:
-        "Password sign-in has moved. Use the Clerk sign-in form on this page to continue.",
-    };
-  }, []);
-
   const signOut = useCallback(async () => {
     try {
       if (clerk?.signOut) {
@@ -161,16 +143,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? !clerk?.isLoaded || !userHook?.isLoaded || (!!clerk?.isSignedIn && isFetching)
       : false;
     return {
-      client: me?.client ?? null,
       organization: me?.organization ?? null,
       member: me?.member ?? null,
       isLoading,
-      isSignedIn: !!clerk?.isSignedIn && !!me?.client,
-      signIn,
+      isSignedIn: !!clerk?.isSignedIn && !!me?.member,
       signOut,
       refresh,
     };
-  }, [clerkEnabled, clerk, userHook, isFetching, me, signIn, signOut, refresh]);
+  }, [clerkEnabled, clerk, userHook, isFetching, me, signOut, refresh]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
