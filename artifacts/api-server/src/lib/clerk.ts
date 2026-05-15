@@ -134,7 +134,7 @@ export async function loadClerkAndOrganization(
     }
     // TEMP DIAGNOSTIC: log what Clerk middleware actually saw on /auth/me so we
     // can debug the prod 401 flood. Remove once cutover is verified.
-    if (req.url.startsWith("/auth/me")) {
+    if (req.originalUrl.startsWith("/api/auth/me") || req.url.startsWith("/api/auth/me")) {
       const cookieHeader = req.headers.cookie ?? "";
       const cookieNames = cookieHeader
         .split(";")
