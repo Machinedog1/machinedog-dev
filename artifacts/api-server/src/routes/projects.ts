@@ -23,7 +23,11 @@ const router: IRouter = Router();
 type ProjectWithRole = Project & { viewerRole: "owner" | "collaborator" };
 
 function withOwnerRole(row: Project): ProjectWithRole {
-  return { ...row, viewerRole: "owner" };
+  // `clientId` is the legacy alias for `organizationId` that the generated
+  // response schema (api-zod, derived from openapi.yaml) still requires.
+  // Until the spec is regenerated against the new naming, mirror the value
+  // so response validation passes.
+  return { ...row, clientId: row.organizationId, viewerRole: "owner" } as ProjectWithRole;
 }
 
 function withCollaboratorRole(row: Project): ProjectWithRole {
@@ -32,9 +36,10 @@ function withCollaboratorRole(row: Project): ProjectWithRole {
   // the project's liveUrl from anywhere on the internet.
   return {
     ...row,
+    clientId: row.organizationId,
     heartbeatToken: null,
     viewerRole: "collaborator",
-  };
+  } as ProjectWithRole;
 }
 
 function generateHeartbeatToken(): string {
