@@ -1,0 +1,74 @@
+The app loads at /dashboard but only shows the background, logo, and Sign Up button. No dashboard content appears, and auth does not appear to be completing.
+
+Fix the blank dashboard/auth rendering problem.
+
+Current observed behavior:
+- URL: /dashboard
+- Page shell loads.
+- Logo appears.
+- Sign Up button appears.
+- Main dashboard content does not appear.
+- Replit Auth/Managed Clerk setup still needs the first successful login.
+
+Do the following:
+
+1. Inspect browser/runtime errors.
+   - Check the dev server console.
+   - Check frontend console errors.
+   - Check for missing Clerk/Replit auth environment variables.
+   - Check whether the app is failing because Clerk provider is missing, keys are missing, or auth hooks are being called outside the provider.
+
+2. Verify auth routes.
+   Make sure these routes actually exist and render visible pages:
+   - /sign-in
+   - /sign-up
+   - /dashboard
+   - /auth-debug
+
+3. Fix the Sign Up button.
+   - The top-right Sign Up button must link to /sign-up.
+   - If already logged in, show a UserButton or account menu instead.
+   - If not logged in, show Sign In and Sign Up buttons.
+
+4. Fix protected route behavior.
+   - /dashboard should not show a blank background.
+   - If the user is not logged in, redirect to /sign-in.
+   - If the user is logged in, show the dashboard content.
+   - Add a temporary visible message on /dashboard such as:
+     “Dashboard loaded. Auth status: signed in / signed out.”
+
+5. Add a temporary /auth-debug page.
+   It should visibly show:
+   - Whether the frontend publishable Clerk key is present.
+   - Whether the app is inside the Clerk provider.
+   - Whether a user is signed in.
+   - Current user ID if signed in.
+   - Buttons for Sign In, Sign Up, Sign Out, and Go to Dashboard.
+   Do not expose secret keys. Only show whether they exist.
+
+6. Check environment variables.
+   Confirm these exist:
+   - CLERK_PUBLISHABLE_KEY
+   - CLERK_SECRET_KEY
+   - SESSION_SECRET
+
+   If using Vite React, also check whether the frontend needs:
+   - VITE_CLERK_PUBLISHABLE_KEY
+
+   If using Next.js, check whether the frontend needs:
+   - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+   Use the correct variable names for the actual framework. Do not hardcode fake keys.
+
+7. Check whether I am testing the published custom domain instead of the Replit Preview URL.
+   - Tell me the exact Replit Preview URL/path I should use for the first login.
+   - Tell me whether machinedog.dev needs additional production auth/domain configuration.
+
+8. Restart the dev server after changes.
+
+9. Final report:
+   - Tell me why the dashboard was blank.
+   - Tell me what files you changed.
+   - Tell me the exact URL to open first:
+     /auth-debug, /sign-in, or /sign-up.
+   - Tell me whether I need to log in through Replit Preview first before the custom domain works.
