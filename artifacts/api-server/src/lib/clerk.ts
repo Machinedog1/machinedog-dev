@@ -127,10 +127,11 @@ export async function loadClerkAndOrganization(
     await new Promise<void>((resolve) => {
       mw(req, res, () => resolve());
     });
-    const auth = (req as unknown as { auth?: { userId?: string; sessionId?: string | null } })
-      .auth;
-    if (auth?.userId) {
-      req.clerkAuth = { userId: auth.userId, sessionId: auth.sessionId ?? null };
+    const auth = (req as unknown as { auth?: Record<string, unknown> }).auth;
+    const userId = (auth?.userId as string | undefined) ?? undefined;
+    const sessionId = (auth?.sessionId as string | null | undefined) ?? null;
+    if (userId) {
+      req.clerkAuth = { userId, sessionId };
     }
     // TEMP DIAGNOSTIC: log what Clerk middleware actually saw on /auth/me so we
     // can debug the prod 401 flood. Remove once cutover is verified.
@@ -141,15 +142,37 @@ export async function loadClerkAndOrganization(
         .map((c) => c.trim().split("=")[0])
         .filter(Boolean);
       const authHeader = req.headers.authorization ?? "";
+      const rawAuth = (req as unknown as { auth?: Record<string, unknown> }).auth ?? {};
+      const authKeys = Object.keys(rawAuth);
+      const authShape: Record<string, unknown> = {};
+      for (const k of authKeys) {
+        const v = rawAuth[k];
+        authShape[k] =
+          typeof v === "string"
+            ? v.length > 80
+              ? `${v.slice(0, 60)}…(${v.length})`
+              : v
+            : v === null || typeof v !== "object"
+              ? v
+              : `[${typeof v}]`;
+      }
       logger.info(
         {
           authHeaderPresent: !!authHeader,
-          authHeaderPrefix: authHeader.slice(0, 12),
+          authHeaderPrefix: authHeader.slice(0, 16),
           cookieNames,
           clerkUserId: req.clerkAuth?.userId ?? null,
           clerkAuthStatusHeader: res.getHeader("x-clerk-auth-status") ?? null,
           clerkAuthReasonHeader: res.getHeader("x-clerk-auth-reason") ?? null,
           clerkAuthMessageHeader: res.getHeader("x-clerk-auth-message") ?? null,
+          authKeys,
+          authShape,
+          secretKeyPrefix: (process.env.CLERK_SECRET_KEY ?? "").slice(0, 12),
+          publishableKeyPrefix: (
+            process.env.CLERK_PUBLISHABLE_KEY ??
+            process.env.VITE_CLERK_PUBLISHABLE_KEY ??
+            ""
+          ).slice(0, 16),
           host: req.headers.host,
           origin: req.headers.origin ?? null,
         },
