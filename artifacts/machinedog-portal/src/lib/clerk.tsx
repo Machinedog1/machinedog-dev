@@ -14,7 +14,11 @@ import { lazy, Suspense, type ReactNode } from "react";
 
 const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
 const PUBLISHABLE_KEY = env.VITE_CLERK_PUBLISHABLE_KEY;
-const CLERK_PROXY_URL = env.VITE_CLERK_PROXY_URL;
+// External Clerk: load clerk-js directly from the CNAME encoded in the
+// publishable key (e.g. clerk.machinedog.dev). We deliberately ignore any
+// VITE_CLERK_PROXY_URL that the deploy environment may inject — it points at
+// /api/__clerk which is the Replit-managed Clerk proxy convention and there
+// is no Express route serving that path in this app.
 
 export function isClerkEnabled(): boolean {
   return !!PUBLISHABLE_KEY;
@@ -33,7 +37,6 @@ const LazyClerkProvider = lazy(async () => {
     default: ({ children }: { children: ReactNode }) => (
       <mod.ClerkProvider
         publishableKey={PUBLISHABLE_KEY!}
-        proxyUrl={CLERK_PROXY_URL || undefined}
         afterSignOutUrl="/sign-in"
       >
         {children}
