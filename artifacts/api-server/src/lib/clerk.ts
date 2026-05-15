@@ -179,6 +179,47 @@ async function autoProvisionTenant(
     return null;
   }
 
+  // Email-attach fallback: existing memberships (e.g. legacy users migrated
+  // from the cookie-session era, or members invited by email before they
+  // ever signed in) have `clerk_user_id = NULL`. Before minting a fresh
+  // workspace, look for any membership matching this email and adopt the
+  // first one — backfilling its clerk_user_id so future sign-ins resolve
+  // directly. We pick the highest-privilege match (owner > admin > others)
+  // and prefer active over pending.
+  const lowered = email.toLowerCase();
+  const existing = await db
+    .select()
+    .from(organizationMembersTable)
+    .where(eq(organizationMembersTable.email, lowered));
+  const adoptable = existing
+    .filter((m) => !m.clerkUserId)
+    .sort((a, b) => {
+      const rolePriority = (r: string) =>
+        r === "owner" ? 0 : r === "admin" ? 1 : r === "billing_admin" ? 2 : r === "developer" ? 3 : 4;
+      const statusPriority = (s: string) => (s === "active" ? 0 : s === "pending" ? 1 : 2);
+      const sa = statusPriority(a.status) - statusPriority(b.status);
+      if (sa !== 0) return sa;
+      return rolePriority(a.role) - rolePriority(b.role);
+    })[0];
+  if (adoptable) {
+    const [member] = await db
+      .update(organizationMembersTable)
+      .set({ clerkUserId, status: "active", acceptedAt: adoptable.acceptedAt ?? new Date() })
+      .where(eq(organizationMembersTable.id, adoptable.id))
+      .returning();
+    const [org] = await db
+      .select()
+      .from(organizationsTable)
+      .where(eq(organizationsTable.id, member.organizationId));
+    if (org) {
+      logger.info(
+        { clerkUserId, organizationId: org.id, memberId: member.id, email },
+        "Adopted existing email-matched membership for Clerk user",
+      );
+      return { organization: org, member, source: "clerk_user" };
+    }
+  }
+
   try {
     const result = await db.transaction(async (tx) => {
       const [org] = await tx
