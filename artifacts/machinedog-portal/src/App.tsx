@@ -14,6 +14,7 @@ import PricingPage from "@/pages/pricing";
 import ThankYouPage from "@/pages/thank-you";
 import IntakePage from "@/pages/intake";
 import PromptConsole from "@/pages/index";
+import OnboardingPage from "@/pages/onboarding";
 import { getGetMeQueryKey } from "@workspace/api-client-react";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
@@ -21,6 +22,7 @@ import BillingPage from "@/pages/billing";
 import ProjectsPage from "@/pages/projects";
 import ProjectNewPage from "@/pages/project-new";
 import TemplatesPage from "@/pages/templates";
+import LandingPage from "@/pages/landing";
 import ProjectDetailPage from "@/pages/project-detail";
 import ProjectWorkspacePage from "@/pages/project-workspace";
 import ProjectPublishPage from "@/pages/project-publish";
@@ -78,6 +80,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     },
   });
 
+  // Phase 9: redirect first-time members into the onboarding wizard until
+  // *their* membership has `onboardingCompletedAt` set. Stored per-member
+  // so existing teammates aren't pulled back into the wizard when a new
+  // member joins. Owners/admins go through the wizard too — they're the
+  // ones who fill in the org profile fields. Auth-flow and "not invited"
+  // routes are explicitly skipped so the wizard never hijacks them.
+  useEffect(() => {
+    if (!me) return;
+    const member = me.member;
+    if (!member) return;
+    if (member.status && member.status !== "active") return;
+    if (member.onboardingCompletedAt) return;
+    if (location === "/onboarding") return;
+    if (location.startsWith("/sign-in") || location.startsWith("/sign-up")) return;
+    if (location === "/not-invited") return;
+    setLocation("/onboarding");
+  }, [me, location, setLocation]);
+
   const { data: myProjects } = useListMyProjects({
     query: {
       queryKey: getListMyProjectsQueryKey(),
@@ -127,12 +147,15 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 function PublicOnlyRoutes() {
   return (
     <Switch>
+      {/* Public marketing surface — accessible without sign-in. */}
+      <Route path="/" component={LandingPage} />
+      <Route path="/templates" component={TemplatesPage} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/accept-invite" component={AcceptInvitePage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/pricing" component={PricingPage} />
       <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/intake" component={IntakePage} />
       <Route path="/work" component={WorkPage} />
@@ -156,6 +179,19 @@ function AuthedRoutes() {
       <Route path="/intake" component={IntakePage} />
       <Route path="/work" component={WorkPage} />
 
+      <Route path="/onboarding">
+        <AuthGuard><OnboardingPage /></AuthGuard>
+      </Route>
+      {/* /app/* aliases — the Phase 9 spec calls out /app/onboarding and
+          /app/dashboard explicitly. The portal's primary routing is root-
+          based (no /app prefix), so these aliases satisfy the spec while
+          keeping every other in-app link working. */}
+      <Route path="/app/onboarding">
+        <AuthGuard><OnboardingPage /></AuthGuard>
+      </Route>
+      <Route path="/app/dashboard">
+        <AuthGuard><PromptConsole /></AuthGuard>
+      </Route>
       <Route path="/">
         <AuthGuard><PromptConsole /></AuthGuard>
       </Route>

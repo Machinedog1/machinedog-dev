@@ -47,6 +47,37 @@ export const GetMeResponse = zod.object({
         "healthcare",
         "enterprise",
       ]),
+      website: zod.string().nullish(),
+      industry: zod.string().nullish(),
+      clientType: zod
+        .union([
+          zod.literal("agency"),
+          zod.literal("startup"),
+          zod.literal("enterprise"),
+          zod.literal("healthcare"),
+          zod.literal("consultancy"),
+          zod.literal("other"),
+          zod.literal(null),
+        ])
+        .nullish(),
+    })
+    .nullish(),
+  member: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      role: zod.enum([
+        "owner",
+        "admin",
+        "developer",
+        "viewer",
+        "billing_admin",
+      ]),
+      isAdmin: zod.boolean(),
+      status: zod.enum(["pending", "active", "removed"]),
+      onboardingStep: zod.number(),
+      onboardingCompletedAt: zod.coerce.date().nullish(),
+      onboardingState: zod.record(zod.string(), zod.unknown()).nullish(),
     })
     .nullish(),
 });
@@ -1444,6 +1475,37 @@ export const ListClientsResponse = zod.object({
             "healthcare",
             "enterprise",
           ]),
+          website: zod.string().nullish(),
+          industry: zod.string().nullish(),
+          clientType: zod
+            .union([
+              zod.literal("agency"),
+              zod.literal("startup"),
+              zod.literal("enterprise"),
+              zod.literal("healthcare"),
+              zod.literal("consultancy"),
+              zod.literal("other"),
+              zod.literal(null),
+            ])
+            .nullish(),
+        })
+        .nullish(),
+      member: zod
+        .object({
+          id: zod.number(),
+          email: zod.string(),
+          role: zod.enum([
+            "owner",
+            "admin",
+            "developer",
+            "viewer",
+            "billing_admin",
+          ]),
+          isAdmin: zod.boolean(),
+          status: zod.enum(["pending", "active", "removed"]),
+          onboardingStep: zod.number(),
+          onboardingCompletedAt: zod.coerce.date().nullish(),
+          onboardingState: zod.record(zod.string(), zod.unknown()).nullish(),
         })
         .nullish(),
     }),
@@ -1500,6 +1562,37 @@ export const GetClientByIdResponse = zod.object({
         "healthcare",
         "enterprise",
       ]),
+      website: zod.string().nullish(),
+      industry: zod.string().nullish(),
+      clientType: zod
+        .union([
+          zod.literal("agency"),
+          zod.literal("startup"),
+          zod.literal("enterprise"),
+          zod.literal("healthcare"),
+          zod.literal("consultancy"),
+          zod.literal("other"),
+          zod.literal(null),
+        ])
+        .nullish(),
+    })
+    .nullish(),
+  member: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      role: zod.enum([
+        "owner",
+        "admin",
+        "developer",
+        "viewer",
+        "billing_admin",
+      ]),
+      isAdmin: zod.boolean(),
+      status: zod.enum(["pending", "active", "removed"]),
+      onboardingStep: zod.number(),
+      onboardingCompletedAt: zod.coerce.date().nullish(),
+      onboardingState: zod.record(zod.string(), zod.unknown()).nullish(),
     })
     .nullish(),
 });
@@ -1575,6 +1668,37 @@ export const AdjustClientBalanceResponse = zod.object({
         "healthcare",
         "enterprise",
       ]),
+      website: zod.string().nullish(),
+      industry: zod.string().nullish(),
+      clientType: zod
+        .union([
+          zod.literal("agency"),
+          zod.literal("startup"),
+          zod.literal("enterprise"),
+          zod.literal("healthcare"),
+          zod.literal("consultancy"),
+          zod.literal("other"),
+          zod.literal(null),
+        ])
+        .nullish(),
+    })
+    .nullish(),
+  member: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      role: zod.enum([
+        "owner",
+        "admin",
+        "developer",
+        "viewer",
+        "billing_admin",
+      ]),
+      isAdmin: zod.boolean(),
+      status: zod.enum(["pending", "active", "removed"]),
+      onboardingStep: zod.number(),
+      onboardingCompletedAt: zod.coerce.date().nullish(),
+      onboardingState: zod.record(zod.string(), zod.unknown()).nullish(),
     })
     .nullish(),
 });

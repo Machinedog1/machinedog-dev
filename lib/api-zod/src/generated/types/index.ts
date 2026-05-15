@@ -64,6 +64,7 @@ export * from "./changeRequestStatus";
 export * from "./checkoutResponse";
 export * from "./client";
 export * from "./clientList";
+export * from "./clientMember";
 export * from "./clientOrganization";
 export * from "./clientPortalSubscriptionStatus";
 export * from "./clientStatus";

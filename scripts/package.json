@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "backfill-organizations": "tsx ./src/backfill-organizations.ts",
     "invite-clients-to-clerk": "tsx ./src/invite-clients-to-clerk.ts",
+    "seed-demo": "tsx ./src/seed-demo.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -13,4 +13,17 @@ export type ClientOrganization = {
   id: string;
   name: string;
   planType: "free" | "starter" | "pro" | "healthcare" | "enterprise";
+  /** @nullable */
+  website?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  /** @nullable */
+  clientType?:
+    | "agency"
+    | "startup"
+    | "enterprise"
+    | "healthcare"
+    | "consultancy"
+    | "other"
+    | null;
 } | null;

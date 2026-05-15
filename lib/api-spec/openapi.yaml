@@ -2140,7 +2140,44 @@ components:
             planType:
               type: string
               enum: [free, starter, pro, healthcare, enterprise]
+            # Phase 9: organization profile fields collected by the
+            # onboarding wizard. Optional — null until set by an
+            # owner/admin.
+            website:
+              type: ["string", "null"]
+            industry:
+              type: ["string", "null"]
+            clientType:
+              type: ["string", "null"]
+              enum: [agency, startup, enterprise, healthcare, consultancy, other, null]
           required: [id, name, planType]
+        # Phase 9: per-member onboarding wizard state. Each member walks
+        # through their own first-run flow, so this is stored on the
+        # caller's organization_membership row, not on the org.
+        member:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            email:
+              type: string
+            role:
+              type: string
+              enum: [owner, admin, developer, viewer, billing_admin]
+            isAdmin:
+              type: boolean
+            status:
+              type: string
+              enum: [pending, active, removed]
+            onboardingStep:
+              type: integer
+            onboardingCompletedAt:
+              type: ["string", "null"]
+              format: date-time
+            onboardingState:
+              type: ["object", "null"]
+              additionalProperties: true
+          required: [id, email, role, isAdmin, status, onboardingStep]
       required: [id, email, tokenBalance, totalTokensUsed, isAdmin, status, portalSubscriptionStatus, createdAt]
 
     ClientList:

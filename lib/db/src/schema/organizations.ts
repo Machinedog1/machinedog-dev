@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -59,6 +59,14 @@ export const organizationsTable = pgTable(
       .notNull()
       .default("none"),
     portalCurrentPeriodEnd: timestamp("portal_current_period_end", { withTimezone: true }),
+    // Phase 9: organization profile fields collected by the onboarding wizard.
+    // Updates to these are restricted to owner/admin members on the api side;
+    // per-step wizard progress lives on `organization_members` (per user).
+    website: text("website"),
+    industry: text("industry"),
+    clientType: text("client_type", {
+      enum: ["agency", "startup", "enterprise", "healthcare", "consultancy", "other"],
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

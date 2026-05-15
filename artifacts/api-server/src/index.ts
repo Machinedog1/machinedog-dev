@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { bootstrapAdmin } from "./lib/bootstrap-admin";
 import { seedTemplates } from "./lib/seed-templates";
 import { seedAiRegistry } from "./lib/seed-ai-registry";
+import { backfillLegacyOnboarding } from "./lib/backfill-onboarding";
 import { isStripeConfigured, isDemoBillingAllowed } from "./lib/billing-service";
 
 const rawPort = process.env["PORT"];
@@ -51,5 +52,8 @@ app.listen(port, (err) => {
   });
   seedAiRegistry().catch((err) => {
     logger.error({ err }, "seedAiRegistry threw");
+  });
+  backfillLegacyOnboarding().catch((err) => {
+    logger.error({ err }, "backfillLegacyOnboarding threw");
   });
 });

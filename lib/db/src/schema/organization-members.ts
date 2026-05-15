@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
@@ -29,6 +29,12 @@ export const organizationMembersTable = pgTable(
       .default("active"),
     invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    // Phase 9: per-member onboarding wizard state. Stored on the membership
+    // (not the org) so each member walks through their own first-run flow
+    // without overwriting a teammate's progress.
+    onboardingStep: integer("onboarding_step").notNull().default(0),
+    onboardingState: jsonb("onboarding_state").$type<Record<string, unknown>>(),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
   },
   (t) => ({
     orgClerkUserUnique: uniqueIndex("organization_members_org_clerk_user_uniq").on(

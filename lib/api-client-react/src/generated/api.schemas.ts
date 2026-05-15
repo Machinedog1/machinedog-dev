@@ -42,6 +42,35 @@ export type ClientOrganization = {
   id: string;
   name: string;
   planType: "free" | "starter" | "pro" | "healthcare" | "enterprise";
+  /** @nullable */
+  website?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  /** @nullable */
+  clientType?:
+    | "agency"
+    | "startup"
+    | "enterprise"
+    | "healthcare"
+    | "consultancy"
+    | "other"
+    | null;
+} | null;
+
+/**
+ * @nullable
+ */
+export type ClientMember = {
+  id: number;
+  email: string;
+  role: "owner" | "admin" | "developer" | "viewer" | "billing_admin";
+  isAdmin: boolean;
+  status: "pending" | "active" | "removed";
+  onboardingStep: number;
+  /** @nullable */
+  onboardingCompletedAt?: string | null;
+  /** @nullable */
+  onboardingState?: { [key: string]: unknown } | null;
 } | null;
 
 export interface Client {
@@ -61,6 +90,8 @@ export interface Client {
   createdAt: string;
   /** @nullable */
   organization?: ClientOrganization;
+  /** @nullable */
+  member?: ClientMember;
 }
 
 export interface ClientList {
