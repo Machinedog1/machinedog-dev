@@ -1151,8 +1151,34 @@ paths:
       description: |
         Surfaces every repo owned (or co-administered) by the GitHub account
         connected via the Replit GitHub integration, alongside whether each one
-        has already been imported as a Machinedog project. Used by the admin
-        All Projects page to populate one-click "Import" cards.
+        has already been imported as a Machinedog project. Supports server-side
+        pagination, search (by `owner/repo`) and import-status filtering so the
+        admin GitHub panel can mirror the other admin list endpoints.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: imported
+          description: |
+            "true" returns only repos already imported as Machinedog projects,
+            "false" returns only un-imported repos. Omit for all.
+          schema:
+            type: boolean
       responses:
         "200":
           description: GitHub repos for the connected account
@@ -1633,6 +1659,224 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminDeploymentList"
 
+  /admin/metrics:
+    get:
+      operationId: getAdminMetrics
+      tags: [admin]
+      summary: Extended admin dashboard metrics (admin only). Cached for 60s.
+      responses:
+        "200":
+          description: Aggregate platform metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMetrics"
+
+  /admin/organizations:
+    get:
+      operationId: listAdminOrganizations
+      tags: [admin]
+      summary: List organizations with extended fields (plan, compliance, status) for the admin console.
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Substring match against name or primary email.
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, suspended, invited]
+        - in: query
+          name: planType
+          schema:
+            type: string
+            enum: [free, starter, pro, business, team, enterprise, healthcare]
+      responses:
+        "200":
+          description: Organizations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrganizationList"
+
+  /admin/organizations/{id}/status:
+    patch:
+      operationId: setAdminOrganizationStatus
+      tags: [admin]
+      summary: Suspend or reactivate an organization (admin only). Suspended orgs are blocked from AI / builds / deploys.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetOrgStatusBody"
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrganization"
+
+  /admin/organizations/{id}/plan:
+    patch:
+      operationId: setAdminOrganizationPlan
+      tags: [admin]
+      summary: Change an organization's plan tier (admin only). Records an audit event; does not bypass Stripe billing.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetOrgPlanBody"
+      responses:
+        "200":
+          description: Updated organization (with optional Stripe-divergence warning)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetOrgPlanResponse"
+
+  /admin/organizations/{id}/compliance:
+    patch:
+      operationId: setAdminOrganizationCompliance
+      tags: [admin]
+      summary: Update an organization's healthcare/compliance flags (admin only). Phase 8 enforces these inputs.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetOrgComplianceBody"
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrganization"
+
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List organization members across all orgs (admin only).
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: organizationId
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [owner, admin, developer, viewer, billing_admin]
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserList"
+
+  /admin/tokens:
+    get:
+      operationId: listAdminTokens
+      tags: [admin]
+      summary: Token ledger entries across all orgs (admin only).
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: organizationId
+          schema: { type: integer }
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum:
+              - grant_monthly
+              - grant_signup
+              - purchase_pack
+              - deduct_ai
+              - deduct_build
+              - deduct_deploy
+              - deduct_template
+              - deduct_other
+              - admin_adjust
+              - refund
+      responses:
+        "200":
+          description: Token ledger entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTokenLedgerList"
+
+  /admin/compliance:
+    get:
+      operationId: listAdminCompliance
+      tags: [admin]
+      summary: Organizations with healthcare/compliance posture (admin only).
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: baaStatus
+          schema:
+            type: string
+            enum: [not_required, required, pending, active, expired]
+        - in: query
+          name: hipaaDeploymentStatus
+          schema:
+            type: string
+            enum: [not_required, required, pending, approved, revoked]
+      responses:
+        "200":
+          description: Compliance posture per organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrganizationList"
+
   /admin/orders:
     get:
       operationId: listAllBuildOrders
@@ -1643,12 +1887,27 @@ paths:
           name: limit
           schema:
             type: integer
-            default: 100
+            default: 25
         - in: query
           name: offset
           schema:
             type: integer
             default: 0
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [build, retainer]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, completed, active, cancelled]
+        - in: query
+          name: search
+          description: Substring match against email, name, company, stripe session id.
+          schema:
+            type: string
       responses:
         "200":
           description: All build orders
@@ -1656,6 +1915,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BuildOrderList"
+
+  /admin/leads:
+    get:
+      operationId: listAdminLeads
+      tags: [admin]
+      summary: List captured leads from the public contact form (admin only)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 25
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: search
+          description: Substring match against name, email, company.
+          schema:
+            type: string
+        - in: query
+          name: status
+          description: Filter by notification state.
+          schema:
+            type: string
+            enum: [all, notified, pending, error]
+      responses:
+        "200":
+          description: Lead inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLeadList"
+
+  /admin/leads/{id}:
+    patch:
+      operationId: updateAdminLead
+      tags: [admin]
+      summary: Update an inbox lead (notes, contacted state)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminLeadBody"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLead"
+        "404":
+          description: Lead not found
 
 # ─── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -2064,6 +2385,247 @@ components:
         - baa_status_updated
         - ai_provider_updated
         - ai_model_updated
+        - organization_suspended
+        - organization_reactivated
+        - plan_changed
+        - compliance_updated
+        - lead_updated
+
+    AdminMetrics:
+      type: object
+      properties:
+        totalUsers: { type: integer }
+        totalOrganizations: { type: integer }
+        activeSubscriptions: { type: integer }
+        mrrCents: { type: integer, description: Placeholder MRR (sum of active recurring orders); Stripe-driven MRR comes later. }
+        tokenRevenueCents: { type: integer }
+        totalTokensUsed: { type: integer }
+        totalProjects: { type: integer }
+        activeProjects: { type: integer }
+        publishedProjects: { type: integer }
+        githubImportsCount: { type: integer }
+        buildJobsCount: { type: integer }
+        deploymentsCount: { type: integer }
+        healthcareProjectsCount: { type: integer }
+        baaPendingCount: { type: integer }
+        phiModeEnabledCount: { type: integer }
+        recentAuditEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/BuildOrder"
+        cachedAt:
+          type: string
+          format: date-time
+      required:
+        - totalUsers
+        - totalOrganizations
+        - activeSubscriptions
+        - mrrCents
+        - tokenRevenueCents
+        - totalTokensUsed
+        - totalProjects
+        - activeProjects
+        - publishedProjects
+        - githubImportsCount
+        - buildJobsCount
+        - deploymentsCount
+        - healthcareProjectsCount
+        - baaPendingCount
+        - phiModeEnabledCount
+        - recentAuditEvents
+        - recentOrders
+        - cachedAt
+
+    AdminOrganization:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        primaryEmail: { type: string }
+        clerkOrgId: { type: ["string", "null"] }
+        clerkOrgSlug: { type: ["string", "null"] }
+        planType:
+          type: string
+          enum: [free, starter, pro, business, team, enterprise, healthcare]
+        planStatus:
+          type: string
+          enum: [none, trialing, active, past_due, canceled, incomplete]
+        status:
+          type: string
+          enum: [active, suspended, invited]
+        baaStatus:
+          type: string
+          enum: [not_required, required, pending, active, expired]
+        hipaaDeploymentStatus:
+          type: string
+          enum: [not_required, required, pending, approved, revoked]
+        mfaRequired: { type: boolean }
+        tokenBalance: { type: integer }
+        totalTokensUsed: { type: integer }
+        buildMinutesUsed: { type: integer }
+        memberCount: { type: integer }
+        projectCount: { type: integer }
+        stripeCustomerId: { type: ["string", "null"] }
+        portalSubscriptionStatus:
+          type: string
+          enum: [none, trialing, active, past_due, canceled, incomplete]
+        portalCurrentPeriodEnd:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - primaryEmail
+        - planType
+        - planStatus
+        - status
+        - baaStatus
+        - hipaaDeploymentStatus
+        - mfaRequired
+        - tokenBalance
+        - totalTokensUsed
+        - buildMinutesUsed
+        - memberCount
+        - projectCount
+        - portalSubscriptionStatus
+        - createdAt
+        - updatedAt
+
+    AdminOrganizationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOrganization"
+        total: { type: integer }
+      required: [data, total]
+
+    SetOrgStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, suspended]
+        reason:
+          type: ["string", "null"]
+      required: [status]
+
+    SetOrgPlanBody:
+      type: object
+      properties:
+        planType:
+          type: string
+          enum: [free, starter, pro, business, team, enterprise, healthcare]
+        reason:
+          type: ["string", "null"]
+      required: [planType]
+
+    SetOrgPlanResponse:
+      type: object
+      properties:
+        organization:
+          $ref: "#/components/schemas/AdminOrganization"
+        warning:
+          type: ["string", "null"]
+          description: Populated when the new plan diverges from the org's Stripe subscription state.
+      required: [organization]
+
+    SetOrgComplianceBody:
+      type: object
+      properties:
+        baaStatus:
+          type: string
+          enum: [not_required, required, pending, active, expired]
+        hipaaDeploymentStatus:
+          type: string
+          enum: [not_required, required, pending, approved, revoked]
+        mfaRequired:
+          type: boolean
+      description: All fields optional; only provided fields are updated.
+
+    AdminUser:
+      type: object
+      properties:
+        id: { type: integer }
+        organizationId: { type: integer }
+        organizationName: { type: ["string", "null"] }
+        email: { type: string }
+        clerkUserId: { type: ["string", "null"] }
+        role:
+          type: string
+          enum: [owner, admin, developer, viewer, billing_admin]
+        status:
+          type: string
+          enum: [pending, active, removed]
+        invitedAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, organizationId, email, role, status, invitedAt]
+
+    AdminUserList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        total: { type: integer }
+      required: [data, total]
+
+    AdminTokenLedgerEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        organizationId: { type: integer }
+        organizationName: { type: ["string", "null"] }
+        projectId: { type: ["integer", "null"] }
+        type:
+          type: string
+          enum:
+            - grant_monthly
+            - grant_signup
+            - purchase_pack
+            - deduct_ai
+            - deduct_build
+            - deduct_deploy
+            - deduct_template
+            - deduct_other
+            - admin_adjust
+            - refund
+        amount: { type: integer }
+        balanceAfter: { type: integer }
+        description: { type: ["string", "null"] }
+        source:
+          type: string
+          enum: [stripe, dev_mock, system, admin]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, organizationId, type, amount, balanceAfter, source, createdAt]
+
+    AdminTokenLedgerList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTokenLedgerEntry"
+        total: { type: integer }
+      required: [data, total]
 
     AuditEvent:
       type: object
@@ -2231,11 +2793,14 @@ components:
         login:
           type: ["string", "null"]
           description: GitHub login (e.g. "Machinedog1") of the connected account.
+        total:
+          type: integer
+          description: Total repos matching the filter (across all pages).
         repos:
           type: array
           items:
             $ref: "#/components/schemas/AdminGithubRepo"
-      required: [connected, repos]
+      required: [connected, repos, total]
 
     ImportGithubProjectBody:
       type: object
@@ -2884,6 +3449,62 @@ components:
         total:
           type: integer
       required: [data, total]
+
+    AdminLead:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        company:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        source:
+          type: string
+        ipAddress:
+          type: ["string", "null"]
+        userAgent:
+          type: ["string", "null"]
+        notifiedAt:
+          type: ["string", "null"]
+          format: date-time
+        notifyError:
+          type: ["string", "null"]
+        contactedAt:
+          type: ["string", "null"]
+          format: date-time
+        contactedByEmail:
+          type: ["string", "null"]
+        operatorNotes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, email, source, createdAt]
+
+    AdminLeadList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminLead"
+        total:
+          type: integer
+      required: [data, total]
+
+    UpdateAdminLeadBody:
+      type: object
+      properties:
+        operatorNotes:
+          type: ["string", "null"]
+        contacted:
+          description: Set true to mark contacted (stamps contactedAt + contactedByEmail), false to clear.
+          type: boolean
 
     ActivityItem:
       type: object

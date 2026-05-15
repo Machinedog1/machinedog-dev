@@ -20,7 +20,14 @@ import type {
   AdjustBalanceBody,
   AdminBuildJobList,
   AdminDeploymentList,
+  AdminLead,
+  AdminLeadList,
+  AdminMetrics,
+  AdminOrganization,
+  AdminOrganizationList,
   AdminStats,
+  AdminTokenLedgerList,
+  AdminUserList,
   AgentThreadResponse,
   AuditEventList,
   BuildJobList,
@@ -52,8 +59,14 @@ import type {
   InviteResponse,
   ListAdminAuditParams,
   ListAdminBuildsParams,
+  ListAdminComplianceParams,
   ListAdminDeploymentsParams,
+  ListAdminGithubReposParams,
   ListAdminGithubReposResponse,
+  ListAdminLeadsParams,
+  ListAdminOrganizationsParams,
+  ListAdminTokensParams,
+  ListAdminUsersParams,
   ListAllBuildOrdersParams,
   ListClientsParams,
   ListMyPromptsParams,
@@ -83,6 +96,10 @@ import type {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
   RotateHeartbeatTokenResponse,
+  SetOrgComplianceBody,
+  SetOrgPlanBody,
+  SetOrgPlanResponse,
+  SetOrgStatusBody,
   SetProjectHostingCredentials200,
   SetProjectHostingCredentialsBody,
   SubmitLeadBody,
@@ -92,6 +109,7 @@ import type {
   TokenBundleList,
   TokenPurchaseList,
   TriggerBuildBody,
+  UpdateAdminLeadBody,
   UpdateProjectBody,
   UpdateProjectSecretBody,
 } from "./api.schemas";
@@ -4763,20 +4781,36 @@ export const useReassignProjectOwner = <
 /**
  * Surfaces every repo owned (or co-administered) by the GitHub account
 connected via the Replit GitHub integration, alongside whether each one
-has already been imported as a Machinedog project. Used by the admin
-All Projects page to populate one-click "Import" cards.
+has already been imported as a Machinedog project. Supports server-side
+pagination, search (by `owner/repo`) and import-status filtering so the
+admin GitHub panel can mirror the other admin list endpoints.
 
  * @summary List GitHub repos accessible to the connected GH account (admin only)
  */
-export const getListAdminGithubReposUrl = () => {
-  return `/api/admin/github/repos`;
+export const getListAdminGithubReposUrl = (
+  params?: ListAdminGithubReposParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/github/repos?${stringifiedParams}`
+    : `/api/admin/github/repos`;
 };
 
 export const listAdminGithubRepos = async (
+  params?: ListAdminGithubReposParams,
   options?: RequestInit,
 ): Promise<ListAdminGithubReposResponse> => {
   return customFetch<ListAdminGithubReposResponse>(
-    getListAdminGithubReposUrl(),
+    getListAdminGithubReposUrl(params),
     {
       ...options,
       method: "GET",
@@ -4784,28 +4818,35 @@ export const listAdminGithubRepos = async (
   );
 };
 
-export const getListAdminGithubReposQueryKey = () => {
-  return [`/api/admin/github/repos`] as const;
+export const getListAdminGithubReposQueryKey = (
+  params?: ListAdminGithubReposParams,
+) => {
+  return [`/api/admin/github/repos`, ...(params ? [params] : [])] as const;
 };
 
 export const getListAdminGithubReposQueryOptions = <
   TData = Awaited<ReturnType<typeof listAdminGithubRepos>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listAdminGithubRepos>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListAdminGithubReposParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminGithubRepos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListAdminGithubReposQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListAdminGithubReposQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listAdminGithubRepos>>
-  > = ({ signal }) => listAdminGithubRepos({ signal, ...requestOptions });
+  > = ({ signal }) =>
+    listAdminGithubRepos(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listAdminGithubRepos>>,
@@ -4826,15 +4867,18 @@ export type ListAdminGithubReposQueryError = ErrorType<unknown>;
 export function useListAdminGithubRepos<
   TData = Awaited<ReturnType<typeof listAdminGithubRepos>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listAdminGithubRepos>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListAdminGithubReposQueryOptions(options);
+>(
+  params?: ListAdminGithubReposParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminGithubRepos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminGithubReposQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -6257,6 +6301,737 @@ export function useListAdminDeployments<
 }
 
 /**
+ * @summary Extended admin dashboard metrics (admin only). Cached for 60s.
+ */
+export const getGetAdminMetricsUrl = () => {
+  return `/api/admin/metrics`;
+};
+
+export const getAdminMetrics = async (
+  options?: RequestInit,
+): Promise<AdminMetrics> => {
+  return customFetch<AdminMetrics>(getGetAdminMetricsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminMetricsQueryKey = () => {
+  return [`/api/admin/metrics`] as const;
+};
+
+export const getGetAdminMetricsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminMetrics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminMetrics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminMetricsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMetrics>>> = ({
+    signal,
+  }) => getAdminMetrics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminMetrics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminMetricsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminMetrics>>
+>;
+export type GetAdminMetricsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Extended admin dashboard metrics (admin only). Cached for 60s.
+ */
+
+export function useGetAdminMetrics<
+  TData = Awaited<ReturnType<typeof getAdminMetrics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminMetrics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminMetricsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List organizations with extended fields (plan, compliance, status) for the admin console.
+ */
+export const getListAdminOrganizationsUrl = (
+  params?: ListAdminOrganizationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/organizations?${stringifiedParams}`
+    : `/api/admin/organizations`;
+};
+
+export const listAdminOrganizations = async (
+  params?: ListAdminOrganizationsParams,
+  options?: RequestInit,
+): Promise<AdminOrganizationList> => {
+  return customFetch<AdminOrganizationList>(
+    getListAdminOrganizationsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListAdminOrganizationsQueryKey = (
+  params?: ListAdminOrganizationsParams,
+) => {
+  return [`/api/admin/organizations`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminOrganizationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminOrganizations>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminOrganizationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminOrganizations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAdminOrganizationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAdminOrganizations>>
+  > = ({ signal }) =>
+    listAdminOrganizations(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminOrganizations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminOrganizationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminOrganizations>>
+>;
+export type ListAdminOrganizationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List organizations with extended fields (plan, compliance, status) for the admin console.
+ */
+
+export function useListAdminOrganizations<
+  TData = Awaited<ReturnType<typeof listAdminOrganizations>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminOrganizationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminOrganizations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminOrganizationsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Suspend or reactivate an organization (admin only). Suspended orgs are blocked from AI / builds / deploys.
+ */
+export const getSetAdminOrganizationStatusUrl = (id: number) => {
+  return `/api/admin/organizations/${id}/status`;
+};
+
+export const setAdminOrganizationStatus = async (
+  id: number,
+  setOrgStatusBody: SetOrgStatusBody,
+  options?: RequestInit,
+): Promise<AdminOrganization> => {
+  return customFetch<AdminOrganization>(getSetAdminOrganizationStatusUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setOrgStatusBody),
+  });
+};
+
+export const getSetAdminOrganizationStatusMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminOrganizationStatus>>,
+    TError,
+    { id: number; data: BodyType<SetOrgStatusBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminOrganizationStatus>>,
+  TError,
+  { id: number; data: BodyType<SetOrgStatusBody> },
+  TContext
+> => {
+  const mutationKey = ["setAdminOrganizationStatus"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminOrganizationStatus>>,
+    { id: number; data: BodyType<SetOrgStatusBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setAdminOrganizationStatus(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetAdminOrganizationStatusMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminOrganizationStatus>>
+>;
+export type SetAdminOrganizationStatusMutationBody = BodyType<SetOrgStatusBody>;
+export type SetAdminOrganizationStatusMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Suspend or reactivate an organization (admin only). Suspended orgs are blocked from AI / builds / deploys.
+ */
+export const useSetAdminOrganizationStatus = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminOrganizationStatus>>,
+    TError,
+    { id: number; data: BodyType<SetOrgStatusBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setAdminOrganizationStatus>>,
+  TError,
+  { id: number; data: BodyType<SetOrgStatusBody> },
+  TContext
+> => {
+  return useMutation(getSetAdminOrganizationStatusMutationOptions(options));
+};
+
+/**
+ * @summary Change an organization's plan tier (admin only). Records an audit event; does not bypass Stripe billing.
+ */
+export const getSetAdminOrganizationPlanUrl = (id: number) => {
+  return `/api/admin/organizations/${id}/plan`;
+};
+
+export const setAdminOrganizationPlan = async (
+  id: number,
+  setOrgPlanBody: SetOrgPlanBody,
+  options?: RequestInit,
+): Promise<SetOrgPlanResponse> => {
+  return customFetch<SetOrgPlanResponse>(getSetAdminOrganizationPlanUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setOrgPlanBody),
+  });
+};
+
+export const getSetAdminOrganizationPlanMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminOrganizationPlan>>,
+    TError,
+    { id: number; data: BodyType<SetOrgPlanBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminOrganizationPlan>>,
+  TError,
+  { id: number; data: BodyType<SetOrgPlanBody> },
+  TContext
+> => {
+  const mutationKey = ["setAdminOrganizationPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminOrganizationPlan>>,
+    { id: number; data: BodyType<SetOrgPlanBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setAdminOrganizationPlan(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetAdminOrganizationPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminOrganizationPlan>>
+>;
+export type SetAdminOrganizationPlanMutationBody = BodyType<SetOrgPlanBody>;
+export type SetAdminOrganizationPlanMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Change an organization's plan tier (admin only). Records an audit event; does not bypass Stripe billing.
+ */
+export const useSetAdminOrganizationPlan = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminOrganizationPlan>>,
+    TError,
+    { id: number; data: BodyType<SetOrgPlanBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setAdminOrganizationPlan>>,
+  TError,
+  { id: number; data: BodyType<SetOrgPlanBody> },
+  TContext
+> => {
+  return useMutation(getSetAdminOrganizationPlanMutationOptions(options));
+};
+
+/**
+ * @summary Update an organization's healthcare/compliance flags (admin only). Phase 8 enforces these inputs.
+ */
+export const getSetAdminOrganizationComplianceUrl = (id: number) => {
+  return `/api/admin/organizations/${id}/compliance`;
+};
+
+export const setAdminOrganizationCompliance = async (
+  id: number,
+  setOrgComplianceBody: SetOrgComplianceBody,
+  options?: RequestInit,
+): Promise<AdminOrganization> => {
+  return customFetch<AdminOrganization>(
+    getSetAdminOrganizationComplianceUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(setOrgComplianceBody),
+    },
+  );
+};
+
+export const getSetAdminOrganizationComplianceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminOrganizationCompliance>>,
+    TError,
+    { id: number; data: BodyType<SetOrgComplianceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAdminOrganizationCompliance>>,
+  TError,
+  { id: number; data: BodyType<SetOrgComplianceBody> },
+  TContext
+> => {
+  const mutationKey = ["setAdminOrganizationCompliance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAdminOrganizationCompliance>>,
+    { id: number; data: BodyType<SetOrgComplianceBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setAdminOrganizationCompliance(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetAdminOrganizationComplianceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminOrganizationCompliance>>
+>;
+export type SetAdminOrganizationComplianceMutationBody =
+  BodyType<SetOrgComplianceBody>;
+export type SetAdminOrganizationComplianceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update an organization's healthcare/compliance flags (admin only). Phase 8 enforces these inputs.
+ */
+export const useSetAdminOrganizationCompliance = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAdminOrganizationCompliance>>,
+    TError,
+    { id: number; data: BodyType<SetOrgComplianceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setAdminOrganizationCompliance>>,
+  TError,
+  { id: number; data: BodyType<SetOrgComplianceBody> },
+  TContext
+> => {
+  return useMutation(getSetAdminOrganizationComplianceMutationOptions(options));
+};
+
+/**
+ * @summary List organization members across all orgs (admin only).
+ */
+export const getListAdminUsersUrl = (params?: ListAdminUsersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/users?${stringifiedParams}`
+    : `/api/admin/users`;
+};
+
+export const listAdminUsers = async (
+  params?: ListAdminUsersParams,
+  options?: RequestInit,
+): Promise<AdminUserList> => {
+  return customFetch<AdminUserList>(getListAdminUsersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminUsersQueryKey = (params?: ListAdminUsersParams) => {
+  return [`/api/admin/users`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminUsersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminUsers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAdminUsersQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsers>>> = ({
+    signal,
+  }) => listAdminUsers(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminUsers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminUsersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminUsers>>
+>;
+export type ListAdminUsersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List organization members across all orgs (admin only).
+ */
+
+export function useListAdminUsers<
+  TData = Awaited<ReturnType<typeof listAdminUsers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminUsersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Token ledger entries across all orgs (admin only).
+ */
+export const getListAdminTokensUrl = (params?: ListAdminTokensParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/tokens?${stringifiedParams}`
+    : `/api/admin/tokens`;
+};
+
+export const listAdminTokens = async (
+  params?: ListAdminTokensParams,
+  options?: RequestInit,
+): Promise<AdminTokenLedgerList> => {
+  return customFetch<AdminTokenLedgerList>(getListAdminTokensUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminTokensQueryKey = (params?: ListAdminTokensParams) => {
+  return [`/api/admin/tokens`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminTokensQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminTokens>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminTokensParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminTokens>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAdminTokensQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminTokens>>> = ({
+    signal,
+  }) => listAdminTokens(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminTokens>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminTokensQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminTokens>>
+>;
+export type ListAdminTokensQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Token ledger entries across all orgs (admin only).
+ */
+
+export function useListAdminTokens<
+  TData = Awaited<ReturnType<typeof listAdminTokens>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminTokensParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminTokens>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminTokensQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Organizations with healthcare/compliance posture (admin only).
+ */
+export const getListAdminComplianceUrl = (
+  params?: ListAdminComplianceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/compliance?${stringifiedParams}`
+    : `/api/admin/compliance`;
+};
+
+export const listAdminCompliance = async (
+  params?: ListAdminComplianceParams,
+  options?: RequestInit,
+): Promise<AdminOrganizationList> => {
+  return customFetch<AdminOrganizationList>(getListAdminComplianceUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminComplianceQueryKey = (
+  params?: ListAdminComplianceParams,
+) => {
+  return [`/api/admin/compliance`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminComplianceQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminCompliance>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminComplianceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminCompliance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAdminComplianceQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAdminCompliance>>
+  > = ({ signal }) =>
+    listAdminCompliance(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminCompliance>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminComplianceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminCompliance>>
+>;
+export type ListAdminComplianceQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Organizations with healthcare/compliance posture (admin only).
+ */
+
+export function useListAdminCompliance<
+  TData = Awaited<ReturnType<typeof listAdminCompliance>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminComplianceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminCompliance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminComplianceQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List paid build deposits and retainer subscriptions (admin only)
  */
 export const getListAllBuildOrdersUrl = (params?: ListAllBuildOrdersParams) => {
@@ -6352,3 +7127,184 @@ export function useListAllBuildOrders<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List captured leads from the public contact form (admin only)
+ */
+export const getListAdminLeadsUrl = (params?: ListAdminLeadsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/leads?${stringifiedParams}`
+    : `/api/admin/leads`;
+};
+
+export const listAdminLeads = async (
+  params?: ListAdminLeadsParams,
+  options?: RequestInit,
+): Promise<AdminLeadList> => {
+  return customFetch<AdminLeadList>(getListAdminLeadsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAdminLeadsQueryKey = (params?: ListAdminLeadsParams) => {
+  return [`/api/admin/leads`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAdminLeadsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminLeads>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminLeadsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminLeads>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAdminLeadsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminLeads>>> = ({
+    signal,
+  }) => listAdminLeads(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminLeads>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminLeadsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminLeads>>
+>;
+export type ListAdminLeadsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List captured leads from the public contact form (admin only)
+ */
+
+export function useListAdminLeads<
+  TData = Awaited<ReturnType<typeof listAdminLeads>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminLeadsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminLeads>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminLeadsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update an inbox lead (notes, contacted state)
+ */
+export const getUpdateAdminLeadUrl = (id: number) => {
+  return `/api/admin/leads/${id}`;
+};
+
+export const updateAdminLead = async (
+  id: number,
+  updateAdminLeadBody: UpdateAdminLeadBody,
+  options?: RequestInit,
+): Promise<AdminLead> => {
+  return customFetch<AdminLead>(getUpdateAdminLeadUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateAdminLeadBody),
+  });
+};
+
+export const getUpdateAdminLeadMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminLead>>,
+    TError,
+    { id: number; data: BodyType<UpdateAdminLeadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminLead>>,
+  TError,
+  { id: number; data: BodyType<UpdateAdminLeadBody> },
+  TContext
+> => {
+  const mutationKey = ["updateAdminLead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminLead>>,
+    { id: number; data: BodyType<UpdateAdminLeadBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateAdminLead(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAdminLeadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminLead>>
+>;
+export type UpdateAdminLeadMutationBody = BodyType<UpdateAdminLeadBody>;
+export type UpdateAdminLeadMutationError = ErrorType<void>;
+
+/**
+ * @summary Update an inbox lead (notes, contacted state)
+ */
+export const useUpdateAdminLead = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminLead>>,
+    TError,
+    { id: number; data: BodyType<UpdateAdminLeadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAdminLead>>,
+  TError,
+  { id: number; data: BodyType<UpdateAdminLeadBody> },
+  TContext
+> => {
+  return useMutation(getUpdateAdminLeadMutationOptions(options));
+};

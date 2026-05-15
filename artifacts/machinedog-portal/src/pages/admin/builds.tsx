@@ -1,12 +1,42 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useListAdminBuilds,
   getListAdminBuildsQueryKey,
+  type ListAdminBuildsParams,
+  type BuildJob,
 } from "@workspace/api-client-react";
-import { Loader2, Hammer } from "lucide-react";
+import { Hammer } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { AdminTable, type AdminTableColumn } from "@/components/admin/AdminTable";
+
+const PAGE_SIZE = 50;
+const PROVIDERS = ["replit", "vercel", "render"] as const;
+const STATUSES = ["queued", "running", "succeeded", "failed", "canceled"] as const;
+
+const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  queued: "outline",
+  running: "secondary",
+  succeeded: "default",
+  failed: "destructive",
+  canceled: "outline",
+};
 
 interface Filters {
   organizationId?: number;
@@ -20,28 +50,81 @@ interface Filters {
 export default function AdminBuildsPage() {
   const [pending, setPending] = useState<Filters>({});
   const [filters, setFilters] = useState<Filters>({});
-  const [page, setPage] = useState(0);
-  const limit = 100;
-  const params = { limit, offset: page * limit, ...filters };
-  const list = useListAdminBuilds(params, {
+  const [offset, setOffset] = useState(0);
+  const [detail, setDetail] = useState<BuildJob | null>(null);
+
+  const params: ListAdminBuildsParams = useMemo(
+    () => ({ limit: PAGE_SIZE, offset, ...filters }),
+    [offset, filters],
+  );
+  const { data, isLoading } = useListAdminBuilds(params, {
     query: { queryKey: getListAdminBuildsQueryKey(params), refetchInterval: 8000 },
   });
-  const rows = list.data?.data ?? [];
-  const total = list.data?.total ?? 0;
+
   const apply = () => {
     setFilters(pending);
-    setPage(0);
+    setOffset(0);
   };
-  return (
-    <div className="p-6 max-w-6xl mx-auto flex flex-col gap-5" data-testid="page-admin-builds">
-      <div className="flex items-center gap-2">
-        <Hammer className="h-5 w-5 text-primary" />
-        <h1 className="text-lg font-mono font-bold uppercase tracking-wider">Build Jobs</h1>
-        <span className="text-xs font-mono text-muted-foreground ml-2">
-          {total.toLocaleString()} jobs
+  const clear = () => {
+    setPending({});
+    setFilters({});
+    setOffset(0);
+  };
+
+  const columns: AdminTableColumn<BuildJob>[] = [
+    {
+      key: "time",
+      header: "Time",
+      cell: (r) => (
+        <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+          {format(new Date(r.createdAt), "MMM d HH:mm:ss")}
         </span>
+      ),
+    },
+    { key: "org", header: "Org", cell: (r) => <span className="font-mono">#{r.organizationId}</span> },
+    { key: "project", header: "Project", cell: (r) => <span className="font-mono">#{r.projectId}</span> },
+    { key: "provider", header: "Provider", cell: (r) => <span className="font-mono uppercase">{r.provider}</span> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (r) => (
+        <Badge variant={statusVariant[r.status] ?? "secondary"} className="font-mono uppercase">
+          {r.status}
+        </Badge>
+      ),
+    },
+    { key: "branch", header: "Branch", cell: (r) => <span className="font-mono text-xs">{r.branch ?? "—"}</span> },
+    {
+      key: "commit",
+      header: "Commit",
+      cell: (r) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {r.commitSha ? r.commitSha.slice(0, 8) : "—"}
+        </span>
+      ),
+    },
+    { key: "tokens", header: "Tokens", cell: (r) => <span className="font-mono">{r.tokenCost}</span> },
+    {
+      key: "by",
+      header: "Triggered by",
+      cell: (r) => (
+        <span className="font-mono text-xs text-muted-foreground">{r.triggeredByEmail ?? "system"}</span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="h-full flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full gap-6 overflow-y-auto">
+      <div>
+        <h1 className="text-2xl font-bold font-mono tracking-tight flex items-center gap-2">
+          <Hammer className="h-6 w-6 text-primary" /> BUILD_JOBS
+        </h1>
+        <p className="text-muted-foreground text-sm font-mono">
+          {data?.total?.toLocaleString() ?? "—"} jobs across all organizations.
+        </p>
       </div>
-      <div className="glass rounded-xl p-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
+
+      <div className="glass rounded-2xl p-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
         <Input
           placeholder="org id"
           value={pending.organizationId ?? ""}
@@ -52,7 +135,6 @@ export default function AdminBuildsPage() {
             }))
           }
           className="font-mono text-xs"
-          data-testid="input-filter-org"
         />
         <Input
           placeholder="project id"
@@ -64,145 +146,119 @@ export default function AdminBuildsPage() {
             }))
           }
           className="font-mono text-xs"
-          data-testid="input-filter-project"
         />
-        <select
-          value={pending.provider ?? ""}
-          onChange={(e) =>
+        <Select
+          value={pending.provider ?? "all"}
+          onValueChange={(v) =>
             setPending((s) => ({
               ...s,
-              provider: (e.target.value || undefined) as Filters["provider"],
+              provider: v === "all" ? undefined : (v as Filters["provider"]),
             }))
           }
-          className="rounded-md border border-border/40 bg-background px-2 py-1.5 text-xs font-mono"
-          data-testid="select-filter-provider"
         >
-          <option value="">any provider</option>
-          <option value="replit">replit</option>
-          <option value="vercel">vercel</option>
-          <option value="render">render</option>
-        </select>
-        <select
-          value={pending.status ?? ""}
-          onChange={(e) =>
+          <SelectTrigger><SelectValue placeholder="provider" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All providers</SelectItem>
+            {PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select
+          value={pending.status ?? "all"}
+          onValueChange={(v) =>
             setPending((s) => ({
               ...s,
-              status: (e.target.value || undefined) as Filters["status"],
+              status: v === "all" ? undefined : (v as Filters["status"]),
             }))
           }
-          className="rounded-md border border-border/40 bg-background px-2 py-1.5 text-xs font-mono"
-          data-testid="select-filter-status"
         >
-          <option value="">any status</option>
-          <option value="queued">queued</option>
-          <option value="running">running</option>
-          <option value="succeeded">succeeded</option>
-          <option value="failed">failed</option>
-          <option value="canceled">canceled</option>
-        </select>
+          <SelectTrigger><SelectValue placeholder="status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Input
           type="datetime-local"
           value={pending.since ?? ""}
           onChange={(e) => setPending((s) => ({ ...s, since: e.target.value || undefined }))}
           className="font-mono text-xs"
-          data-testid="input-filter-since"
         />
         <Input
           type="datetime-local"
           value={pending.until ?? ""}
           onChange={(e) => setPending((s) => ({ ...s, until: e.target.value || undefined }))}
           className="font-mono text-xs"
-          data-testid="input-filter-until"
         />
         <div className="flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setPending({});
-              setFilters({});
-              setPage(0);
-            }}
-          >
-            CLEAR
-          </Button>
-          <Button size="sm" onClick={apply} data-testid="button-filter-apply">
-            APPLY
-          </Button>
+          <Button size="sm" variant="outline" onClick={clear}>CLEAR</Button>
+          <Button size="sm" onClick={apply}>APPLY</Button>
         </div>
       </div>
-      <div className="glass rounded-xl overflow-hidden">
-        {list.isLoading && (
-          <div className="p-8 flex justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        )}
-        {!list.isLoading && (
-          <table className="w-full text-[11px] font-mono">
-            <thead className="bg-background/60 text-left text-muted-foreground">
-              <tr>
-                <th className="p-2">Time</th>
-                <th className="p-2">Org</th>
-                <th className="p-2">Project</th>
-                <th className="p-2">Provider</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Branch</th>
-                <th className="p-2">Commit</th>
-                <th className="p-2">Tokens</th>
-                <th className="p-2">Triggered by</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                    No builds match these filters.
-                  </td>
-                </tr>
+
+      <AdminTable
+        columns={columns}
+        rows={data?.data}
+        total={data?.total}
+        isLoading={isLoading}
+        limit={PAGE_SIZE}
+        offset={offset}
+        onPageChange={setOffset}
+        rowKey={(r) => r.id}
+        onRowClick={(r) => setDetail(r)}
+        emptyMessage="NO_BUILDS"
+      />
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Build #{detail?.id}</DialogTitle>
+            <DialogDescription>
+              {detail && format(new Date(detail.createdAt), "MMM d, yyyy HH:mm:ss")}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <dl className="grid grid-cols-2 gap-3 text-sm font-mono">
+              <F label="Org" value={`#${detail.organizationId}`} />
+              <F label="Project" value={`#${detail.projectId}`} />
+              <F label="Provider" value={detail.provider} />
+              <F label="Status" value={detail.status} />
+              <F label="Environment" value={detail.environment} />
+              <F label="Branch" value={detail.branch ?? "—"} />
+              <F label="Commit" value={detail.commitSha ?? "—"} />
+              <F label="Tokens" value={String(detail.tokenCost)} />
+              <F label="External id" value={detail.externalId ?? "—"} />
+              <F label="Triggered by" value={detail.triggeredByEmail ?? "system"} />
+              {detail.errorMessage && (
+                <div className="col-span-2 flex flex-col gap-1">
+                  <span className="text-xs uppercase text-muted-foreground">Error</span>
+                  <span className="text-destructive break-words">{detail.errorMessage}</span>
+                </div>
               )}
-              {rows.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-t border-border/30"
-                  data-testid={`row-admin-build-${r.id}`}
-                >
-                  <td className="p-2 whitespace-nowrap text-muted-foreground">
-                    {format(new Date(r.createdAt), "yyyy-MM-dd HH:mm:ss")}
-                  </td>
-                  <td className="p-2">{r.organizationId}</td>
-                  <td className="p-2">{r.projectId}</td>
-                  <td className="p-2">{r.provider}</td>
-                  <td className="p-2 text-primary">{r.status}</td>
-                  <td className="p-2 text-muted-foreground">{r.branch ?? "—"}</td>
-                  <td className="p-2 text-muted-foreground">
-                    {r.commitSha ? r.commitSha.slice(0, 8) : "—"}
-                  </td>
-                  <td className="p-2">{r.tokenCost}</td>
-                  <td className="p-2 text-muted-foreground">{r.triggeredByEmail ?? "system"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-mono text-muted-foreground">
-          Page {page + 1} of {Math.max(1, Math.ceil(total / limit))}
-        </span>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            PREV
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={(page + 1) * limit >= total}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            NEXT
-          </Button>
-        </div>
-      </div>
+              {detail.logsUrl && (
+                <div className="col-span-2">
+                  <a
+                    href={detail.logsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline text-xs"
+                  >
+                    Open logs →
+                  </a>
+                </div>
+              )}
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function F({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs uppercase text-muted-foreground">{label}</span>
+      <span className="text-foreground break-words">{value}</span>
     </div>
   );
 }

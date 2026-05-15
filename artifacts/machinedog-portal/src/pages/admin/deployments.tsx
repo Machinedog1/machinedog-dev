@@ -1,12 +1,43 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useListAdminDeployments,
   getListAdminDeploymentsQueryKey,
+  type ListAdminDeploymentsParams,
+  type Deployment,
 } from "@workspace/api-client-react";
-import { Loader2, Rocket } from "lucide-react";
+import { Rocket, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { AdminTable, type AdminTableColumn } from "@/components/admin/AdminTable";
+
+const PAGE_SIZE = 50;
+const PROVIDERS = ["replit", "vercel", "render"] as const;
+const STATUSES = ["pending", "building", "live", "failed", "canceled", "rolled_back"] as const;
+
+const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  pending: "outline",
+  building: "secondary",
+  live: "default",
+  failed: "destructive",
+  canceled: "outline",
+  rolled_back: "outline",
+};
 
 interface Filters {
   organizationId?: number;
@@ -20,28 +51,92 @@ interface Filters {
 export default function AdminDeploymentsPage() {
   const [pending, setPending] = useState<Filters>({});
   const [filters, setFilters] = useState<Filters>({});
-  const [page, setPage] = useState(0);
-  const limit = 100;
-  const params = { limit, offset: page * limit, ...filters };
-  const list = useListAdminDeployments(params, {
+  const [offset, setOffset] = useState(0);
+  const [detail, setDetail] = useState<Deployment | null>(null);
+
+  const params: ListAdminDeploymentsParams = useMemo(
+    () => ({ limit: PAGE_SIZE, offset, ...filters }),
+    [offset, filters],
+  );
+  const { data, isLoading } = useListAdminDeployments(params, {
     query: { queryKey: getListAdminDeploymentsQueryKey(params), refetchInterval: 8000 },
   });
-  const rows = list.data?.data ?? [];
-  const total = list.data?.total ?? 0;
+
   const apply = () => {
     setFilters(pending);
-    setPage(0);
+    setOffset(0);
   };
-  return (
-    <div className="p-6 max-w-6xl mx-auto flex flex-col gap-5" data-testid="page-admin-deployments">
-      <div className="flex items-center gap-2">
-        <Rocket className="h-5 w-5 text-primary" />
-        <h1 className="text-lg font-mono font-bold uppercase tracking-wider">Deployments</h1>
-        <span className="text-xs font-mono text-muted-foreground ml-2">
-          {total.toLocaleString()} deployments
+  const clear = () => {
+    setPending({});
+    setFilters({});
+    setOffset(0);
+  };
+
+  const columns: AdminTableColumn<Deployment>[] = [
+    {
+      key: "time",
+      header: "Time",
+      cell: (r) => (
+        <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+          {format(new Date(r.createdAt), "MMM d HH:mm:ss")}
         </span>
+      ),
+    },
+    { key: "org", header: "Org", cell: (r) => <span className="font-mono">#{r.organizationId}</span> },
+    { key: "project", header: "Project", cell: (r) => <span className="font-mono">#{r.projectId}</span> },
+    { key: "provider", header: "Provider", cell: (r) => <span className="font-mono uppercase">{r.provider}</span> },
+    { key: "env", header: "Env", cell: (r) => <span className="font-mono uppercase">{r.environment}</span> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (r) => (
+        <Badge variant={statusVariant[r.status] ?? "secondary"} className="font-mono uppercase">
+          {r.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "url",
+      header: "URL",
+      cell: (r) =>
+        r.url ? (
+          <a
+            href={r.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="font-mono text-xs underline text-primary truncate max-w-[200px] inline-block"
+          >
+            {r.url.replace(/^https?:\/\//, "")}
+          </a>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: "commit",
+      header: "Commit",
+      cell: (r) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {r.commitSha ? r.commitSha.slice(0, 8) : "—"}
+        </span>
+      ),
+    },
+    { key: "tokens", header: "Tokens", cell: (r) => <span className="font-mono">{r.tokenCost}</span> },
+  ];
+
+  return (
+    <div className="h-full flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full gap-6 overflow-y-auto">
+      <div>
+        <h1 className="text-2xl font-bold font-mono tracking-tight flex items-center gap-2">
+          <Rocket className="h-6 w-6 text-primary" /> DEPLOYMENTS
+        </h1>
+        <p className="text-muted-foreground text-sm font-mono">
+          {data?.total?.toLocaleString() ?? "—"} deployments across all organizations.
+        </p>
       </div>
-      <div className="glass rounded-xl p-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
+
+      <div className="glass rounded-2xl p-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
         <Input
           placeholder="org id"
           value={pending.organizationId ?? ""}
@@ -64,148 +159,126 @@ export default function AdminDeploymentsPage() {
           }
           className="font-mono text-xs"
         />
-        <select
-          value={pending.provider ?? ""}
-          onChange={(e) =>
+        <Select
+          value={pending.provider ?? "all"}
+          onValueChange={(v) =>
             setPending((s) => ({
               ...s,
-              provider: (e.target.value || undefined) as Filters["provider"],
+              provider: v === "all" ? undefined : (v as Filters["provider"]),
             }))
           }
-          className="rounded-md border border-border/40 bg-background px-2 py-1.5 text-xs font-mono"
         >
-          <option value="">any provider</option>
-          <option value="replit">replit</option>
-          <option value="vercel">vercel</option>
-          <option value="render">render</option>
-        </select>
-        <select
-          value={pending.status ?? ""}
-          onChange={(e) =>
+          <SelectTrigger><SelectValue placeholder="provider" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All providers</SelectItem>
+            {PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select
+          value={pending.status ?? "all"}
+          onValueChange={(v) =>
             setPending((s) => ({
               ...s,
-              status: (e.target.value || undefined) as Filters["status"],
+              status: v === "all" ? undefined : (v as Filters["status"]),
             }))
           }
-          className="rounded-md border border-border/40 bg-background px-2 py-1.5 text-xs font-mono"
         >
-          <option value="">any status</option>
-          <option value="pending">pending</option>
-          <option value="building">building</option>
-          <option value="live">live</option>
-          <option value="failed">failed</option>
-          <option value="canceled">canceled</option>
-          <option value="rolled_back">rolled_back</option>
-        </select>
+          <SelectTrigger><SelectValue placeholder="status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Input
           type="datetime-local"
           value={pending.since ?? ""}
           onChange={(e) => setPending((s) => ({ ...s, since: e.target.value || undefined }))}
           className="font-mono text-xs"
-          data-testid="input-filter-since"
         />
         <Input
           type="datetime-local"
           value={pending.until ?? ""}
           onChange={(e) => setPending((s) => ({ ...s, until: e.target.value || undefined }))}
           className="font-mono text-xs"
-          data-testid="input-filter-until"
         />
         <div className="flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setPending({});
-              setFilters({});
-              setPage(0);
-            }}
-          >
-            CLEAR
-          </Button>
-          <Button size="sm" onClick={apply} data-testid="button-filter-apply">APPLY</Button>
+          <Button size="sm" variant="outline" onClick={clear}>CLEAR</Button>
+          <Button size="sm" onClick={apply}>APPLY</Button>
         </div>
       </div>
-      <div className="glass rounded-xl overflow-hidden">
-        {list.isLoading && (
-          <div className="p-8 flex justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        )}
-        {!list.isLoading && (
-          <table className="w-full text-[11px] font-mono">
-            <thead className="bg-background/60 text-left text-muted-foreground">
-              <tr>
-                <th className="p-2">Time</th>
-                <th className="p-2">Org</th>
-                <th className="p-2">Project</th>
-                <th className="p-2">Provider</th>
-                <th className="p-2">Env</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">URL</th>
-                <th className="p-2">Commit</th>
-                <th className="p-2">Tokens</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                    No deployments match these filters.
-                  </td>
-                </tr>
+
+      <AdminTable
+        columns={columns}
+        rows={data?.data}
+        total={data?.total}
+        isLoading={isLoading}
+        limit={PAGE_SIZE}
+        offset={offset}
+        onPageChange={setOffset}
+        rowKey={(r) => r.id}
+        onRowClick={(r) => setDetail(r)}
+        emptyMessage="NO_DEPLOYMENTS"
+      />
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deployment #{detail?.id}</DialogTitle>
+            <DialogDescription>
+              {detail && format(new Date(detail.createdAt), "MMM d, yyyy HH:mm:ss")}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <dl className="grid grid-cols-2 gap-3 text-sm font-mono">
+              <F label="Org" value={`#${detail.organizationId}`} />
+              <F label="Project" value={`#${detail.projectId}`} />
+              <F label="Provider" value={detail.provider} />
+              <F label="Environment" value={detail.environment} />
+              <F label="Status" value={detail.status} />
+              <F label="Branch" value={detail.branch ?? "—"} />
+              <F label="Commit" value={detail.commitSha ?? "—"} />
+              <F label="Tokens" value={String(detail.tokenCost)} />
+              <F label="External id" value={detail.externalId ?? "—"} />
+              <F label="Build job" value={detail.buildJobId ? `#${detail.buildJobId}` : "—"} />
+              <F
+                label="Deployed at"
+                value={
+                  detail.deployedAt
+                    ? format(new Date(detail.deployedAt), "MMM d, yyyy HH:mm")
+                    : "—"
+                }
+              />
+              {detail.url && (
+                <div className="col-span-2">
+                  <a
+                    href={detail.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline text-xs inline-flex items-center gap-1"
+                  >
+                    {detail.url} <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               )}
-              {rows.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-t border-border/30"
-                  data-testid={`row-admin-deployment-${r.id}`}
-                >
-                  <td className="p-2 whitespace-nowrap text-muted-foreground">
-                    {format(new Date(r.createdAt), "yyyy-MM-dd HH:mm:ss")}
-                  </td>
-                  <td className="p-2">{r.organizationId}</td>
-                  <td className="p-2">{r.projectId}</td>
-                  <td className="p-2">{r.provider}</td>
-                  <td className="p-2">{r.environment}</td>
-                  <td className="p-2 text-primary">{r.status}</td>
-                  <td className="p-2 text-muted-foreground max-w-[200px] truncate">
-                    {r.url ? (
-                      <a href={r.url} target="_blank" rel="noreferrer" className="underline">
-                        {r.url.replace(/^https?:\/\//, "")}
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="p-2 text-muted-foreground">
-                    {r.commitSha ? r.commitSha.slice(0, 8) : "—"}
-                  </td>
-                  <td className="p-2">{r.tokenCost}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-mono text-muted-foreground">
-          Page {page + 1} of {Math.max(1, Math.ceil(total / limit))}
-        </span>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            PREV
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={(page + 1) * limit >= total}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            NEXT
-          </Button>
-        </div>
-      </div>
+              {detail.errorMessage && (
+                <div className="col-span-2 flex flex-col gap-1">
+                  <span className="text-xs uppercase text-muted-foreground">Error</span>
+                  <span className="text-destructive break-words">{detail.errorMessage}</span>
+                </div>
+              )}
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function F({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs uppercase text-muted-foreground">{label}</span>
+      <span className="text-foreground break-words">{value}</span>
     </div>
   );
 }

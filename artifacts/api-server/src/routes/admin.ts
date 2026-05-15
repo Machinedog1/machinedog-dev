@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { randomBytes } from "node:crypto";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, or, ilike, isNull, isNotNull } from "drizzle-orm";
 import {
   db,
   organizationsTable,
@@ -9,6 +9,7 @@ import {
   projectsTable,
   consultingBookingsTable,
   buildOrdersTable,
+  leadsTable,
 } from "@workspace/db";
 import {
   GetAdminStatsResponse,
@@ -31,12 +32,19 @@ import {
   ListAllBuildOrdersResponse,
   ListAdminGithubReposResponse,
   ImportGithubProjectBody,
+  ListAdminLeadsQueryParams,
+  ListAdminLeadsResponse,
+  UpdateAdminLeadParams,
+  UpdateAdminLeadBody,
+  UpdateAdminLeadResponse,
 } from "@workspace/api-zod";
 import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
 import { generateSecureToken } from "../lib/passwords";
 import { sendInviteEmail } from "../lib/mailer";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { importGithubAsProject } from "../lib/github-import";
+import * as tokenService from "../lib/token-service";
+import { invalidateMetricsCache } from "./admin-platform";
 import {
   getConnectedGithubUser,
   listConnectedUserRepos,
@@ -401,18 +409,44 @@ router.patch("/admin/clients/:id/balance", async (req, res): Promise<void> => {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const [row] = await db
-    .update(organizationsTable)
-    .set({
-      tokenBalance: sql`GREATEST(${organizationsTable.tokenBalance} + ${body.data.delta}, 0)`,
-    })
-    .where(eq(organizationsTable.id, params.data.id))
-    .returning();
-  if (!row) {
+  const [existing] = await db
+    .select()
+    .from(organizationsTable)
+    .where(eq(organizationsTable.id, params.data.id));
+  if (!existing) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  req.log.info({ clientId: row.id, delta: body.data.delta, reason: body.data.reason }, "Admin balance adjustment");
+  // Route through the canonical token service so we get a ledger row,
+  // a `tokens_adjusted` audit event, and the same balance-floor handling
+  // (no negative balances) as everywhere else.
+  const safeDelta =
+    body.data.delta < 0
+      ? -Math.min(Math.abs(body.data.delta), existing.tokenBalance)
+      : body.data.delta;
+  const result = await tokenService.adminAdjust(existing.id, safeDelta, {
+    description: body.data.reason
+      ? `Admin adjustment: ${body.data.reason}`
+      : undefined,
+    actorOrganizationId: req.dbClient?.id ?? null,
+  });
+  // Token-balance changes affect totalTokensUsed/grants surfaced in
+  // /admin/metrics; flush the 60s cache so the dashboard reflects the
+  // adjustment immediately.
+  invalidateMetricsCache();
+  const [row] = await db
+    .select()
+    .from(organizationsTable)
+    .where(eq(organizationsTable.id, existing.id));
+  req.log.info(
+    {
+      clientId: existing.id,
+      delta: safeDelta,
+      reason: body.data.reason,
+      balanceAfter: result.balanceAfter,
+    },
+    "Admin balance adjustment",
+  );
   res.json(AdjustClientBalanceResponse.parse(row));
 });
 
@@ -490,7 +524,19 @@ router.patch("/admin/projects/:id/owner", async (req, res): Promise<void> => {
 // GitHub" panel on the admin All Projects page so admins can pull every
 // repo Tom owns into Machinedog and then reassign clients with the existing
 // per-card controls.
-router.get("/admin/github/repos", async (_req, res): Promise<void> => {
+router.get("/admin/github/repos", async (req, res): Promise<void> => {
+  const limitRaw = Number(req.query.limit ?? 50);
+  const offsetRaw = Number(req.query.offset ?? 0);
+  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 50, 1), 200);
+  const offset = Math.max(Number.isFinite(offsetRaw) ? offsetRaw : 0, 0);
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  const importedFilter =
+    req.query.imported === "true"
+      ? "imported"
+      : req.query.imported === "false"
+        ? "available"
+        : "all";
+
   // Treat both "not connected" and "auth expired/revoked" (401/403 from GH)
   // as the same disconnected state so the UI can prompt re-authorization
   // instead of showing a 500.
@@ -500,6 +546,7 @@ router.get("/admin/github/repos", async (_req, res): Promise<void> => {
         connected: false,
         login: null,
         repos: [],
+        total: 0,
       }),
     );
   }
@@ -551,15 +598,26 @@ router.get("/admin/github/repos", async (_req, res): Promise<void> => {
     }
   }
 
+  const enriched = repos.map((r) => ({
+    ...r,
+    importedProjectId:
+      importedKey.get(`${r.owner.toLowerCase()}/${r.repo.toLowerCase()}`) ?? null,
+  }));
+  const term = search.toLowerCase();
+  const filtered = enriched.filter((r) => {
+    if (importedFilter === "imported" && r.importedProjectId == null) return false;
+    if (importedFilter === "available" && r.importedProjectId != null) return false;
+    if (term && !r.fullName.toLowerCase().includes(term)) return false;
+    return true;
+  });
+  const page = filtered.slice(offset, offset + limit);
+
   res.json(
     ListAdminGithubReposResponse.parse({
       connected: true,
       login,
-      repos: repos.map((r) => ({
-        ...r,
-        importedProjectId:
-          importedKey.get(`${r.owner.toLowerCase()}/${r.repo.toLowerCase()}`) ?? null,
-      })),
+      repos: page,
+      total: filtered.length,
     }),
   );
 });
@@ -621,17 +679,129 @@ router.get("/admin/orders", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const { limit, offset } = params.data;
+  const { limit, offset, kind, status, search } = params.data;
+  const conds = [];
+  if (kind) conds.push(eq(buildOrdersTable.kind, kind));
+  if (status) conds.push(eq(buildOrdersTable.status, status));
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`;
+    conds.push(
+      or(
+        ilike(buildOrdersTable.email, term),
+        ilike(buildOrdersTable.name, term),
+        ilike(buildOrdersTable.company, term),
+        ilike(buildOrdersTable.stripeSessionId, term),
+      )!,
+    );
+  }
+  const where = conds.length ? and(...conds) : undefined;
   const rows = await db
     .select()
     .from(buildOrdersTable)
+    .where(where)
     .orderBy(desc(buildOrdersTable.createdAt))
     .limit(limit)
     .offset(offset);
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(buildOrdersTable);
+    .from(buildOrdersTable)
+    .where(where);
   res.json(ListAllBuildOrdersResponse.parse({ data: rows, total: Number(count) }));
+});
+
+router.get("/admin/leads", async (req, res): Promise<void> => {
+  const params = ListAdminLeadsQueryParams.safeParse(req.query);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const { limit, offset, search, status } = params.data;
+  const conds = [];
+  if (search && search.trim()) {
+    const term = `%${search.trim()}%`;
+    conds.push(
+      or(
+        ilike(leadsTable.email, term),
+        ilike(leadsTable.name, term),
+        ilike(leadsTable.company, term),
+      )!,
+    );
+  }
+  if (status === "notified") conds.push(isNotNull(leadsTable.notifiedAt));
+  else if (status === "pending")
+    conds.push(and(isNull(leadsTable.notifiedAt), isNull(leadsTable.notifyError))!);
+  else if (status === "error") conds.push(isNotNull(leadsTable.notifyError));
+  const where = conds.length ? and(...conds) : undefined;
+
+  const rows = await db
+    .select()
+    .from(leadsTable)
+    .where(where)
+    .orderBy(desc(leadsTable.createdAt))
+    .limit(limit)
+    .offset(offset);
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(leadsTable)
+    .where(where);
+  res.json(ListAdminLeadsResponse.parse({ data: rows, total: Number(count) }));
+});
+
+router.patch("/admin/leads/:id", async (req, res): Promise<void> => {
+  const params = UpdateAdminLeadParams.safeParse(req.params);
+  const body = UpdateAdminLeadBody.safeParse(req.body);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const leadId = params.data.id;
+  const [existing] = await db
+    .select()
+    .from(leadsTable)
+    .where(eq(leadsTable.id, leadId))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Lead not found" });
+    return;
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (body.data.operatorNotes !== undefined) patch.operatorNotes = body.data.operatorNotes;
+  if (body.data.contacted === true) {
+    patch.contactedAt = new Date();
+    patch.contactedByEmail = req.dbClient?.email ?? null;
+  } else if (body.data.contacted === false) {
+    patch.contactedAt = null;
+    patch.contactedByEmail = null;
+  }
+
+  const [updated] = await db
+    .update(leadsTable)
+    .set(patch)
+    .where(eq(leadsTable.id, leadId))
+    .returning();
+
+  recordAuditEventAsync({
+    category: "admin",
+    action: "lead_updated",
+    targetType: "lead",
+    targetId: String(leadId),
+    metadata: {
+      operatorNotesChanged: body.data.operatorNotes !== undefined,
+      contacted: body.data.contacted ?? null,
+    },
+    actorUserId: null,
+    actorEmail: req.dbClient?.email ?? null,
+    organizationId: null,
+    projectId: null,
+    ...reqAuditMeta(req),
+  });
+
+  res.json(UpdateAdminLeadResponse.parse(updated));
 });
 
 export default router;

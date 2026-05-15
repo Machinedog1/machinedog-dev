@@ -5,8 +5,16 @@
  * Machinedog Client Portal API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListAllBuildOrdersKind } from "./listAllBuildOrdersKind";
+import type { ListAllBuildOrdersStatus } from "./listAllBuildOrdersStatus";
 
 export type ListAllBuildOrdersParams = {
   limit?: number;
   offset?: number;
+  kind?: ListAllBuildOrdersKind;
+  status?: ListAllBuildOrdersStatus;
+  /**
+   * Substring match against email, name, company, stripe session id.
+   */
+  search?: string;
 };

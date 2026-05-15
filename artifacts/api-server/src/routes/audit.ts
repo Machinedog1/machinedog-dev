@@ -5,6 +5,7 @@ import {
   auditEventsTable,
   projectsTable,
   projectMembersTable,
+  AUDIT_ACTION_VALUES,
 } from "@workspace/db";
 import { requireAuth, loadOrCreateClient, requireActiveClient, requireAdmin } from "../lib/auth";
 
@@ -103,7 +104,12 @@ router.get(
       if (Number.isFinite(v)) filters.push(eq(auditEventsTable.projectId, v));
     }
     if (typeof req.query.action === "string" && req.query.action) {
-      filters.push(eq(auditEventsTable.action, req.query.action));
+      const candidate = req.query.action;
+      if ((AUDIT_ACTION_VALUES as readonly string[]).includes(candidate)) {
+        filters.push(
+          eq(auditEventsTable.action, candidate as (typeof AUDIT_ACTION_VALUES)[number]),
+        );
+      }
     }
     if (typeof req.query.actor === "string" && req.query.actor) {
       filters.push(sql`lower(${auditEventsTable.actorEmail}) like ${`%${req.query.actor.toLowerCase()}%`}`);

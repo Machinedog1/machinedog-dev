@@ -1,31 +1,55 @@
-import { useListAllBuildOrders } from "@workspace/api-client-react";
-import { Briefcase, ShieldAlert, ExternalLink, Package, Repeat } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  useListAllBuildOrders,
+  getListAllBuildOrdersQueryKey,
+  type ListAllBuildOrdersParams,
+  type BuildOrder,
+} from "@workspace/api-client-react";
+import { Briefcase, ShieldAlert, ExternalLink, Package, Repeat, Search } from "lucide-react";
 import { format } from "date-fns";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { AdminTable, type AdminTableColumn } from "@/components/admin/AdminTable";
 
-const statusStyles: Record<string, string> = {
-  pending: "text-yellow-500 ring-yellow-500/30",
-  completed: "text-green-500 ring-green-500/30",
-  active: "text-primary ring-primary/30",
-  cancelled: "text-destructive ring-destructive/30",
+const PAGE_SIZE = 25;
+const STATUSES = ["pending", "completed", "active", "cancelled"] as const;
+const KINDS = ["build", "retainer"] as const;
+
+type OrderKind = (typeof KINDS)[number];
+type OrderStatus = (typeof STATUSES)[number];
+
+const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  pending: "outline",
+  completed: "default",
+  active: "default",
+  cancelled: "destructive",
 };
 
-function stripeUrl(order: {
-  stripeSubscriptionId?: string | null;
-  stripePaymentIntentId?: string | null;
-  stripeSessionId: string;
-  kind: string;
-}): string {
-  // Default to live dashboard; Stripe will fall back to test mode automatically
-  // when the user is signed in to a test account.
+function stripeUrl(o: BuildOrder): string {
   const base = "https://dashboard.stripe.com";
-  if (order.kind === "retainer" && order.stripeSubscriptionId) {
-    return `${base}/subscriptions/${order.stripeSubscriptionId}`;
+  if (o.kind === "retainer" && o.stripeSubscriptionId) {
+    return `${base}/subscriptions/${o.stripeSubscriptionId}`;
   }
-  if (order.stripePaymentIntentId) {
-    return `${base}/payments/${order.stripePaymentIntentId}`;
+  if (o.stripePaymentIntentId) {
+    return `${base}/payments/${o.stripePaymentIntentId}`;
   }
-  return `${base}/payments?query=${encodeURIComponent(order.stripeSessionId)}`;
+  return `${base}/payments?query=${encodeURIComponent(o.stripeSessionId)}`;
 }
 
 function formatAmount(cents: number, currency: string): string {
@@ -40,114 +64,226 @@ function formatAmount(cents: number, currency: string): string {
   }
 }
 
-export default function AdminOrders() {
-  const { data, isLoading } = useListAllBuildOrders();
+export default function AdminOrdersPage() {
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [kind, setKind] = useState<"all" | OrderKind>("all");
+  const [status, setStatus] = useState<"all" | OrderStatus>("all");
+  const [offset, setOffset] = useState(0);
+  const [detail, setDetail] = useState<BuildOrder | null>(null);
+
+  const params: ListAllBuildOrdersParams = useMemo(
+    () => ({
+      limit: PAGE_SIZE,
+      offset,
+      kind: kind === "all" ? undefined : kind,
+      status: status === "all" ? undefined : status,
+      search: appliedSearch.trim() || undefined,
+    }),
+    [offset, kind, status, appliedSearch],
+  );
+  const { data, isLoading } = useListAllBuildOrders(params, {
+    query: { queryKey: getListAllBuildOrdersQueryKey(params) },
+  });
+
+  const columns: AdminTableColumn<BuildOrder>[] = [
+    {
+      key: "kind",
+      header: "Kind",
+      cell: (o) => (
+        <Badge variant="secondary" className="font-mono uppercase inline-flex items-center gap-1">
+          {o.kind === "retainer" ? <Repeat className="h-3 w-3" /> : <Package className="h-3 w-3" />}
+          {o.kind}
+        </Badge>
+      ),
+    },
+    {
+      key: "customer",
+      header: "Customer",
+      cell: (o) => (
+        <div className="flex flex-col min-w-0">
+          <span className="font-mono font-bold text-foreground truncate">
+            {o.name?.trim() || o.email?.trim() || "(unknown)"}
+          </span>
+          {o.email && o.name && (
+            <span className="text-xs font-mono text-muted-foreground truncate">{o.email}</span>
+          )}
+          <span className="text-[10px] font-mono text-muted-foreground/60">
+            #{o.id} · {o.source}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      cell: (o) => (
+        <span className="font-mono font-bold">{formatAmount(o.amountCents, o.currency)}</span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (o) => (
+        <Badge variant={statusVariant[o.status] ?? "secondary"} className="font-mono uppercase">
+          {o.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "created",
+      header: "Created",
+      cell: (o) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {format(new Date(o.createdAt), "MMM d, yyyy")}
+        </span>
+      ),
+    },
+    {
+      key: "stripe",
+      header: "",
+      className: "text-right",
+      cell: (o) => (
+        <a
+          href={stripeUrl(o)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-muted-foreground hover:text-primary"
+          title="Open in Stripe dashboard"
+        >
+          <ExternalLink className="h-4 w-4 inline" />
+        </a>
+      ),
+    },
+  ];
+
+  const submitSearch = () => {
+    setAppliedSearch(search);
+    setOffset(0);
+  };
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-8 max-w-6xl mx-auto w-full gap-6">
-      <div className="flex flex-col gap-2 shrink-0">
+    <div className="h-full flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full gap-6 overflow-y-auto">
+      <div>
         <h1 className="text-2xl font-bold font-mono tracking-tight flex items-center gap-2">
-          <Briefcase className="h-6 w-6 text-primary" />
-          PAID_ORDERS
+          <Briefcase className="h-6 w-6 text-primary" /> PAID_ORDERS
         </h1>
         <p className="text-muted-foreground text-sm font-mono flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4" /> Premium Build deposits and monthly retainer subscriptions.
+          <ShieldAlert className="h-4 w-4" /> Premium Build deposits and monthly retainer
+          subscriptions.
         </p>
       </div>
 
-      <div className="glass rounded-2xl overflow-hidden flex-1 flex flex-col min-h-0">
-        <div className="grid grid-cols-12 text-xs font-mono text-muted-foreground p-4 border-b border-border/20 glass-subtle uppercase shrink-0 gap-2">
-          <div className="col-span-2">Kind</div>
-          <div className="col-span-3">Customer</div>
-          <div className="col-span-2">Amount</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2">Created</div>
-          <div className="col-span-1 text-right">Stripe</div>
-        </div>
-
-        <div className="divide-y divide-border/10 overflow-y-auto flex-1">
-          {isLoading ? (
-            [1, 2, 3].map((i) => (
-              <div key={i} className="p-4">
-                <Skeleton className="h-6 w-full glass" />
-              </div>
-            ))
-          ) : !data?.data?.length ? (
-            <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              NO_ORDERS_YET
-            </div>
-          ) : (
-            data.data.map((order) => {
-              const customerLabel =
-                (order.name && order.name.trim()) ||
-                (order.email && order.email.trim()) ||
-                "(unknown)";
-              const status = order.status as keyof typeof statusStyles;
-              const styleKey = statusStyles[status] ?? "text-muted-foreground ring-border/30";
-              return (
-                <div
-                  key={order.id}
-                  className="grid grid-cols-12 text-sm items-center p-4 hover:bg-muted/10 transition-colors gap-2"
-                >
-                  <div className="col-span-2">
-                    <span className="font-mono text-xs font-bold text-primary glass-subtle px-2 py-0.5 rounded uppercase inline-flex items-center gap-1">
-                      {order.kind === "retainer" ? (
-                        <Repeat className="h-3 w-3" />
-                      ) : (
-                        <Package className="h-3 w-3" />
-                      )}
-                      {order.kind}
-                    </span>
-                  </div>
-                  <div className="col-span-3 flex flex-col min-w-0">
-                    <span className="font-mono font-bold text-foreground truncate">
-                      {customerLabel}
-                    </span>
-                    {order.email && order.name && (
-                      <span className="text-xs font-mono text-muted-foreground truncate">
-                        {order.email}
-                      </span>
-                    )}
-                    <span className="text-[10px] font-mono text-muted-foreground/60 truncate">
-                      ID: {order.id} · {order.source}
-                    </span>
-                  </div>
-                  <div className="col-span-2 font-mono font-bold text-foreground">
-                    {formatAmount(order.amountCents, order.currency)}
-                  </div>
-                  <div className="col-span-2">
-                    <span
-                      className={`text-xs font-mono px-2 py-0.5 rounded uppercase glass-subtle ring-1 ${styleKey}`}
-                    >
-                      {order.status}
-                    </span>
-                  </div>
-                  <div className="col-span-2 font-mono text-xs text-muted-foreground">
-                    {format(new Date(order.createdAt), "MMM d, yyyy")}
-                  </div>
-                  <div className="col-span-1 flex justify-end">
-                    <a
-                      href={stripeUrl(order)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                      title="Open in Stripe dashboard"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {data?.total != null && data.total > 0 && (
-          <div className="p-3 border-t border-border/20 glass-subtle text-xs font-mono text-muted-foreground text-right shrink-0">
-            {data.data.length} of {data.total} orders
-          </div>
-        )}
+      <div className="flex flex-col md:flex-row gap-3">
+        <form
+          className="relative flex-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitSearch();
+          }}
+        >
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={submitSearch}
+            placeholder="Search customer, email, company, session id (press enter)"
+            className="pl-9"
+          />
+        </form>
+        <Select
+          value={kind}
+          onValueChange={(v) => {
+            setKind(v as "all" | OrderKind);
+            setOffset(0);
+          }}
+        >
+          <SelectTrigger className="w-full md:w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All kinds</SelectItem>
+            {KINDS.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v as "all" | OrderStatus);
+            setOffset(0);
+          }}
+        >
+          <SelectTrigger className="w-full md:w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
+
+      <AdminTable
+        columns={columns}
+        rows={data?.data}
+        total={data?.total}
+        isLoading={isLoading}
+        limit={PAGE_SIZE}
+        offset={offset}
+        onPageChange={setOffset}
+        rowKey={(o) => o.id}
+        onRowClick={(o) => setDetail(o)}
+        emptyMessage="NO_ORDERS"
+      />
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Order #{detail?.id}</DialogTitle>
+            <DialogDescription>
+              {detail && format(new Date(detail.createdAt), "MMM d, yyyy HH:mm:ss")}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <dl className="grid grid-cols-2 gap-3 text-sm font-mono">
+              <F label="Kind" value={detail.kind} />
+              <F label="Status" value={detail.status} />
+              <F label="Amount" value={formatAmount(detail.amountCents, detail.currency)} />
+              <F label="Source" value={detail.source} />
+              <F label="Email" value={detail.email ?? "—"} />
+              <F label="Name" value={detail.name ?? "—"} />
+              <F label="Company" value={detail.company ?? "—"} />
+              <F label="Stripe customer" value={detail.stripeCustomerId ?? "—"} />
+              <F label="Stripe session" value={detail.stripeSessionId} />
+              <F label="Subscription" value={detail.stripeSubscriptionId ?? "—"} />
+              <F label="Payment intent" value={detail.stripePaymentIntentId ?? "—"} />
+              <F
+                label="Completed"
+                value={
+                  detail.completedAt
+                    ? format(new Date(detail.completedAt), "MMM d, yyyy HH:mm")
+                    : "—"
+                }
+              />
+            </dl>
+          )}
+          <DialogFooter>
+            {detail && (
+              <a href={stripeUrl(detail)} target="_blank" rel="noreferrer">
+                <Button variant="outline">
+                  Open in Stripe <ExternalLink className="h-3 w-3 ml-1" />
+                </Button>
+              </a>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function F({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs uppercase text-muted-foreground">{label}</span>
+      <span className="text-foreground break-words">{value}</span>
     </div>
   );
 }

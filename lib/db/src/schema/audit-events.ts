@@ -52,6 +52,11 @@ export const AUDIT_ACTION_VALUES = [
   "baa_status_updated",
   "ai_provider_updated",
   "ai_model_updated",
+  "organization_suspended",
+  "organization_reactivated",
+  "plan_changed",
+  "compliance_updated",
+  "lead_updated",
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTION_VALUES)[number];
 export const auditActionEnum = pgEnum("audit_action", AUDIT_ACTION_VALUES);

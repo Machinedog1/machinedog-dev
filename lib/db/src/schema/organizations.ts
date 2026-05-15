@@ -34,6 +34,11 @@ export const organizationsTable = pgTable(
     })
       .notNull()
       .default("not_required"),
+    // Phase 7: admin-controlled MFA requirement input. Real enforcement
+    // (forcing every member's session to satisfy MFA) lands in Phase 8 with
+    // the rest of the healthcare gating; this field is simply the toggle the
+    // admin flips ahead of that work.
+    mfaRequired: integer("mfa_required").notNull().default(0),
     stripeCustomerId: text("stripe_customer_id"),
     // Token wallet — moved from legacy clients table.
     tokenBalance: integer("token_balance").notNull().default(0),

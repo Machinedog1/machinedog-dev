@@ -34,6 +34,12 @@ import AdminAuditPage from "@/pages/admin/audit";
 import AdminBuildsPage from "@/pages/admin/builds";
 import AdminDeploymentsPage from "@/pages/admin/deployments";
 import AdminAiModelsPage from "@/pages/admin/ai-models";
+import AdminOrganizationsPage from "@/pages/admin/organizations";
+import AdminUsersPage from "@/pages/admin/users";
+import AdminTokensPage from "@/pages/admin/tokens";
+import AdminCompliancePage from "@/pages/admin/compliance";
+import AdminGithubPage from "@/pages/admin/github";
+import AdminLeadsPage from "@/pages/admin/leads";
 import SettingsPage from "@/pages/settings";
 
 import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
@@ -210,11 +216,29 @@ function AuthedRoutes() {
       <Route path="/admin/orders">
         <AuthGuard><AdminGuard><AdminOrders /></AdminGuard></AuthGuard>
       </Route>
+      <Route path="/admin/leads">
+        <AuthGuard><AdminGuard><AdminLeadsPage /></AdminGuard></AuthGuard>
+      </Route>
       <Route path="/admin/builds">
         <AuthGuard><AdminGuard><AdminBuildsPage /></AdminGuard></AuthGuard>
       </Route>
       <Route path="/admin/deployments">
         <AuthGuard><AdminGuard><AdminDeploymentsPage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/organizations">
+        <AuthGuard><AdminGuard><AdminOrganizationsPage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/users">
+        <AuthGuard><AdminGuard><AdminUsersPage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/tokens">
+        <AuthGuard><AdminGuard><AdminTokensPage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/compliance">
+        <AuthGuard><AdminGuard><AdminCompliancePage /></AdminGuard></AuthGuard>
+      </Route>
+      <Route path="/admin/github">
+        <AuthGuard><AdminGuard><AdminGithubPage /></AdminGuard></AuthGuard>
       </Route>
 
       <Route component={NotFound} />

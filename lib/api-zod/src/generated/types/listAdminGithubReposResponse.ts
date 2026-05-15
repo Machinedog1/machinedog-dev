@@ -18,5 +18,7 @@ authorize GitHub in Replit > Integrations.
    * @nullable
    */
   login?: string | null;
+  /** Total repos matching the filter (across all pages). */
+  total: number;
   repos: AdminGithubRepo[];
 }

@@ -54,4 +54,9 @@ export const AuditAction = {
   baa_status_updated: "baa_status_updated",
   ai_provider_updated: "ai_provider_updated",
   ai_model_updated: "ai_model_updated",
+  organization_suspended: "organization_suspended",
+  organization_reactivated: "organization_reactivated",
+  plan_changed: "plan_changed",
+  compliance_updated: "compliance_updated",
+  lead_updated: "lead_updated",
 } as const;

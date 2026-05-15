@@ -67,11 +67,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const adminItems = [
     { href: "/admin", label: "Dashboard", icon: ShieldAlert },
+    { href: "/admin/organizations", label: "Organizations", icon: ShieldAlert },
     { href: "/admin/clients", label: "Clients", icon: ShieldAlert },
+    { href: "/admin/users", label: "Users", icon: ShieldAlert },
     { href: "/admin/projects", label: "All Projects", icon: ShieldAlert },
     { href: "/admin/orders", label: "Orders", icon: ShieldAlert },
+    { href: "/admin/leads", label: "Leads", icon: ShieldAlert },
     { href: "/admin/builds", label: "Builds", icon: ShieldAlert },
     { href: "/admin/deployments", label: "Deployments", icon: ShieldAlert },
+    { href: "/admin/tokens", label: "Tokens", icon: ShieldAlert },
+    { href: "/admin/compliance", label: "Compliance", icon: ShieldAlert },
+    { href: "/admin/github", label: "GitHub", icon: ShieldAlert },
     { href: "/admin/audit", label: "Audit", icon: ShieldAlert },
     { href: "/admin/ai-models", label: "AI Models", icon: ShieldAlert },
   ];

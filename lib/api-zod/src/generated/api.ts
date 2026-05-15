@@ -1722,11 +1722,37 @@ export const ReassignProjectOwnerResponse = zod.object({
 /**
  * Surfaces every repo owned (or co-administered) by the GitHub account
 connected via the Replit GitHub integration, alongside whether each one
-has already been imported as a Machinedog project. Used by the admin
-All Projects page to populate one-click "Import" cards.
+has already been imported as a Machinedog project. Supports server-side
+pagination, search (by `owner/repo`) and import-status filtering so the
+admin GitHub panel can mirror the other admin list endpoints.
 
  * @summary List GitHub repos accessible to the connected GH account (admin only)
  */
+export const listAdminGithubReposQueryLimitDefault = 50;
+export const listAdminGithubReposQueryLimitMax = 200;
+
+export const listAdminGithubReposQueryOffsetDefault = 0;
+export const listAdminGithubReposQueryOffsetMin = 0;
+
+export const ListAdminGithubReposQueryParams = zod.object({
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listAdminGithubReposQueryLimitMax)
+    .default(listAdminGithubReposQueryLimitDefault),
+  offset: zod.coerce
+    .number()
+    .min(listAdminGithubReposQueryOffsetMin)
+    .default(listAdminGithubReposQueryOffsetDefault),
+  search: zod.coerce.string().optional(),
+  imported: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      '\"true\" returns only repos already imported as Machinedog projects,\n\"false\" returns only un-imported repos. Omit for all.\n',
+    ),
+});
+
 export const ListAdminGithubReposResponse = zod.object({
   connected: zod
     .boolean()
@@ -1737,6 +1763,9 @@ export const ListAdminGithubReposResponse = zod.object({
     .string()
     .nullish()
     .describe('GitHub login (e.g. \"Machinedog1\") of the connected account.'),
+  total: zod
+    .number()
+    .describe("Total repos matching the filter (across all pages)."),
   repos: zod.array(
     zod.object({
       owner: zod.string(),
@@ -1962,6 +1991,11 @@ export const ListProjectAuditResponse = zod.object({
           "baa_status_updated",
           "ai_provider_updated",
           "ai_model_updated",
+          "organization_suspended",
+          "organization_reactivated",
+          "plan_changed",
+          "compliance_updated",
+          "lead_updated",
         ])
         .describe(
           "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
@@ -2046,6 +2080,11 @@ export const ListAdminAuditResponse = zod.object({
           "baa_status_updated",
           "ai_provider_updated",
           "ai_model_updated",
+          "organization_suspended",
+          "organization_reactivated",
+          "plan_changed",
+          "compliance_updated",
+          "lead_updated",
         ])
         .describe(
           "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
@@ -2320,14 +2359,633 @@ export const ListAdminDeploymentsResponse = zod.object({
 });
 
 /**
+ * @summary Extended admin dashboard metrics (admin only). Cached for 60s.
+ */
+export const GetAdminMetricsResponse = zod.object({
+  totalUsers: zod.number(),
+  totalOrganizations: zod.number(),
+  activeSubscriptions: zod.number(),
+  mrrCents: zod
+    .number()
+    .describe(
+      "Placeholder MRR (sum of active recurring orders); Stripe-driven MRR comes later.",
+    ),
+  tokenRevenueCents: zod.number(),
+  totalTokensUsed: zod.number(),
+  totalProjects: zod.number(),
+  activeProjects: zod.number(),
+  publishedProjects: zod.number(),
+  githubImportsCount: zod.number(),
+  buildJobsCount: zod.number(),
+  deploymentsCount: zod.number(),
+  healthcareProjectsCount: zod.number(),
+  baaPendingCount: zod.number(),
+  phiModeEnabledCount: zod.number(),
+  recentAuditEvents: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number().nullish(),
+      projectId: zod.number().nullish(),
+      actorOrganizationId: zod.number().nullish(),
+      actorEmail: zod.string().nullish(),
+      actorUserId: zod.string().nullish(),
+      category: zod.string(),
+      action: zod
+        .enum([
+          "signin",
+          "signin_failed",
+          "organization_created",
+          "member_invited",
+          "member_removed",
+          "project_created",
+          "project_updated",
+          "project_archived",
+          "file_created",
+          "file_updated",
+          "file_deleted",
+          "ai_prompt_submitted",
+          "ai_change_accepted",
+          "ai_change_rejected",
+          "phi_blocked",
+          "secret_created",
+          "secret_updated",
+          "secret_deleted",
+          "secret_rotated",
+          "github_connected",
+          "repo_imported",
+          "repo_pulled",
+          "repo_pushed",
+          "build_started",
+          "build_failed",
+          "build_succeeded",
+          "deployment_started",
+          "deployment_live",
+          "deployment_failed",
+          "tokens_purchased",
+          "tokens_used",
+          "tokens_granted",
+          "tokens_adjusted",
+          "checkout_created",
+          "subscription_changed",
+          "payment_failed",
+          "healthcare_mode_requested",
+          "healthcare_gating_blocked",
+          "insufficient_tokens",
+          "baa_status_updated",
+          "ai_provider_updated",
+          "ai_model_updated",
+          "organization_suspended",
+          "organization_reactivated",
+          "plan_changed",
+          "compliance_updated",
+          "lead_updated",
+        ])
+        .describe(
+          "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
+        ),
+      targetType: zod.string().nullish(),
+      targetId: zod.string().nullish(),
+      metadata: zod.record(zod.string(), zod.unknown()).nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  recentOrders: zod.array(
+    zod.object({
+      id: zod.number(),
+      kind: zod.enum(["build", "retainer"]),
+      email: zod.string().nullish(),
+      name: zod.string().nullish(),
+      company: zod.string().nullish(),
+      amountCents: zod.number(),
+      currency: zod.string(),
+      source: zod.string(),
+      status: zod.enum(["pending", "completed", "active", "cancelled"]),
+      stripeSessionId: zod.string(),
+      stripeCustomerId: zod.string().nullish(),
+      stripeSubscriptionId: zod.string().nullish(),
+      stripePaymentIntentId: zod.string().nullish(),
+      completedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  cachedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List organizations with extended fields (plan, compliance, status) for the admin console.
+ */
+export const listAdminOrganizationsQueryLimitDefault = 50;
+export const listAdminOrganizationsQueryOffsetDefault = 0;
+
+export const ListAdminOrganizationsQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminOrganizationsQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminOrganizationsQueryOffsetDefault),
+  search: zod.coerce
+    .string()
+    .optional()
+    .describe("Substring match against name or primary email."),
+  status: zod.enum(["active", "suspended", "invited"]).optional(),
+  planType: zod
+    .enum([
+      "free",
+      "starter",
+      "pro",
+      "business",
+      "team",
+      "enterprise",
+      "healthcare",
+    ])
+    .optional(),
+});
+
+export const ListAdminOrganizationsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      primaryEmail: zod.string(),
+      clerkOrgId: zod.string().nullish(),
+      clerkOrgSlug: zod.string().nullish(),
+      planType: zod.enum([
+        "free",
+        "starter",
+        "pro",
+        "business",
+        "team",
+        "enterprise",
+        "healthcare",
+      ]),
+      planStatus: zod.enum([
+        "none",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+      ]),
+      status: zod.enum(["active", "suspended", "invited"]),
+      baaStatus: zod.enum([
+        "not_required",
+        "required",
+        "pending",
+        "active",
+        "expired",
+      ]),
+      hipaaDeploymentStatus: zod.enum([
+        "not_required",
+        "required",
+        "pending",
+        "approved",
+        "revoked",
+      ]),
+      mfaRequired: zod.boolean(),
+      tokenBalance: zod.number(),
+      totalTokensUsed: zod.number(),
+      buildMinutesUsed: zod.number(),
+      memberCount: zod.number(),
+      projectCount: zod.number(),
+      stripeCustomerId: zod.string().nullish(),
+      portalSubscriptionStatus: zod.enum([
+        "none",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+      ]),
+      portalCurrentPeriodEnd: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Suspend or reactivate an organization (admin only). Suspended orgs are blocked from AI / builds / deploys.
+ */
+export const SetAdminOrganizationStatusParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetAdminOrganizationStatusBody = zod.object({
+  status: zod.enum(["active", "suspended"]),
+  reason: zod.string().nullish(),
+});
+
+export const SetAdminOrganizationStatusResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  primaryEmail: zod.string(),
+  clerkOrgId: zod.string().nullish(),
+  clerkOrgSlug: zod.string().nullish(),
+  planType: zod.enum([
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "team",
+    "enterprise",
+    "healthcare",
+  ]),
+  planStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  status: zod.enum(["active", "suspended", "invited"]),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  hipaaDeploymentStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "approved",
+    "revoked",
+  ]),
+  mfaRequired: zod.boolean(),
+  tokenBalance: zod.number(),
+  totalTokensUsed: zod.number(),
+  buildMinutesUsed: zod.number(),
+  memberCount: zod.number(),
+  projectCount: zod.number(),
+  stripeCustomerId: zod.string().nullish(),
+  portalSubscriptionStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  portalCurrentPeriodEnd: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Change an organization's plan tier (admin only). Records an audit event; does not bypass Stripe billing.
+ */
+export const SetAdminOrganizationPlanParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetAdminOrganizationPlanBody = zod.object({
+  planType: zod.enum([
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "team",
+    "enterprise",
+    "healthcare",
+  ]),
+  reason: zod.string().nullish(),
+});
+
+export const SetAdminOrganizationPlanResponse = zod.object({
+  organization: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    primaryEmail: zod.string(),
+    clerkOrgId: zod.string().nullish(),
+    clerkOrgSlug: zod.string().nullish(),
+    planType: zod.enum([
+      "free",
+      "starter",
+      "pro",
+      "business",
+      "team",
+      "enterprise",
+      "healthcare",
+    ]),
+    planStatus: zod.enum([
+      "none",
+      "trialing",
+      "active",
+      "past_due",
+      "canceled",
+      "incomplete",
+    ]),
+    status: zod.enum(["active", "suspended", "invited"]),
+    baaStatus: zod.enum([
+      "not_required",
+      "required",
+      "pending",
+      "active",
+      "expired",
+    ]),
+    hipaaDeploymentStatus: zod.enum([
+      "not_required",
+      "required",
+      "pending",
+      "approved",
+      "revoked",
+    ]),
+    mfaRequired: zod.boolean(),
+    tokenBalance: zod.number(),
+    totalTokensUsed: zod.number(),
+    buildMinutesUsed: zod.number(),
+    memberCount: zod.number(),
+    projectCount: zod.number(),
+    stripeCustomerId: zod.string().nullish(),
+    portalSubscriptionStatus: zod.enum([
+      "none",
+      "trialing",
+      "active",
+      "past_due",
+      "canceled",
+      "incomplete",
+    ]),
+    portalCurrentPeriodEnd: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  warning: zod
+    .string()
+    .nullish()
+    .describe(
+      "Populated when the new plan diverges from the org's Stripe subscription state.",
+    ),
+});
+
+/**
+ * @summary Update an organization's healthcare/compliance flags (admin only). Phase 8 enforces these inputs.
+ */
+export const SetAdminOrganizationComplianceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetAdminOrganizationComplianceBody = zod
+  .object({
+    baaStatus: zod
+      .enum(["not_required", "required", "pending", "active", "expired"])
+      .optional(),
+    hipaaDeploymentStatus: zod
+      .enum(["not_required", "required", "pending", "approved", "revoked"])
+      .optional(),
+    mfaRequired: zod.boolean().optional(),
+  })
+  .describe("All fields optional; only provided fields are updated.");
+
+export const SetAdminOrganizationComplianceResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  primaryEmail: zod.string(),
+  clerkOrgId: zod.string().nullish(),
+  clerkOrgSlug: zod.string().nullish(),
+  planType: zod.enum([
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "team",
+    "enterprise",
+    "healthcare",
+  ]),
+  planStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  status: zod.enum(["active", "suspended", "invited"]),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  hipaaDeploymentStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "approved",
+    "revoked",
+  ]),
+  mfaRequired: zod.boolean(),
+  tokenBalance: zod.number(),
+  totalTokensUsed: zod.number(),
+  buildMinutesUsed: zod.number(),
+  memberCount: zod.number(),
+  projectCount: zod.number(),
+  stripeCustomerId: zod.string().nullish(),
+  portalSubscriptionStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  portalCurrentPeriodEnd: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List organization members across all orgs (admin only).
+ */
+export const listAdminUsersQueryLimitDefault = 100;
+export const listAdminUsersQueryOffsetDefault = 0;
+
+export const ListAdminUsersQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminUsersQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminUsersQueryOffsetDefault),
+  organizationId: zod.coerce.number().optional(),
+  search: zod.coerce.string().optional(),
+  role: zod
+    .enum(["owner", "admin", "developer", "viewer", "billing_admin"])
+    .optional(),
+});
+
+export const ListAdminUsersResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      organizationName: zod.string().nullish(),
+      email: zod.string(),
+      clerkUserId: zod.string().nullish(),
+      role: zod.enum([
+        "owner",
+        "admin",
+        "developer",
+        "viewer",
+        "billing_admin",
+      ]),
+      status: zod.enum(["pending", "active", "removed"]),
+      invitedAt: zod.coerce.date(),
+      acceptedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Token ledger entries across all orgs (admin only).
+ */
+export const listAdminTokensQueryLimitDefault = 100;
+export const listAdminTokensQueryOffsetDefault = 0;
+
+export const ListAdminTokensQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminTokensQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminTokensQueryOffsetDefault),
+  organizationId: zod.coerce.number().optional(),
+  type: zod
+    .enum([
+      "grant_monthly",
+      "grant_signup",
+      "purchase_pack",
+      "deduct_ai",
+      "deduct_build",
+      "deduct_deploy",
+      "deduct_template",
+      "deduct_other",
+      "admin_adjust",
+      "refund",
+    ])
+    .optional(),
+});
+
+export const ListAdminTokensResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      organizationId: zod.number(),
+      organizationName: zod.string().nullish(),
+      projectId: zod.number().nullish(),
+      type: zod.enum([
+        "grant_monthly",
+        "grant_signup",
+        "purchase_pack",
+        "deduct_ai",
+        "deduct_build",
+        "deduct_deploy",
+        "deduct_template",
+        "deduct_other",
+        "admin_adjust",
+        "refund",
+      ]),
+      amount: zod.number(),
+      balanceAfter: zod.number(),
+      description: zod.string().nullish(),
+      source: zod.enum(["stripe", "dev_mock", "system", "admin"]),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Organizations with healthcare/compliance posture (admin only).
+ */
+export const listAdminComplianceQueryLimitDefault = 100;
+export const listAdminComplianceQueryOffsetDefault = 0;
+
+export const ListAdminComplianceQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminComplianceQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminComplianceQueryOffsetDefault),
+  baaStatus: zod
+    .enum(["not_required", "required", "pending", "active", "expired"])
+    .optional(),
+  hipaaDeploymentStatus: zod
+    .enum(["not_required", "required", "pending", "approved", "revoked"])
+    .optional(),
+});
+
+export const ListAdminComplianceResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      primaryEmail: zod.string(),
+      clerkOrgId: zod.string().nullish(),
+      clerkOrgSlug: zod.string().nullish(),
+      planType: zod.enum([
+        "free",
+        "starter",
+        "pro",
+        "business",
+        "team",
+        "enterprise",
+        "healthcare",
+      ]),
+      planStatus: zod.enum([
+        "none",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+      ]),
+      status: zod.enum(["active", "suspended", "invited"]),
+      baaStatus: zod.enum([
+        "not_required",
+        "required",
+        "pending",
+        "active",
+        "expired",
+      ]),
+      hipaaDeploymentStatus: zod.enum([
+        "not_required",
+        "required",
+        "pending",
+        "approved",
+        "revoked",
+      ]),
+      mfaRequired: zod.boolean(),
+      tokenBalance: zod.number(),
+      totalTokensUsed: zod.number(),
+      buildMinutesUsed: zod.number(),
+      memberCount: zod.number(),
+      projectCount: zod.number(),
+      stripeCustomerId: zod.string().nullish(),
+      portalSubscriptionStatus: zod.enum([
+        "none",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+      ]),
+      portalCurrentPeriodEnd: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
  * @summary List paid build deposits and retainer subscriptions (admin only)
  */
-export const listAllBuildOrdersQueryLimitDefault = 100;
+export const listAllBuildOrdersQueryLimitDefault = 25;
 export const listAllBuildOrdersQueryOffsetDefault = 0;
 
 export const ListAllBuildOrdersQueryParams = zod.object({
   limit: zod.coerce.number().default(listAllBuildOrdersQueryLimitDefault),
   offset: zod.coerce.number().default(listAllBuildOrdersQueryOffsetDefault),
+  kind: zod.enum(["build", "retainer"]).optional(),
+  status: zod.enum(["pending", "completed", "active", "cancelled"]).optional(),
+  search: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Substring match against email, name, company, stripe session id.",
+    ),
 });
 
 export const ListAllBuildOrdersResponse = zod.object({
@@ -2352,4 +3010,79 @@ export const ListAllBuildOrdersResponse = zod.object({
     }),
   ),
   total: zod.number(),
+});
+
+/**
+ * @summary List captured leads from the public contact form (admin only)
+ */
+export const listAdminLeadsQueryLimitDefault = 25;
+export const listAdminLeadsQueryOffsetDefault = 0;
+
+export const ListAdminLeadsQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAdminLeadsQueryLimitDefault),
+  offset: zod.coerce.number().default(listAdminLeadsQueryOffsetDefault),
+  search: zod.coerce
+    .string()
+    .optional()
+    .describe("Substring match against name, email, company."),
+  status: zod
+    .enum(["all", "notified", "pending", "error"])
+    .optional()
+    .describe("Filter by notification state."),
+});
+
+export const ListAdminLeadsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      email: zod.string(),
+      company: zod.string().nullish(),
+      notes: zod.string().nullish(),
+      source: zod.string(),
+      ipAddress: zod.string().nullish(),
+      userAgent: zod.string().nullish(),
+      notifiedAt: zod.coerce.date().nullish(),
+      notifyError: zod.string().nullish(),
+      contactedAt: zod.coerce.date().nullish(),
+      contactedByEmail: zod.string().nullish(),
+      operatorNotes: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Update an inbox lead (notes, contacted state)
+ */
+export const UpdateAdminLeadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAdminLeadBody = zod.object({
+  operatorNotes: zod.string().nullish(),
+  contacted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Set true to mark contacted (stamps contactedAt + contactedByEmail), false to clear.",
+    ),
+});
+
+export const UpdateAdminLeadResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  company: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  source: zod.string(),
+  ipAddress: zod.string().nullish(),
+  userAgent: zod.string().nullish(),
+  notifiedAt: zod.coerce.date().nullish(),
+  notifyError: zod.string().nullish(),
+  contactedAt: zod.coerce.date().nullish(),
+  contactedByEmail: zod.string().nullish(),
+  operatorNotes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
 });

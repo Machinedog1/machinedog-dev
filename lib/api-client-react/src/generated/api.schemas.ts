@@ -370,6 +370,11 @@ export const AuditAction = {
   baa_status_updated: "baa_status_updated",
   ai_provider_updated: "ai_provider_updated",
   ai_model_updated: "ai_model_updated",
+  organization_suspended: "organization_suspended",
+  organization_reactivated: "organization_reactivated",
+  plan_changed: "plan_changed",
+  compliance_updated: "compliance_updated",
+  lead_updated: "lead_updated",
 } as const;
 
 /**
@@ -398,6 +403,332 @@ export interface AuditEvent {
   /** @nullable */
   metadata?: AuditEventMetadata;
   createdAt: string;
+}
+
+export type BuildOrderKind =
+  (typeof BuildOrderKind)[keyof typeof BuildOrderKind];
+
+export const BuildOrderKind = {
+  build: "build",
+  retainer: "retainer",
+} as const;
+
+export type BuildOrderStatus =
+  (typeof BuildOrderStatus)[keyof typeof BuildOrderStatus];
+
+export const BuildOrderStatus = {
+  pending: "pending",
+  completed: "completed",
+  active: "active",
+  cancelled: "cancelled",
+} as const;
+
+export interface BuildOrder {
+  id: number;
+  kind: BuildOrderKind;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  company?: string | null;
+  amountCents: number;
+  currency: string;
+  source: string;
+  status: BuildOrderStatus;
+  stripeSessionId: string;
+  /** @nullable */
+  stripeCustomerId?: string | null;
+  /** @nullable */
+  stripeSubscriptionId?: string | null;
+  /** @nullable */
+  stripePaymentIntentId?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminMetrics {
+  totalUsers: number;
+  totalOrganizations: number;
+  activeSubscriptions: number;
+  /** Placeholder MRR (sum of active recurring orders); Stripe-driven MRR comes later. */
+  mrrCents: number;
+  tokenRevenueCents: number;
+  totalTokensUsed: number;
+  totalProjects: number;
+  activeProjects: number;
+  publishedProjects: number;
+  githubImportsCount: number;
+  buildJobsCount: number;
+  deploymentsCount: number;
+  healthcareProjectsCount: number;
+  baaPendingCount: number;
+  phiModeEnabledCount: number;
+  recentAuditEvents: AuditEvent[];
+  recentOrders: BuildOrder[];
+  cachedAt: string;
+}
+
+export type AdminOrganizationPlanType =
+  (typeof AdminOrganizationPlanType)[keyof typeof AdminOrganizationPlanType];
+
+export const AdminOrganizationPlanType = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+  business: "business",
+  team: "team",
+  enterprise: "enterprise",
+  healthcare: "healthcare",
+} as const;
+
+export type AdminOrganizationPlanStatus =
+  (typeof AdminOrganizationPlanStatus)[keyof typeof AdminOrganizationPlanStatus];
+
+export const AdminOrganizationPlanStatus = {
+  none: "none",
+  trialing: "trialing",
+  active: "active",
+  past_due: "past_due",
+  canceled: "canceled",
+  incomplete: "incomplete",
+} as const;
+
+export type AdminOrganizationStatus =
+  (typeof AdminOrganizationStatus)[keyof typeof AdminOrganizationStatus];
+
+export const AdminOrganizationStatus = {
+  active: "active",
+  suspended: "suspended",
+  invited: "invited",
+} as const;
+
+export type AdminOrganizationBaaStatus =
+  (typeof AdminOrganizationBaaStatus)[keyof typeof AdminOrganizationBaaStatus];
+
+export const AdminOrganizationBaaStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  active: "active",
+  expired: "expired",
+} as const;
+
+export type AdminOrganizationHipaaDeploymentStatus =
+  (typeof AdminOrganizationHipaaDeploymentStatus)[keyof typeof AdminOrganizationHipaaDeploymentStatus];
+
+export const AdminOrganizationHipaaDeploymentStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  approved: "approved",
+  revoked: "revoked",
+} as const;
+
+export type AdminOrganizationPortalSubscriptionStatus =
+  (typeof AdminOrganizationPortalSubscriptionStatus)[keyof typeof AdminOrganizationPortalSubscriptionStatus];
+
+export const AdminOrganizationPortalSubscriptionStatus = {
+  none: "none",
+  trialing: "trialing",
+  active: "active",
+  past_due: "past_due",
+  canceled: "canceled",
+  incomplete: "incomplete",
+} as const;
+
+export interface AdminOrganization {
+  id: number;
+  name: string;
+  primaryEmail: string;
+  /** @nullable */
+  clerkOrgId?: string | null;
+  /** @nullable */
+  clerkOrgSlug?: string | null;
+  planType: AdminOrganizationPlanType;
+  planStatus: AdminOrganizationPlanStatus;
+  status: AdminOrganizationStatus;
+  baaStatus: AdminOrganizationBaaStatus;
+  hipaaDeploymentStatus: AdminOrganizationHipaaDeploymentStatus;
+  mfaRequired: boolean;
+  tokenBalance: number;
+  totalTokensUsed: number;
+  buildMinutesUsed: number;
+  memberCount: number;
+  projectCount: number;
+  /** @nullable */
+  stripeCustomerId?: string | null;
+  portalSubscriptionStatus: AdminOrganizationPortalSubscriptionStatus;
+  /** @nullable */
+  portalCurrentPeriodEnd?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrganizationList {
+  data: AdminOrganization[];
+  total: number;
+}
+
+export type SetOrgStatusBodyStatus =
+  (typeof SetOrgStatusBodyStatus)[keyof typeof SetOrgStatusBodyStatus];
+
+export const SetOrgStatusBodyStatus = {
+  active: "active",
+  suspended: "suspended",
+} as const;
+
+export interface SetOrgStatusBody {
+  status: SetOrgStatusBodyStatus;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export type SetOrgPlanBodyPlanType =
+  (typeof SetOrgPlanBodyPlanType)[keyof typeof SetOrgPlanBodyPlanType];
+
+export const SetOrgPlanBodyPlanType = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+  business: "business",
+  team: "team",
+  enterprise: "enterprise",
+  healthcare: "healthcare",
+} as const;
+
+export interface SetOrgPlanBody {
+  planType: SetOrgPlanBodyPlanType;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface SetOrgPlanResponse {
+  organization: AdminOrganization;
+  /**
+   * Populated when the new plan diverges from the org's Stripe subscription state.
+   * @nullable
+   */
+  warning?: string | null;
+}
+
+export type SetOrgComplianceBodyBaaStatus =
+  (typeof SetOrgComplianceBodyBaaStatus)[keyof typeof SetOrgComplianceBodyBaaStatus];
+
+export const SetOrgComplianceBodyBaaStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  active: "active",
+  expired: "expired",
+} as const;
+
+export type SetOrgComplianceBodyHipaaDeploymentStatus =
+  (typeof SetOrgComplianceBodyHipaaDeploymentStatus)[keyof typeof SetOrgComplianceBodyHipaaDeploymentStatus];
+
+export const SetOrgComplianceBodyHipaaDeploymentStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  approved: "approved",
+  revoked: "revoked",
+} as const;
+
+/**
+ * All fields optional; only provided fields are updated.
+ */
+export interface SetOrgComplianceBody {
+  baaStatus?: SetOrgComplianceBodyBaaStatus;
+  hipaaDeploymentStatus?: SetOrgComplianceBodyHipaaDeploymentStatus;
+  mfaRequired?: boolean;
+}
+
+export type AdminUserRole = (typeof AdminUserRole)[keyof typeof AdminUserRole];
+
+export const AdminUserRole = {
+  owner: "owner",
+  admin: "admin",
+  developer: "developer",
+  viewer: "viewer",
+  billing_admin: "billing_admin",
+} as const;
+
+export type AdminUserStatus =
+  (typeof AdminUserStatus)[keyof typeof AdminUserStatus];
+
+export const AdminUserStatus = {
+  pending: "pending",
+  active: "active",
+  removed: "removed",
+} as const;
+
+export interface AdminUser {
+  id: number;
+  organizationId: number;
+  /** @nullable */
+  organizationName?: string | null;
+  email: string;
+  /** @nullable */
+  clerkUserId?: string | null;
+  role: AdminUserRole;
+  status: AdminUserStatus;
+  invitedAt: string;
+  /** @nullable */
+  acceptedAt?: string | null;
+}
+
+export interface AdminUserList {
+  data: AdminUser[];
+  total: number;
+}
+
+export type AdminTokenLedgerEntryType =
+  (typeof AdminTokenLedgerEntryType)[keyof typeof AdminTokenLedgerEntryType];
+
+export const AdminTokenLedgerEntryType = {
+  grant_monthly: "grant_monthly",
+  grant_signup: "grant_signup",
+  purchase_pack: "purchase_pack",
+  deduct_ai: "deduct_ai",
+  deduct_build: "deduct_build",
+  deduct_deploy: "deduct_deploy",
+  deduct_template: "deduct_template",
+  deduct_other: "deduct_other",
+  admin_adjust: "admin_adjust",
+  refund: "refund",
+} as const;
+
+export type AdminTokenLedgerEntrySource =
+  (typeof AdminTokenLedgerEntrySource)[keyof typeof AdminTokenLedgerEntrySource];
+
+export const AdminTokenLedgerEntrySource = {
+  stripe: "stripe",
+  dev_mock: "dev_mock",
+  system: "system",
+  admin: "admin",
+} as const;
+
+export interface AdminTokenLedgerEntry {
+  id: number;
+  organizationId: number;
+  /** @nullable */
+  organizationName?: string | null;
+  /** @nullable */
+  projectId?: number | null;
+  type: AdminTokenLedgerEntryType;
+  amount: number;
+  balanceAfter: number;
+  /** @nullable */
+  description?: string | null;
+  source: AdminTokenLedgerEntrySource;
+  createdAt: string;
+}
+
+export interface AdminTokenLedgerList {
+  data: AdminTokenLedgerEntry[];
+  total: number;
 }
 
 export interface AuditEventList {
@@ -499,6 +830,8 @@ authorize GitHub in Replit > Integrations.
    * @nullable
    */
   login?: string | null;
+  /** Total repos matching the filter (across all pages). */
+  total: number;
   repos: AdminGithubRepo[];
 }
 
@@ -952,53 +1285,47 @@ export interface AdminStats {
   recentActivity: ActivityItem[];
 }
 
-export type BuildOrderKind =
-  (typeof BuildOrderKind)[keyof typeof BuildOrderKind];
-
-export const BuildOrderKind = {
-  build: "build",
-  retainer: "retainer",
-} as const;
-
-export type BuildOrderStatus =
-  (typeof BuildOrderStatus)[keyof typeof BuildOrderStatus];
-
-export const BuildOrderStatus = {
-  pending: "pending",
-  completed: "completed",
-  active: "active",
-  cancelled: "cancelled",
-} as const;
-
-export interface BuildOrder {
-  id: number;
-  kind: BuildOrderKind;
-  /** @nullable */
-  email?: string | null;
-  /** @nullable */
-  name?: string | null;
-  /** @nullable */
-  company?: string | null;
-  amountCents: number;
-  currency: string;
-  source: string;
-  status: BuildOrderStatus;
-  stripeSessionId: string;
-  /** @nullable */
-  stripeCustomerId?: string | null;
-  /** @nullable */
-  stripeSubscriptionId?: string | null;
-  /** @nullable */
-  stripePaymentIntentId?: string | null;
-  /** @nullable */
-  completedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface BuildOrderList {
   data: BuildOrder[];
   total: number;
+}
+
+export interface AdminLead {
+  id: number;
+  name: string;
+  email: string;
+  /** @nullable */
+  company?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  source: string;
+  /** @nullable */
+  ipAddress?: string | null;
+  /** @nullable */
+  userAgent?: string | null;
+  /** @nullable */
+  notifiedAt?: string | null;
+  /** @nullable */
+  notifyError?: string | null;
+  /** @nullable */
+  contactedAt?: string | null;
+  /** @nullable */
+  contactedByEmail?: string | null;
+  /** @nullable */
+  operatorNotes?: string | null;
+  createdAt: string;
+}
+
+export interface AdminLeadList {
+  data: AdminLead[];
+  total: number;
+}
+
+export interface UpdateAdminLeadBody {
+  /** @nullable */
+  operatorNotes?: string | null;
+  /** Set true to mark contacted (stamps contactedAt + contactedByEmail), false to clear. */
+  contacted?: boolean;
 }
 
 export interface InviteClientBody {
@@ -1249,6 +1576,25 @@ export type ListClientsParams = {
   offset?: number;
 };
 
+export type ListAdminGithubReposParams = {
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limit?: number;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+  search?: string;
+  /**
+ * "true" returns only repos already imported as Machinedog projects,
+"false" returns only un-imported repos. Omit for all.
+
+ */
+  imported?: boolean;
+};
+
 export type ListProjectAuditParams = {
   limit?: number;
   offset?: number;
@@ -1357,7 +1703,158 @@ export const ListAdminDeploymentsStatus = {
   rolled_back: "rolled_back",
 } as const;
 
+export type ListAdminOrganizationsParams = {
+  limit?: number;
+  offset?: number;
+  /**
+   * Substring match against name or primary email.
+   */
+  search?: string;
+  status?: ListAdminOrganizationsStatus;
+  planType?: ListAdminOrganizationsPlanType;
+};
+
+export type ListAdminOrganizationsStatus =
+  (typeof ListAdminOrganizationsStatus)[keyof typeof ListAdminOrganizationsStatus];
+
+export const ListAdminOrganizationsStatus = {
+  active: "active",
+  suspended: "suspended",
+  invited: "invited",
+} as const;
+
+export type ListAdminOrganizationsPlanType =
+  (typeof ListAdminOrganizationsPlanType)[keyof typeof ListAdminOrganizationsPlanType];
+
+export const ListAdminOrganizationsPlanType = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+  business: "business",
+  team: "team",
+  enterprise: "enterprise",
+  healthcare: "healthcare",
+} as const;
+
+export type ListAdminUsersParams = {
+  limit?: number;
+  offset?: number;
+  organizationId?: number;
+  search?: string;
+  role?: ListAdminUsersRole;
+};
+
+export type ListAdminUsersRole =
+  (typeof ListAdminUsersRole)[keyof typeof ListAdminUsersRole];
+
+export const ListAdminUsersRole = {
+  owner: "owner",
+  admin: "admin",
+  developer: "developer",
+  viewer: "viewer",
+  billing_admin: "billing_admin",
+} as const;
+
+export type ListAdminTokensParams = {
+  limit?: number;
+  offset?: number;
+  organizationId?: number;
+  type?: ListAdminTokensType;
+};
+
+export type ListAdminTokensType =
+  (typeof ListAdminTokensType)[keyof typeof ListAdminTokensType];
+
+export const ListAdminTokensType = {
+  grant_monthly: "grant_monthly",
+  grant_signup: "grant_signup",
+  purchase_pack: "purchase_pack",
+  deduct_ai: "deduct_ai",
+  deduct_build: "deduct_build",
+  deduct_deploy: "deduct_deploy",
+  deduct_template: "deduct_template",
+  deduct_other: "deduct_other",
+  admin_adjust: "admin_adjust",
+  refund: "refund",
+} as const;
+
+export type ListAdminComplianceParams = {
+  limit?: number;
+  offset?: number;
+  baaStatus?: ListAdminComplianceBaaStatus;
+  hipaaDeploymentStatus?: ListAdminComplianceHipaaDeploymentStatus;
+};
+
+export type ListAdminComplianceBaaStatus =
+  (typeof ListAdminComplianceBaaStatus)[keyof typeof ListAdminComplianceBaaStatus];
+
+export const ListAdminComplianceBaaStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  active: "active",
+  expired: "expired",
+} as const;
+
+export type ListAdminComplianceHipaaDeploymentStatus =
+  (typeof ListAdminComplianceHipaaDeploymentStatus)[keyof typeof ListAdminComplianceHipaaDeploymentStatus];
+
+export const ListAdminComplianceHipaaDeploymentStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  approved: "approved",
+  revoked: "revoked",
+} as const;
+
 export type ListAllBuildOrdersParams = {
   limit?: number;
   offset?: number;
+  kind?: ListAllBuildOrdersKind;
+  status?: ListAllBuildOrdersStatus;
+  /**
+   * Substring match against email, name, company, stripe session id.
+   */
+  search?: string;
 };
+
+export type ListAllBuildOrdersKind =
+  (typeof ListAllBuildOrdersKind)[keyof typeof ListAllBuildOrdersKind];
+
+export const ListAllBuildOrdersKind = {
+  build: "build",
+  retainer: "retainer",
+} as const;
+
+export type ListAllBuildOrdersStatus =
+  (typeof ListAllBuildOrdersStatus)[keyof typeof ListAllBuildOrdersStatus];
+
+export const ListAllBuildOrdersStatus = {
+  pending: "pending",
+  completed: "completed",
+  active: "active",
+  cancelled: "cancelled",
+} as const;
+
+export type ListAdminLeadsParams = {
+  limit?: number;
+  offset?: number;
+  /**
+   * Substring match against name, email, company.
+   */
+  search?: string;
+  /**
+   * Filter by notification state.
+   */
+  status?: ListAdminLeadsStatus;
+};
+
+export type ListAdminLeadsStatus =
+  (typeof ListAdminLeadsStatus)[keyof typeof ListAdminLeadsStatus];
+
+export const ListAdminLeadsStatus = {
+  all: "all",
+  notified: "notified",
+  pending: "pending",
+  error: "error",
+} as const;

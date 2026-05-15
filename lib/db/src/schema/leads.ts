@@ -15,6 +15,9 @@ export const leadsTable = pgTable(
     userAgent: text("user_agent"),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
     notifyError: text("notify_error"),
+    operatorNotes: text("operator_notes"),
+    contactedAt: timestamp("contacted_at", { withTimezone: true }),
+    contactedByEmail: text("contacted_by_email"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
