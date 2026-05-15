@@ -93,6 +93,19 @@ export async function loadClerkAndOrganization(
     if (userId) {
       req.clerkAuth = { userId, sessionId };
     }
+    if (req.url.includes("/auth/me")) {
+      logger.info(
+        {
+          url: req.url,
+          hasAuthHeader: !!req.headers.authorization,
+          authHeaderPrefix: req.headers.authorization?.slice(0, 20),
+          hasSessionCookie: !!(req.headers.cookie && req.headers.cookie.includes("__session")),
+          clerkAuthKeys: auth ? Object.keys(auth) : [],
+          resolvedUserId: userId ?? null,
+        },
+        "DEBUG /me clerk auth state",
+      );
+    }
   }
 
   if (req.clerkAuth?.userId) {
