@@ -12,7 +12,6 @@ import ThankYouPage from "@/pages/thank-you";
 import IntakePage from "@/pages/intake";
 import PromptConsole from "@/pages/index";
 import OnboardingPage from "@/pages/onboarding";
-import { getGetMeQueryKey } from "@workspace/api-client-react";
 import HistoryPage from "@/pages/history";
 import TokensPage from "@/pages/tokens";
 import BillingPage from "@/pages/billing";
@@ -42,7 +41,7 @@ import SettingsPage from "@/pages/settings";
 import CompliancePage from "@/pages/compliance";
 import AuthDebugPage from "@/pages/auth-debug";
 
-import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
+import { useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
 import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
@@ -68,35 +67,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { member: authMember, isLoading: authLoading } = useAuth();
   const [location, setLocation] = useLocation();
 
-  const { data: me, isLoading } = useGetMe({
-    query: {
-      queryKey: getGetMeQueryKey(),
-      enabled: !!authMember,
-      retry: false,
-    },
-  });
-
-  // Onboarding is opt-in via the dashboard — we no longer force-redirect new
-  // members into the wizard after sign-in. Login and sign-up land users on
-  // the home page (or wherever Clerk's fallbackRedirectUrl points) so the
-  // first-run experience is the marketing/landing surface, not a wizard.
+  const isAdmin = !!authMember?.isAdmin;
 
   const { data: myProjects } = useListMyProjects({
     query: {
       queryKey: getListMyProjectsQueryKey(),
-      enabled: !!me && !me.isAdmin && location === "/",
+      enabled: !!authMember && !isAdmin && location === "/",
       retry: false,
     },
   });
 
   useEffect(() => {
-    if (!me || me.isAdmin) return;
+    if (!authMember || isAdmin) return;
     if (location !== "/") return;
     const list = myProjects?.data ?? [];
     if (list.length === 1 && list[0]?.viewerRole === "collaborator") {
       setLocation(`/projects/${list[0].id}`);
     }
-  }, [me, myProjects, location, setLocation]);
+  }, [authMember, isAdmin, myProjects, location, setLocation]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -105,22 +93,17 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, authMember, setLocation]);
 
-  if (authLoading || (authMember && isLoading)) return <LoadingScreen />;
+  if (authLoading) return <LoadingScreen />;
   if (!authMember) return null;
-  // No /me yet (org auto-provision in flight on first sign-in) — show the
-  // loading screen rather than bouncing to /not-invited. The backend creates
-  // the org+member on the first authenticated request, so the next /me poll
-  // will succeed.
-  if (!me) return <LoadingScreen />;
 
   return <AppLayout>{children}</AppLayout>;
 }
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
+  const { member } = useAuth();
   const [, setLocation] = useLocation();
 
-  if (me && !me.isAdmin) {
+  if (member && !member.isAdmin) {
     setLocation("/");
     return null;
   }
