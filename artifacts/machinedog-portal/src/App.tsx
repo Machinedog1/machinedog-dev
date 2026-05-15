@@ -6,7 +6,6 @@ import NotFound from "@/pages/not-found";
 
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
-import AcceptInvitePage from "@/pages/accept-invite";
 import NotInvitedPage from "@/pages/not-invited";
 import PricingPage from "@/pages/pricing";
 import ThankYouPage from "@/pages/thank-you";
@@ -48,7 +47,6 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ClerkProviderWrapper } from "@/lib/clerk";
-import { DemoAuthBanner } from "@/components/DemoAuthBanner";
 
 const queryClient = new QueryClient();
 
@@ -151,7 +149,6 @@ function PublicOnlyRoutes() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/sign-in/:rest*" component={SignInPage} />
       <Route path="/sign-up/:rest*" component={SignUpPage} />
-      <Route path="/accept-invite" component={AcceptInvitePage} />
       <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/intake" component={IntakePage} />
       <Route path="/work" component={WorkPage} />
@@ -166,7 +163,6 @@ function AuthedRoutes() {
       {/* Public routes still accessible while signed in */}
       <Route path="/sign-in/:rest*" component={SignInPage} />
       <Route path="/sign-up/:rest*" component={SignUpPage} />
-      <Route path="/accept-invite" component={AcceptInvitePage} />
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/thank-you" component={ThankYouPage} />
@@ -298,7 +294,6 @@ function App() {
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <AuthProvider>
-              <DemoAuthBanner />
               <RoutedApp />
             </AuthProvider>
           </WouterRouter>

@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
-import { isClerkEnabled } from "./clerk";
+import { setBillingApiTokenGetter } from "./billing-api";
 
 export interface AuthOrganization {
   id: number;
@@ -32,6 +32,12 @@ export interface AuthMember {
 interface AuthContextValue {
   organization: AuthOrganization | null;
   member: AuthMember | null;
+  /**
+   * Temporary alias for `organization`. Older pages refer to the active
+   * tenant as `client` from the pre-Clerk era. Kept until those callers are
+   * renamed in a follow-up pass.
+   */
+  client: AuthOrganization | null;
   isLoading: boolean;
   isSignedIn: boolean;
   signOut: () => Promise<void>;
@@ -62,9 +68,8 @@ async function fetchMe(getToken: () => Promise<string | null>): Promise<MeRespon
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const clerkEnabled = isClerkEnabled();
-  const clerk = useClerkAuthSafe(clerkEnabled);
-  const userHook = useUserSafe(clerkEnabled);
+  const clerk = useClerkAuth();
+  const userHook = useUser();
 
   const [me, setMe] = useState<MeResponse | null>(null);
   const [isFetching, setIsFetching] = useState(true);
@@ -78,16 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clerkRef = useRef(clerk);
   clerkRef.current = clerk;
 
-  // Wire bearer-token auth into the generated API client exactly once per
-  // (clerkEnabled change). The getter reads from the ref so it always sees
-  // the latest Clerk handle.
+  // Wire bearer-token auth into the generated API client exactly once. The
+  // getter reads from the ref so it always sees the latest Clerk handle.
   useEffect(() => {
     setBaseUrl(null);
-    if (!clerkEnabled) {
-      setAuthTokenGetter(null);
-      return;
-    }
-    setAuthTokenGetter(async () => {
+    const getter = async () => {
       try {
         const c = clerkRef.current;
         if (!c) return null;
@@ -95,13 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         return null;
       }
-    });
-    return () => setAuthTokenGetter(null);
-  }, [clerkEnabled]);
+    };
+    setAuthTokenGetter(getter);
+    setBillingApiTokenGetter(getter);
+    return () => {
+      setAuthTokenGetter(null);
+      setBillingApiTokenGetter(null);
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     const c = clerkRef.current;
-    if (!clerkEnabled || !c?.isSignedIn) {
+    if (!c?.isSignedIn) {
       setMe(null);
       setIsFetching(false);
       return;
@@ -110,28 +115,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await fetchMe(() => c.getToken());
     setMe(data);
     setIsFetching(false);
-  }, [clerkEnabled]);
+  }, []);
 
   // Refetch /me only when Clerk's signed-in identity actually changes —
   // depend on primitive values, not the hook return objects, so this effect
   // does not re-fire on every render.
   useEffect(() => {
-    if (!clerkEnabled) {
-      setIsFetching(false);
-      return;
-    }
-    if (!clerk?.isLoaded || !userHook?.isLoaded) {
+    if (!clerk.isLoaded || !userHook.isLoaded) {
       setIsFetching(true);
       return;
     }
     void refresh();
-  }, [clerkEnabled, clerk?.isLoaded, clerk?.isSignedIn, userHook?.isLoaded, userHook?.user?.id, refresh]);
+  }, [clerk.isLoaded, clerk.isSignedIn, userHook.isLoaded, userHook.user?.id, refresh]);
 
   const signOut = useCallback(async () => {
     try {
-      if (clerk?.signOut) {
-        await clerk.signOut();
-      }
+      await clerk.signOut();
     } catch {
       // ignore
     }
@@ -139,18 +138,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clerk]);
 
   const value = useMemo<AuthContextValue>(() => {
-    const isLoading = clerkEnabled
-      ? !clerk?.isLoaded || !userHook?.isLoaded || (!!clerk?.isSignedIn && isFetching)
-      : false;
+    const isLoading =
+      !clerk.isLoaded || !userHook.isLoaded || (!!clerk.isSignedIn && isFetching);
+    const organization = me?.organization ?? null;
     return {
-      organization: me?.organization ?? null,
+      organization,
       member: me?.member ?? null,
+      client: organization,
       isLoading,
-      isSignedIn: !!clerk?.isSignedIn && !!me?.member,
+      isSignedIn: !!clerk.isSignedIn && !!me?.member,
       signOut,
       refresh,
     };
-  }, [clerkEnabled, clerk, userHook, isFetching, me, signOut, refresh]);
+  }, [clerk, userHook, isFetching, me, signOut, refresh]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -159,29 +159,4 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
-}
-
-// ---------------------------------------------------------------------------
-// Safe wrappers around Clerk hooks. When Clerk is disabled (no publishable
-// key configured), the ClerkProvider is not mounted and calling Clerk hooks
-// would throw. These wrappers degrade gracefully so the rest of the app can
-// keep rendering the demo banner.
-// ---------------------------------------------------------------------------
-
-function useClerkAuthSafe(enabled: boolean) {
-  if (!enabled) return null;
-  try {
-    return useClerkAuth();
-  } catch {
-    return null;
-  }
-}
-
-function useUserSafe(enabled: boolean) {
-  if (!enabled) return null;
-  try {
-    return useUser();
-  } catch {
-    return null;
-  }
 }

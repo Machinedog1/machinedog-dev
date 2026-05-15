@@ -1,6 +1,5 @@
 import { SignUp } from "@clerk/clerk-react";
 import { Logo } from "@/components/Logo";
-import { isClerkEnabled } from "@/lib/clerk";
 import { glassClerkAppearance } from "@/lib/clerkAppearance";
 
 export default function SignUpPage() {
@@ -70,20 +69,13 @@ export default function SignUpPage() {
       </header>
 
       <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10">
-        {isClerkEnabled() ? (
-          <SignUp
-            routing="path"
-            path={`${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/").replace(/\/$/, "")}
-            signInUrl={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/")}
-            fallbackRedirectUrl={import.meta.env.BASE_URL}
-            appearance={glassClerkAppearance}
-          />
-        ) : (
-          <div className="max-w-md text-center text-white/80 text-sm">
-            Authentication is not configured for this environment. Set{" "}
-            <code>VITE_CLERK_PUBLISHABLE_KEY</code> to enable sign-up.
-          </div>
-        )}
+        <SignUp
+          routing="path"
+          path={`${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/").replace(/\/$/, "")}
+          signInUrl={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/")}
+          fallbackRedirectUrl={import.meta.env.BASE_URL}
+          appearance={glassClerkAppearance}
+        />
       </main>
     </div>
   );

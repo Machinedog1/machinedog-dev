@@ -2,14 +2,42 @@
  * Phase 1 billing/token client. Hand-rolled because the new endpoints aren't
  * (yet) part of the OpenAPI spec — the existing useGetMe / useListTokenBundles
  * hooks keep working unchanged for the legacy bundles flow.
+ *
+ * Auth: attaches Clerk's session token (`Authorization: Bearer ...`) to every
+ * request. The token getter is registered by the AuthProvider via
+ * `setBillingApiTokenGetter` so this module stays free of a direct Clerk
+ * dependency.
  */
 
 const BASE = "/api";
 
+let tokenGetter: (() => Promise<string | null>) | null = null;
+
+export function setBillingApiTokenGetter(
+  getter: (() => Promise<string | null>) | null,
+): void {
+  tokenGetter = getter;
+}
+
+async function authHeader(): Promise<Record<string, string>> {
+  if (!tokenGetter) return {};
+  try {
+    const token = await tokenGetter();
+    return token ? { authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const auth = await authHeader();
   const res = await fetch(BASE + path, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...auth,
+      ...(init?.headers ?? {}),
+    },
     ...init,
   });
   if (!res.ok) {
