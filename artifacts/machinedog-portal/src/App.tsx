@@ -149,8 +149,8 @@ function PublicOnlyRoutes() {
       <Route path="/" component={LandingPage} />
       <Route path="/templates" component={TemplatesPage} />
       <Route path="/pricing" component={PricingPage} />
-      <Route path="/sign-in" component={SignInPage} />
-      <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/sign-in/:rest*" component={SignInPage} />
+      <Route path="/sign-up/:rest*" component={SignUpPage} />
       <Route path="/accept-invite" component={AcceptInvitePage} />
       <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/intake" component={IntakePage} />
@@ -164,8 +164,8 @@ function AuthedRoutes() {
   return (
     <Switch>
       {/* Public routes still accessible while signed in */}
-      <Route path="/sign-in" component={SignInPage} />
-      <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/sign-in/:rest*" component={SignInPage} />
+      <Route path="/sign-up/:rest*" component={SignUpPage} />
       <Route path="/accept-invite" component={AcceptInvitePage} />
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
