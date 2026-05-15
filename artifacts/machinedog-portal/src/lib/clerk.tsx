@@ -48,6 +48,12 @@ const LazyClerkProvider = lazy(async () => {
   return {
     default: ({ children }: { children: ReactNode }) => {
       const satellite = isSatelliteHost();
+      // The primary's frontend API CNAME (e.g. clerk.machinedog.dev). Clerk
+      // would normally derive the clerk-js script URL from `domain` in
+      // satellite mode, which on Replit becomes `clerk.<repl-id>.janeway
+      // .replit.dev` and 404s. Force-load the script from the primary
+      // instance so the satellite never tries to spin up its own CNAME.
+      const PRIMARY_FRONTEND_API = `clerk.${PRIMARY_DOMAIN}`;
       const satelliteProps = satellite
         ? {
             isSatellite: true as const,
@@ -57,6 +63,7 @@ const LazyClerkProvider = lazy(async () => {
             // standard satellite handshake.
             signInUrl: `https://${PRIMARY_DOMAIN}/sign-in`,
             signUpUrl: `https://${PRIMARY_DOMAIN}/sign-up`,
+            clerkJSUrl: `https://${PRIMARY_FRONTEND_API}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`,
           }
         : {};
       return (
