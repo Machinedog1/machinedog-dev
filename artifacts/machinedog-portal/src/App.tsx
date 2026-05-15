@@ -150,6 +150,8 @@ function PublicOnlyRoutes() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/auth-debug" component={AuthDebugPage} />
+      <Route path="/dashboard" component={SignInPage} />
       <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/intake" component={IntakePage} />
       <Route path="/work" component={WorkPage} />
@@ -164,6 +166,10 @@ function AuthedRoutes() {
       {/* Public routes still accessible while signed in */}
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/auth-debug" component={AuthDebugPage} />
+      <Route path="/dashboard">
+        <AuthGuard><PromptConsole /></AuthGuard>
+      </Route>
       <Route path="/not-invited" component={NotInvitedPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/thank-you" component={ThankYouPage} />

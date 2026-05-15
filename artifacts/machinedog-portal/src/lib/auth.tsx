@@ -11,6 +11,7 @@ import {
 import { useAuth as useClerkAuth, useUser } from "@clerk/react";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { setBillingApiTokenGetter } from "./billing-api";
+import { isClerkConfigured } from "./clerk";
 
 export interface AuthOrganization {
   id: number;
@@ -67,7 +68,28 @@ async function fetchMe(getToken: () => Promise<string | null>): Promise<MeRespon
   }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+/**
+ * Static fallback used when Clerk is not configured (e.g. Replit-managed
+ * Clerk hasn't provisioned). Without this, useClerkAuth() throws because
+ * ClerkProvider isn't mounted, and the entire app blank-screens.
+ */
+function UnconfiguredAuthProvider({ children }: { children: ReactNode }) {
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      organization: null,
+      member: null,
+      client: null,
+      isLoading: false,
+      isSignedIn: false,
+      signOut: async () => {},
+      refresh: async () => {},
+    }),
+    [],
+  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function ClerkAuthProvider({ children }: { children: ReactNode }) {
   const clerk = useClerkAuth();
   const userHook = useUser();
 
@@ -153,6 +175,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clerk, userHook, isFetching, me, signOut, refresh]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  if (!isClerkConfigured()) return <UnconfiguredAuthProvider>{children}</UnconfiguredAuthProvider>;
+  return <ClerkAuthProvider>{children}</ClerkAuthProvider>;
 }
 
 export function useAuth(): AuthContextValue {

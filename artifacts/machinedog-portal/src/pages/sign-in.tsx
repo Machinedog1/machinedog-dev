@@ -1,17 +1,24 @@
-import { SignIn } from "@clerk/react";
+import { lazy, Suspense } from "react";
+import { Link } from "wouter";
 import { Logo } from "@/components/Logo";
 import { glassClerkAppearance } from "@/lib/clerkAppearance";
+import { isClerkConfigured } from "@/lib/clerk";
+import { ClerkErrorBoundary } from "@/components/ClerkErrorBoundary";
+
+const LazySignIn = lazy(async () => {
+  const mod = await import("@clerk/react");
+  return { default: mod.SignIn };
+});
 
 export default function SignInPage() {
   const signUpHref = `${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/");
+  const signInPath = `${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/").replace(/\/$/, "");
 
   return (
     <div
       className="dark relative min-h-screen w-full overflow-hidden text-white flex flex-col"
       style={{ background: "hsl(220 45% 3%)" }}
     >
-      {/* Vivid gradient blobs make the frosted-glass card actually read.
-          A glass card on a flat color is just a flat card. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute top-[10%] left-[15%] h-[640px] w-[640px] rounded-full"
@@ -37,22 +44,6 @@ export default function SignInPage() {
             filter: "blur(40px)",
           }}
         />
-        <div
-          className="absolute top-0 right-1/4 h-[420px] w-[420px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(closest-side, hsl(180 90% 60% / 0.6), transparent 70%)",
-            filter: "blur(30px)",
-          }}
-        />
-        {/* Subtle film grain so the gradient doesn't look like a phone wallpaper */}
-        <div
-          className="absolute inset-0 opacity-[0.04] mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
-          }}
-        />
       </div>
 
       <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
@@ -72,14 +63,54 @@ export default function SignInPage() {
       </header>
 
       <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10">
-        <SignIn
-          routing="path"
-          path={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/").replace(/\/$/, "")}
-          signUpUrl={`${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/")}
-          fallbackRedirectUrl={import.meta.env.BASE_URL}
-          appearance={glassClerkAppearance}
-        />
+        {isClerkConfigured() ? (
+          <ClerkErrorBoundary>
+            <Suspense fallback={<div className="text-white/60 text-sm">Loading sign-in…</div>}>
+              <LazySignIn
+                routing="path"
+                path={signInPath}
+                signUpUrl={`${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/")}
+                fallbackRedirectUrl={import.meta.env.BASE_URL}
+                appearance={glassClerkAppearance}
+              />
+            </Suspense>
+          </ClerkErrorBoundary>
+        ) : (
+          <AuthNotConfigured kind="sign-in" />
+        )}
       </main>
+    </div>
+  );
+}
+
+function AuthNotConfigured({ kind }: { kind: "sign-in" | "sign-up" }) {
+  return (
+    <div className="max-w-md w-full rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-6 text-center">
+      <div className="text-xs font-mono uppercase tracking-wider text-amber-300 mb-2">
+        Auth not configured
+      </div>
+      <h1 className="text-2xl font-bold mb-3">
+        {kind === "sign-in" ? "Sign-in" : "Sign-up"} is unavailable
+      </h1>
+      <p className="text-sm text-amber-100/80 mb-6">
+        Replit-managed Clerk has not provisioned credentials for this workspace
+        yet, so <code className="font-mono">VITE_CLERK_PUBLISHABLE_KEY</code> is
+        missing. The auth flow will work the moment that secret appears.
+      </p>
+      <div className="flex flex-col gap-2">
+        <Link
+          href="/auth-debug"
+          className="rounded-lg px-4 py-2 text-sm font-semibold bg-white text-black hover:bg-white/90"
+        >
+          Open /auth-debug
+        </Link>
+        <Link
+          href="/"
+          className="rounded-lg px-4 py-2 text-sm font-semibold bg-white/10 hover:bg-white/15 border border-white/20"
+        >
+          Back to home
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,18 @@
-import { SignUp } from "@clerk/react";
+import { lazy, Suspense } from "react";
+import { Link } from "wouter";
 import { Logo } from "@/components/Logo";
 import { glassClerkAppearance } from "@/lib/clerkAppearance";
+import { isClerkConfigured } from "@/lib/clerk";
+import { ClerkErrorBoundary } from "@/components/ClerkErrorBoundary";
+
+const LazySignUp = lazy(async () => {
+  const mod = await import("@clerk/react");
+  return { default: mod.SignUp };
+});
 
 export default function SignUpPage() {
   const signInHref = `${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/");
+  const signUpPath = `${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/").replace(/\/$/, "");
 
   return (
     <div
@@ -35,21 +44,6 @@ export default function SignUpPage() {
             filter: "blur(40px)",
           }}
         />
-        <div
-          className="absolute top-0 left-1/4 h-[420px] w-[420px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(closest-side, hsl(180 90% 60% / 0.6), transparent 70%)",
-            filter: "blur(30px)",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.04] mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
-          }}
-        />
       </div>
 
       <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
@@ -69,13 +63,46 @@ export default function SignUpPage() {
       </header>
 
       <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10">
-        <SignUp
-          routing="path"
-          path={`${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/").replace(/\/$/, "")}
-          signInUrl={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/")}
-          fallbackRedirectUrl={import.meta.env.BASE_URL}
-          appearance={glassClerkAppearance}
-        />
+        {isClerkConfigured() ? (
+          <ClerkErrorBoundary>
+            <Suspense fallback={<div className="text-white/60 text-sm">Loading sign-up…</div>}>
+              <LazySignUp
+                routing="path"
+                path={signUpPath}
+                signInUrl={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/")}
+                fallbackRedirectUrl={import.meta.env.BASE_URL}
+                appearance={glassClerkAppearance}
+              />
+            </Suspense>
+          </ClerkErrorBoundary>
+        ) : (
+          <div className="max-w-md w-full rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-6 text-center">
+            <div className="text-xs font-mono uppercase tracking-wider text-amber-300 mb-2">
+              Auth not configured
+            </div>
+            <h1 className="text-2xl font-bold mb-3">Sign-up is unavailable</h1>
+            <p className="text-sm text-amber-100/80 mb-6">
+              Replit-managed Clerk has not provisioned credentials for this
+              workspace yet, so{" "}
+              <code className="font-mono">VITE_CLERK_PUBLISHABLE_KEY</code> is
+              missing. The auth flow will work the moment that secret appears.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/auth-debug"
+                className="rounded-lg px-4 py-2 text-sm font-semibold bg-white text-black hover:bg-white/90"
+              >
+                Open /auth-debug
+              </Link>
+              <Link
+                href="/"
+                className="rounded-lg px-4 py-2 text-sm font-semibold bg-white/10 hover:bg-white/15 border border-white/20"
+              >
+                Back to home
+              </Link>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -2,19 +2,25 @@
  * Clerk integration wrapper for the portal — wired for Replit-managed Clerk.
  *
  * Per the clerk-auth skill canonical wiring:
- *   - publishableKey is resolved from window.location.hostname so the same
- *     build serves multiple Clerk custom domains.
- *   - proxyUrl is unconditional (empty string in dev, auto-populated in prod).
+ *   - publishableKey resolved via publishableKeyFromHost so the same build
+ *     serves multiple Clerk custom domains.
+ *   - proxyUrl is unconditional.
  *   - Uses @clerk/react (Replit's flavor), not @clerk/clerk-react.
  *
- * Wrapped in ClerkErrorBoundary so a missing publishable key shows a real
- * diagnostic screen + link to /auth-debug instead of blank-screening the app.
+ * Short-circuits BEFORE mounting ClerkProvider when the publishable key is
+ * absent, so a missing/unprovisioned Replit-managed Clerk does not blank-
+ * screen the app or hang at the loading spinner. Pages can detect this via
+ * `isClerkConfigured()` and render a sane fallback.
  */
 
 import { lazy, Suspense, type ReactNode } from "react";
 import { ClerkErrorBoundary } from "@/components/ClerkErrorBoundary";
 
 const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+
+export function isClerkConfigured(): boolean {
+  return !!env.VITE_CLERK_PUBLISHABLE_KEY;
+}
 
 const LazyClerkProvider = lazy(async () => {
   const [{ ClerkProvider }, { publishableKeyFromHost }] = await Promise.all([
@@ -40,6 +46,12 @@ const LazyClerkProvider = lazy(async () => {
 });
 
 export function ClerkProviderWrapper({ children }: { children: ReactNode }) {
+  // Short-circuit: render children with no provider when Clerk hasn't been
+  // configured. Downstream code checks isClerkConfigured() and renders a
+  // helpful screen instead of crashing or hanging.
+  if (!isClerkConfigured()) {
+    return <>{children}</>;
+  }
   return (
     <ClerkErrorBoundary>
       <Suspense fallback={null}>
