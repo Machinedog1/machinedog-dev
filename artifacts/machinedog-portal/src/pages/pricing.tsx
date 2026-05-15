@@ -499,139 +499,133 @@ export default function PricingPage() {
         </div>
       </header>
 
-      {/* PRICING — Premium Build Starter */}
+      {/* PRICING — Good / Better / Best tiers */}
       <section id="pricing" className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-16 lg:pb-24">
         <div className="text-center mb-12">
-          <div className="text-eyebrow text-primary mb-3">— PREMIUM ENGAGEMENT —</div>
+          <div className="text-eyebrow text-primary mb-3">— PRICING —</div>
           <h2 className="text-headline text-4xl sm:text-5xl lg:text-6xl tracking-tight">
-            One build. Your entire system.
+            Pick the plan that fits.
           </h2>
           <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
-            A single fixed-scope engagement that delivers your full product —
-            backend, frontend, AI, automations, and launch.
+            Plain-English in, real PRs out. Token-based billing on every tier —
+            top up any time.
           </p>
         </div>
 
-        <div className="relative max-w-4xl mx-auto">
-          {/* Outer glow */}
-          <div
-            aria-hidden
-            className="absolute -inset-1 rounded-[28px] blur-2xl opacity-60"
-            style={{
-              background:
-                "linear-gradient(135deg, hsla(200,90%,60%,0.55), hsla(254,95%,75%,0.55))",
-            }}
-          />
-          {/* Card */}
-          <div className="relative glass-strong rounded-[24px] p-8 sm:p-10 lg:p-12 overflow-hidden">
-            {/* Featured badge */}
-            <div className="absolute top-6 right-6">
+        <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+          {tiers.map((tier) => (
+            <div key={tier.id} className="relative flex">
+              {tier.highlight && (
+                <div
+                  aria-hidden
+                  className="absolute -inset-1 rounded-[24px] blur-2xl opacity-70"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, hsla(200,90%,60%,0.55), hsla(254,95%,75%,0.55))",
+                  }}
+                />
+              )}
               <div
-                className="text-[10px] font-mono tracking-[0.22em] px-3 py-1.5 rounded-full text-white"
-                style={{
-                  background:
-                    "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
-                }}
+                className={`relative flex flex-col w-full glass-strong rounded-[20px] p-8 ${
+                  tier.highlight
+                    ? "ring-1 ring-primary/40"
+                    : "border border-foreground/10"
+                }`}
               >
-                FEATURED
-              </div>
-            </div>
+                {tier.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <div
+                      className="text-[10px] font-mono tracking-[0.22em] px-3 py-1.5 rounded-full text-white whitespace-nowrap"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                      }}
+                    >
+                      {tier.badge}
+                    </div>
+                  </div>
+                )}
 
-            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-10">
-              <div>
-                <div className="text-eyebrow text-primary mb-2">
-                  PREMIUM BUILD STARTER
+                <div className="mb-6">
+                  <div className="text-eyebrow text-primary mb-2">{tier.name}</div>
+                  <p className="text-sm text-muted-foreground min-h-[2.5em]">
+                    {tier.tagline}
+                  </p>
                 </div>
-                <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">
-                  Complete Business System Build
-                </h3>
-                <p className="text-muted-foreground max-w-xl">
-                  Everything you need to launch a production-ready, revenue-generating
-                  product — designed, built, and shipped by us.
-                </p>
-              </div>
 
-              <div className="text-left lg:text-right">
-                <div className="flex items-baseline gap-2 lg:justify-end">
-                  <span className="text-5xl sm:text-6xl font-extrabold tracking-tight text-gradient-cyber">
-                    $25,000
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-5xl font-extrabold tracking-tight text-gradient-cyber">
+                    {tier.price}
+                  </span>
+                  <span className="text-base text-muted-foreground">
+                    {tier.cadence}
                   </span>
                 </div>
-                <div className="text-xs font-mono tracking-widest text-muted-foreground mt-2">
-                  ONE-TIME · 4–8 WEEK DELIVERY
-                </div>
-              </div>
-            </div>
 
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-foreground/15 to-transparent mb-8" />
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-foreground/15 to-transparent mb-6" />
 
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 mb-10">
-              {premiumFeatures.map((f) => (
-                <div key={f.label} className="flex items-start gap-3">
-                  <div
-                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, hsla(200,90%,60%,0.18), hsla(254,95%,75%,0.18))",
-                    }}
-                  >
-                    <Check className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="text-sm sm:text-[15px] leading-snug">{f.label}</div>
-                </div>
-              ))}
-            </div>
+                <ul className="space-y-3 mb-8 flex-1">
+                  {tier.features.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-start gap-3 text-sm sm:text-[15px] leading-snug"
+                    >
+                      <div
+                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, hsla(200,90%,60%,0.18), hsla(254,95%,75%,0.18))",
+                        }}
+                      >
+                        <Check className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
 
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4 text-primary" />
-                <span>
-                  <span className="text-foreground font-semibold">4–8 Week</span>{" "}
-                  delivery timeline
-                </span>
-              </div>
-              <Button
-                size="lg"
-                onClick={startBuildCheckout}
-                disabled={buildPending}
-                className="h-12 px-8 text-sm tracking-wider font-bold"
-                style={{
-                  background:
-                    "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
-                  boxShadow: "0 10px 30px -10px hsla(200,90%,60%,0.55)",
-                }}
-              >
-                {buildPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    OPENING CHECKOUT…
-                  </>
-                ) : (
-                  <>
-                    START YOUR BUILD
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {checkoutError && (
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                <span>{checkoutError}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCheckoutError(null);
-                    scrollToId("contact");
-                  }}
-                  className="font-mono text-xs tracking-widest text-red-100 hover:text-white underline underline-offset-4"
+                <Button
+                  size="lg"
+                  onClick={() => scrollToId("contact")}
+                  className={`w-full h-12 text-sm tracking-wider font-bold ${
+                    tier.highlight ? "" : "bg-transparent text-white"
+                  }`}
+                  variant={tier.highlight ? "default" : "outline"}
+                  style={
+                    tier.highlight
+                      ? {
+                          background:
+                            "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                          boxShadow:
+                            "0 10px 30px -10px hsla(200,90%,60%,0.55)",
+                        }
+                      : { border: "1px solid hsla(0,0%,100%,0.25)" }
+                  }
                 >
-                  CONTACT US INSTEAD →
-                </button>
+                  {tier.cta}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               </div>
-            )}
-          </div>
+            </div>
+          ))}
         </div>
+
+        {checkoutError && (
+          <div className="mt-8 max-w-3xl mx-auto flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <span>{checkoutError}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setCheckoutError(null);
+                scrollToId("contact");
+              }}
+              className="font-mono text-xs tracking-widest text-red-100 hover:text-white underline underline-offset-4"
+            >
+              CONTACT US INSTEAD →
+            </button>
+          </div>
+        )}
+
       </section>
 
       {/* PORTAL ACCESS */}
