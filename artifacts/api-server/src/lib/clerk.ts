@@ -88,9 +88,24 @@ export async function loadClerkAndOrganization(
     await new Promise<void>((resolve) => {
       mw(req, res, () => resolve());
     });
-    const auth = (req as unknown as { auth?: Record<string, unknown> }).auth;
-    const userId = (auth?.userId as string | undefined) ?? undefined;
-    const sessionId = (auth?.sessionId as string | null | undefined) ?? null;
+    // @clerk/express v2 attaches `req.auth` as a FUNCTION that returns the
+    // resolved auth object — not an object directly. Calling it triggers
+    // lazy JWT verification and returns { userId, sessionId, ... }. Reading
+    // `req.auth` as a property gives you the function reference, whose
+    // Object.keys() is empty — that was the bug behind the silent 401s.
+    const authAccessor = (req as unknown as { auth?: unknown }).auth;
+    let authObj: Record<string, unknown> | null = null;
+    if (typeof authAccessor === "function") {
+      try {
+        authObj = (authAccessor as () => Record<string, unknown>)();
+      } catch (err) {
+        logger.warn({ err: (err as Error).message }, "req.auth() threw");
+      }
+    } else if (authAccessor && typeof authAccessor === "object") {
+      authObj = authAccessor as Record<string, unknown>;
+    }
+    const userId = (authObj?.userId as string | undefined) ?? undefined;
+    const sessionId = (authObj?.sessionId as string | null | undefined) ?? null;
     if (userId) {
       req.clerkAuth = { userId, sessionId };
     }
@@ -101,7 +116,8 @@ export async function loadClerkAndOrganization(
           hasAuthHeader: !!req.headers.authorization,
           authHeaderPrefix: req.headers.authorization?.slice(0, 20),
           hasSessionCookie: !!(req.headers.cookie && req.headers.cookie.includes("__session")),
-          clerkAuthKeys: auth ? Object.keys(auth) : [],
+          authAccessorType: typeof authAccessor,
+          clerkAuthKeys: authObj ? Object.keys(authObj) : [],
           resolvedUserId: userId ?? null,
         },
         "DEBUG /me clerk auth state",

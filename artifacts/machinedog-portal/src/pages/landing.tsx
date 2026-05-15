@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
 import {
   ArrowRight,
   Sparkles,
@@ -44,6 +45,7 @@ const STARTERS = [
 ];
 
 export default function LandingPage() {
+  const { isSignedIn, member } = useAuth();
   return (
     <div className="dark min-h-screen w-full text-white" style={{ background: "hsl(220 45% 3%)" }}>
       <div
@@ -59,20 +61,43 @@ export default function LandingPage() {
         <nav className="hidden md:flex items-center gap-6 text-sm text-white/70">
           <Link href="/templates" className="hover:text-white">Templates</Link>
           <Link href="/pricing" className="hover:text-white">Pricing</Link>
-          <Link href="/sign-in" className="hover:text-white">Sign in</Link>
-          <Link href="/sign-up">
-            <Button
-              className="h-9 px-4 text-xs font-bold border-0 text-white"
-              style={{
-                background:
-                  "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
-              }}
-              data-testid="button-landing-signup"
-            >
-              Get started
-              <ArrowRight className="h-3.5 w-3.5 ml-2" />
-            </Button>
-          </Link>
+          {isSignedIn ? (
+            <>
+              <span className="text-white/60 text-xs font-mono" data-testid="text-landing-signed-in-email">
+                {member?.email}
+              </span>
+              <Link href="/dashboard">
+                <Button
+                  className="h-9 px-4 text-xs font-bold border-0 text-white"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                  }}
+                  data-testid="button-landing-dashboard"
+                >
+                  Open dashboard
+                  <ArrowRight className="h-3.5 w-3.5 ml-2" />
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/sign-in" className="hover:text-white">Sign in</Link>
+              <Link href="/sign-up">
+                <Button
+                  className="h-9 px-4 text-xs font-bold border-0 text-white"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, hsl(200 90% 60%) 0%, hsl(254 95% 75%) 100%)",
+                  }}
+                  data-testid="button-landing-signup"
+                >
+                  Get started
+                  <ArrowRight className="h-3.5 w-3.5 ml-2" />
+                </Button>
+              </Link>
+            </>
+          )}
         </nav>
       </header>
 
