@@ -20,6 +20,7 @@ import secretsRouter from "./secrets";
 import auditRouter from "./audit";
 import buildsRouter from "./builds";
 import complianceRouter from "./compliance";
+import commitFilesRouter from "./commit-files";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(secretsRouter);
 router.use(auditRouter);
 router.use(buildsRouter);
 router.use(complianceRouter);
+router.use(commitFilesRouter);
 
 export default router;

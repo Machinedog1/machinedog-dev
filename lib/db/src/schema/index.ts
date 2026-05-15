@@ -23,3 +23,4 @@ export * from "./ai-conversations";
 export * from "./build-jobs";
 export * from "./deployments";
 export * from "./compliance-profiles";
+export * from "./github-app-installations";

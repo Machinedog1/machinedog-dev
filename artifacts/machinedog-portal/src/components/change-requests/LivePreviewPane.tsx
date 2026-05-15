@@ -62,6 +62,8 @@ export function LivePreviewPane({
   onSetDevUrl,
   onSetDevUrlValue,
   isSavingDevUrl,
+  githubOwner,
+  githubRepo,
 }: {
   previewUrl: string | null | undefined;
   liveUrl: string | null | undefined;
@@ -80,6 +82,11 @@ export function LivePreviewPane({
    *  clicks the Dev tab while empty. */
   onSetDevUrlValue?: (url: string) => void;
   isSavingDevUrl?: boolean;
+  /** When the project has a GitHub repo configured, the empty Dev state
+   *  surfaces an "Open in Replit" button that deep-links to Replit's
+   *  GitHub-import flow so the customer can spin up a Repl in one click. */
+  githubOwner?: string | null;
+  githubRepo?: string | null;
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [viewport, setViewport] = useState<Viewport>("desktop");
@@ -532,9 +539,31 @@ if (__mdDev) {
                   )}
                 </button>
               </div>
-              <div className="text-[10.5px] text-muted-foreground/70 text-center max-w-md">
-                Or paste the URL directly into the address bar above. Either
-                way, this view auto-refreshes when a new URL lands.
+              {/* Spin-up shortcut: when a GitHub repo is configured we
+                  deep-link to Replit's import-from-GitHub flow so the
+                  customer doesn't have to copy/paste the repo URL. Falls
+                  back to a generic "New Repl" link when no repo is set. */}
+              <div className="flex flex-col items-center gap-1.5">
+                <a
+                  href={
+                    githubOwner && githubRepo
+                      ? `https://replit.com/github/${encodeURIComponent(githubOwner)}/${encodeURIComponent(githubRepo)}`
+                      : "https://replit.com/new"
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="button-open-in-replit"
+                  className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md font-mono text-[11px] font-bold ring-1 ring-border/50 bg-background/80 text-foreground/90 hover:ring-sky-400/60 transition-shadow"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {githubOwner && githubRepo
+                    ? "Open in Replit"
+                    : "New Repl on Replit"}
+                </a>
+                <div className="text-[10.5px] text-muted-foreground/70 text-center max-w-md">
+                  Or paste the URL directly into the address bar above.
+                  Either way, this view auto-refreshes when a new URL lands.
+                </div>
               </div>
             </div>
           ) : (

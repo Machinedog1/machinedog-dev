@@ -547,6 +547,9 @@ export function AgentConversation({
             <LivePreviewPane
               previewUrl={null}
               liveUrl={project?.liveUrl}
+              heartbeatToken={isOwner ? project?.heartbeatToken : null}
+              githubOwner={project?.githubOwner}
+              githubRepo={project?.githubRepo}
               onSetDevUrl={onSetDevUrl}
             />
           </TabsContent>

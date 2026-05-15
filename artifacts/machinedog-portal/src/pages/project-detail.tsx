@@ -935,6 +935,8 @@ export default function ProjectDetailPage() {
                 heartbeatToken={isOwner ? project.heartbeatToken : null}
                 onSetDevUrlValue={isOwner ? saveDevUrlInline : undefined}
                 isSavingDevUrl={updateProject.isPending}
+                githubOwner={project.githubOwner}
+                githubRepo={project.githubRepo}
               />
             )
           }
