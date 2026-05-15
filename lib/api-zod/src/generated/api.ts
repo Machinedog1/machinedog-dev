@@ -417,6 +417,8 @@ export const UpdateProjectBody = zod.object({
   title: zod.string().optional(),
   description: zod.string().optional(),
   summary: zod.string().optional(),
+  healthcareMode: zod.boolean().optional(),
+  phiAllowed: zod.boolean().optional(),
   liveUrl: zod.string().nullish(),
   coverImageUrl: zod.string().nullish(),
   status: zod.enum(["draft", "active", "completed", "archived"]).optional(),
@@ -1996,6 +1998,9 @@ export const ListProjectAuditResponse = zod.object({
           "plan_changed",
           "compliance_updated",
           "lead_updated",
+          "phi_mode_enabled",
+          "phi_mode_disabled",
+          "hipaa_deployment_approved",
         ])
         .describe(
           "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
@@ -2085,6 +2090,9 @@ export const ListAdminAuditResponse = zod.object({
           "plan_changed",
           "compliance_updated",
           "lead_updated",
+          "phi_mode_enabled",
+          "phi_mode_disabled",
+          "hipaa_deployment_approved",
         ])
         .describe(
           "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
@@ -2439,6 +2447,9 @@ export const GetAdminMetricsResponse = zod.object({
           "plan_changed",
           "compliance_updated",
           "lead_updated",
+          "phi_mode_enabled",
+          "phi_mode_disabled",
+          "hipaa_deployment_approved",
         ])
         .describe(
           "Canonical audit action identifier. Must stay in sync with the `audit_action` Postgres enum in lib\/db\/src\/schema\/audit-events.ts.",
@@ -2967,6 +2978,276 @@ export const ListAdminComplianceResponse = zod.object({
     }),
   ),
   total: zod.number(),
+});
+
+/**
+ * @summary Approve an organization's HIPAA deployment environment (admin only). Sets hipaaDeploymentStatus=approved and emits a hipaa_deployment_approved audit event.
+ */
+export const ApproveAdminOrganizationHipaaDeploymentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveAdminOrganizationHipaaDeploymentBody = zod.object({
+  reason: zod.string().nullish(),
+});
+
+export const ApproveAdminOrganizationHipaaDeploymentResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  primaryEmail: zod.string(),
+  clerkOrgId: zod.string().nullish(),
+  clerkOrgSlug: zod.string().nullish(),
+  planType: zod.enum([
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "team",
+    "enterprise",
+    "healthcare",
+  ]),
+  planStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  status: zod.enum(["active", "suspended", "invited"]),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  hipaaDeploymentStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "approved",
+    "revoked",
+  ]),
+  mfaRequired: zod.boolean(),
+  tokenBalance: zod.number(),
+  totalTokensUsed: zod.number(),
+  buildMinutesUsed: zod.number(),
+  memberCount: zod.number(),
+  projectCount: zod.number(),
+  stripeCustomerId: zod.string().nullish(),
+  portalSubscriptionStatus: zod.enum([
+    "none",
+    "trialing",
+    "active",
+    "past_due",
+    "canceled",
+    "incomplete",
+  ]),
+  portalCurrentPeriodEnd: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Operator override that flips a project's phiAllowed=true after a manual compliance review. Records a phi_mode_enabled audit event attributed to the admin actor.
+ */
+export const ApproveAdminProjectPhiModeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveAdminProjectPhiModeBody = zod.object({
+  reason: zod.string().nullish(),
+});
+
+export const ApproveAdminProjectPhiModeResponse = zod.object({
+  projectId: zod.number(),
+  healthcareMode: zod.boolean(),
+  phiAllowed: zod.boolean(),
+});
+
+/**
+ * @summary Per-organization compliance posture for the signed-in user.
+ */
+export const GetMyComplianceProfileResponse = zod.object({
+  organizationId: zod.number(),
+  planType: zod.enum([
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "team",
+    "enterprise",
+    "healthcare",
+  ]),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  hipaaDeploymentStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "approved",
+    "revoked",
+  ]),
+  mfaRequired: zod.boolean(),
+  healthcareEnabled: zod.boolean(),
+  phiAllowed: zod.boolean(),
+  auditLoggingEnabled: zod.boolean(),
+  auditRequired: zod.boolean(),
+  hipaaDeploymentRequired: zod.boolean(),
+  awsHipaaEnvironmentStatus: zod.enum([
+    "not_configured",
+    "pending",
+    "active",
+    "revoked",
+  ]),
+  riskAnalysisStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  incidentResponseStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  backupPolicyStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  dataRetentionPolicyStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  notes: zod.string().nullish(),
+  lastReviewedAt: zod.coerce.date().nullish(),
+  lastReviewedByEmail: zod.string().nullish(),
+  phiModeUnlocked: zod
+    .boolean()
+    .describe("True iff every server-side precondition for PHI mode is met."),
+  failedPreconditions: zod.array(zod.string()),
+  warningCopy: zod
+    .string()
+    .describe(
+      "Standardized warning copy to display on every PHI-related surface. Verbatim from compliance-warnings.ts.",
+    ),
+});
+
+/**
+ * @summary Update the operational compliance checklist (org owner/admin only).
+ */
+export const UpdateMyComplianceProfileBody = zod.object({
+  riskAnalysisStatus: zod
+    .enum(["not_started", "in_progress", "approved", "needs_attention"])
+    .optional(),
+  incidentResponseStatus: zod
+    .enum(["not_started", "in_progress", "approved", "needs_attention"])
+    .optional(),
+  backupPolicyStatus: zod
+    .enum(["not_started", "in_progress", "approved", "needs_attention"])
+    .optional(),
+  dataRetentionPolicyStatus: zod
+    .enum(["not_started", "in_progress", "approved", "needs_attention"])
+    .optional(),
+  auditLoggingEnabled: zod.boolean().optional(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdateMyComplianceProfileResponse = zod.object({
+  organizationId: zod.number(),
+  planType: zod.enum([
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "team",
+    "enterprise",
+    "healthcare",
+  ]),
+  baaStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "active",
+    "expired",
+  ]),
+  hipaaDeploymentStatus: zod.enum([
+    "not_required",
+    "required",
+    "pending",
+    "approved",
+    "revoked",
+  ]),
+  mfaRequired: zod.boolean(),
+  healthcareEnabled: zod.boolean(),
+  phiAllowed: zod.boolean(),
+  auditLoggingEnabled: zod.boolean(),
+  auditRequired: zod.boolean(),
+  hipaaDeploymentRequired: zod.boolean(),
+  awsHipaaEnvironmentStatus: zod.enum([
+    "not_configured",
+    "pending",
+    "active",
+    "revoked",
+  ]),
+  riskAnalysisStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  incidentResponseStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  backupPolicyStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  dataRetentionPolicyStatus: zod.enum([
+    "not_started",
+    "in_progress",
+    "approved",
+    "needs_attention",
+  ]),
+  notes: zod.string().nullish(),
+  lastReviewedAt: zod.coerce.date().nullish(),
+  lastReviewedByEmail: zod.string().nullish(),
+  phiModeUnlocked: zod
+    .boolean()
+    .describe("True iff every server-side precondition for PHI mode is met."),
+  failedPreconditions: zod.array(zod.string()),
+  warningCopy: zod
+    .string()
+    .describe(
+      "Standardized warning copy to display on every PHI-related surface. Verbatim from compliance-warnings.ts.",
+    ),
+});
+
+/**
+ * @summary Request operator review to enable healthcare/PHI mode for the signed-in user's org. Records a healthcare_mode_requested audit event.
+ */
+export const RequestComplianceReviewBody = zod.object({
+  message: zod.string().nullish(),
+});
+
+export const RequestComplianceReviewResponse = zod.object({
+  ok: zod.boolean(),
 });
 
 /**

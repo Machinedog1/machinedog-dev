@@ -29,6 +29,9 @@ import type {
   AdminTokenLedgerList,
   AdminUserList,
   AgentThreadResponse,
+  ApproveHipaaDeploymentBody,
+  ApprovePhiModeBody,
+  ApprovePhiModeResponse,
   AuditEventList,
   BuildJobList,
   BuildJobResponse,
@@ -74,6 +77,7 @@ import type {
   ListProjectBuildsParams,
   ListProjectDeploymentsParams,
   ListTemplatesParams,
+  MyComplianceProfile,
   Project,
   ProjectComment,
   ProjectCommentList,
@@ -93,6 +97,8 @@ import type {
   PublicCheckoutBody,
   PublishPromptBody,
   ReassignProjectOwnerBody,
+  RequestComplianceReviewBody,
+  RequestComplianceReviewResponse,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
   RotateHeartbeatTokenResponse,
@@ -110,6 +116,7 @@ import type {
   TokenPurchaseList,
   TriggerBuildBody,
   UpdateAdminLeadBody,
+  UpdateMyComplianceProfileBody,
   UpdateProjectBody,
   UpdateProjectSecretBody,
 } from "./api.schemas";
@@ -7030,6 +7037,444 @@ export function useListAdminCompliance<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Approve an organization's HIPAA deployment environment (admin only). Sets hipaaDeploymentStatus=approved and emits a hipaa_deployment_approved audit event.
+ */
+export const getApproveAdminOrganizationHipaaDeploymentUrl = (id: number) => {
+  return `/api/admin/organizations/${id}/compliance/approve-hipaa`;
+};
+
+export const approveAdminOrganizationHipaaDeployment = async (
+  id: number,
+  approveHipaaDeploymentBody?: ApproveHipaaDeploymentBody,
+  options?: RequestInit,
+): Promise<AdminOrganization> => {
+  return customFetch<AdminOrganization>(
+    getApproveAdminOrganizationHipaaDeploymentUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(approveHipaaDeploymentBody),
+    },
+  );
+};
+
+export const getApproveAdminOrganizationHipaaDeploymentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAdminOrganizationHipaaDeployment>>,
+    TError,
+    { id: number; data: BodyType<ApproveHipaaDeploymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveAdminOrganizationHipaaDeployment>>,
+  TError,
+  { id: number; data: BodyType<ApproveHipaaDeploymentBody> },
+  TContext
+> => {
+  const mutationKey = ["approveAdminOrganizationHipaaDeployment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveAdminOrganizationHipaaDeployment>>,
+    { id: number; data: BodyType<ApproveHipaaDeploymentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return approveAdminOrganizationHipaaDeployment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveAdminOrganizationHipaaDeploymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveAdminOrganizationHipaaDeployment>>
+>;
+export type ApproveAdminOrganizationHipaaDeploymentMutationBody =
+  BodyType<ApproveHipaaDeploymentBody>;
+export type ApproveAdminOrganizationHipaaDeploymentMutationError =
+  ErrorType<unknown>;
+
+/**
+ * @summary Approve an organization's HIPAA deployment environment (admin only). Sets hipaaDeploymentStatus=approved and emits a hipaa_deployment_approved audit event.
+ */
+export const useApproveAdminOrganizationHipaaDeployment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAdminOrganizationHipaaDeployment>>,
+    TError,
+    { id: number; data: BodyType<ApproveHipaaDeploymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveAdminOrganizationHipaaDeployment>>,
+  TError,
+  { id: number; data: BodyType<ApproveHipaaDeploymentBody> },
+  TContext
+> => {
+  return useMutation(
+    getApproveAdminOrganizationHipaaDeploymentMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Operator override that flips a project's phiAllowed=true after a manual compliance review. Records a phi_mode_enabled audit event attributed to the admin actor.
+ */
+export const getApproveAdminProjectPhiModeUrl = (id: number) => {
+  return `/api/admin/projects/${id}/phi-mode/approve`;
+};
+
+export const approveAdminProjectPhiMode = async (
+  id: number,
+  approvePhiModeBody?: ApprovePhiModeBody,
+  options?: RequestInit,
+): Promise<ApprovePhiModeResponse> => {
+  return customFetch<ApprovePhiModeResponse>(
+    getApproveAdminProjectPhiModeUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(approvePhiModeBody),
+    },
+  );
+};
+
+export const getApproveAdminProjectPhiModeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAdminProjectPhiMode>>,
+    TError,
+    { id: number; data: BodyType<ApprovePhiModeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveAdminProjectPhiMode>>,
+  TError,
+  { id: number; data: BodyType<ApprovePhiModeBody> },
+  TContext
+> => {
+  const mutationKey = ["approveAdminProjectPhiMode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveAdminProjectPhiMode>>,
+    { id: number; data: BodyType<ApprovePhiModeBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return approveAdminProjectPhiMode(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveAdminProjectPhiModeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveAdminProjectPhiMode>>
+>;
+export type ApproveAdminProjectPhiModeMutationBody =
+  BodyType<ApprovePhiModeBody>;
+export type ApproveAdminProjectPhiModeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Operator override that flips a project's phiAllowed=true after a manual compliance review. Records a phi_mode_enabled audit event attributed to the admin actor.
+ */
+export const useApproveAdminProjectPhiMode = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAdminProjectPhiMode>>,
+    TError,
+    { id: number; data: BodyType<ApprovePhiModeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveAdminProjectPhiMode>>,
+  TError,
+  { id: number; data: BodyType<ApprovePhiModeBody> },
+  TContext
+> => {
+  return useMutation(getApproveAdminProjectPhiModeMutationOptions(options));
+};
+
+/**
+ * @summary Per-organization compliance posture for the signed-in user.
+ */
+export const getGetMyComplianceProfileUrl = () => {
+  return `/api/compliance/me`;
+};
+
+export const getMyComplianceProfile = async (
+  options?: RequestInit,
+): Promise<MyComplianceProfile> => {
+  return customFetch<MyComplianceProfile>(getGetMyComplianceProfileUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMyComplianceProfileQueryKey = () => {
+  return [`/api/compliance/me`] as const;
+};
+
+export const getGetMyComplianceProfileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyComplianceProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyComplianceProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMyComplianceProfileQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMyComplianceProfile>>
+  > = ({ signal }) => getMyComplianceProfile({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyComplianceProfile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyComplianceProfileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyComplianceProfile>>
+>;
+export type GetMyComplianceProfileQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Per-organization compliance posture for the signed-in user.
+ */
+
+export function useGetMyComplianceProfile<
+  TData = Awaited<ReturnType<typeof getMyComplianceProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyComplianceProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyComplianceProfileQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update the operational compliance checklist (org owner/admin only).
+ */
+export const getUpdateMyComplianceProfileUrl = () => {
+  return `/api/compliance/me`;
+};
+
+export const updateMyComplianceProfile = async (
+  updateMyComplianceProfileBody: UpdateMyComplianceProfileBody,
+  options?: RequestInit,
+): Promise<MyComplianceProfile> => {
+  return customFetch<MyComplianceProfile>(getUpdateMyComplianceProfileUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateMyComplianceProfileBody),
+  });
+};
+
+export const getUpdateMyComplianceProfileMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyComplianceProfile>>,
+    TError,
+    { data: BodyType<UpdateMyComplianceProfileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMyComplianceProfile>>,
+  TError,
+  { data: BodyType<UpdateMyComplianceProfileBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMyComplianceProfile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMyComplianceProfile>>,
+    { data: BodyType<UpdateMyComplianceProfileBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateMyComplianceProfile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMyComplianceProfileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMyComplianceProfile>>
+>;
+export type UpdateMyComplianceProfileMutationBody =
+  BodyType<UpdateMyComplianceProfileBody>;
+export type UpdateMyComplianceProfileMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update the operational compliance checklist (org owner/admin only).
+ */
+export const useUpdateMyComplianceProfile = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyComplianceProfile>>,
+    TError,
+    { data: BodyType<UpdateMyComplianceProfileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMyComplianceProfile>>,
+  TError,
+  { data: BodyType<UpdateMyComplianceProfileBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMyComplianceProfileMutationOptions(options));
+};
+
+/**
+ * @summary Request operator review to enable healthcare/PHI mode for the signed-in user's org. Records a healthcare_mode_requested audit event.
+ */
+export const getRequestComplianceReviewUrl = () => {
+  return `/api/compliance/me/request-review`;
+};
+
+export const requestComplianceReview = async (
+  requestComplianceReviewBody?: RequestComplianceReviewBody,
+  options?: RequestInit,
+): Promise<RequestComplianceReviewResponse> => {
+  return customFetch<RequestComplianceReviewResponse>(
+    getRequestComplianceReviewUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(requestComplianceReviewBody),
+    },
+  );
+};
+
+export const getRequestComplianceReviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestComplianceReview>>,
+    TError,
+    { data: BodyType<RequestComplianceReviewBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestComplianceReview>>,
+  TError,
+  { data: BodyType<RequestComplianceReviewBody> },
+  TContext
+> => {
+  const mutationKey = ["requestComplianceReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestComplianceReview>>,
+    { data: BodyType<RequestComplianceReviewBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestComplianceReview(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestComplianceReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestComplianceReview>>
+>;
+export type RequestComplianceReviewMutationBody =
+  BodyType<RequestComplianceReviewBody>;
+export type RequestComplianceReviewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request operator review to enable healthcare/PHI mode for the signed-in user's org. Records a healthcare_mode_requested audit event.
+ */
+export const useRequestComplianceReview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestComplianceReview>>,
+    TError,
+    { data: BodyType<RequestComplianceReviewBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestComplianceReview>>,
+  TError,
+  { data: BodyType<RequestComplianceReviewBody> },
+  TContext
+> => {
+  return useMutation(getRequestComplianceReviewMutationOptions(options));
+};
 
 /**
  * @summary List paid build deposits and retainer subscriptions (admin only)

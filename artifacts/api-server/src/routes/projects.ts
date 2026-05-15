@@ -11,6 +11,7 @@ import {
   changeRequestsTable,
   changeRequestEventsTable,
   templatesTable,
+  complianceProfilesTable,
   type Project,
 } from "@workspace/db";
 import {
@@ -68,6 +69,7 @@ import {
 import { generateSecureToken } from "../lib/passwords";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { scanForPhi } from "../lib/ai-phi-guard";
 
 const PROJECT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -801,10 +803,159 @@ router.patch(
       res.status(400).json({ error: body.error.message });
       return;
     }
+
+    // Phase 8 — server-side gate for the project-level PHI mode toggle.
+    // Owners may only flip phiAllowed=true once their org meets ALL
+    // healthcare-safe preconditions (plan, BAA, MFA, HIPAA deployment).
+    // The gate runs against the *current* DB state (not the body), so a
+    // single request can never both flip phiAllowed and bypass the check.
+    if (body.data.phiAllowed === true || body.data.healthcareMode === true) {
+      const [existingProject] = await db
+        .select()
+        .from(projectsTable)
+        .where(
+          and(
+            eq(projectsTable.id, params.data.id),
+            eq(projectsTable.organizationId, req.dbClient!.id),
+          ),
+        );
+      if (!existingProject) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      const flippingHealthcare =
+        body.data.healthcareMode === true && !existingProject.healthcareMode;
+      const flippingPhi =
+        body.data.phiAllowed === true && !existingProject.phiAllowed;
+      if (flippingHealthcare && !flippingPhi) {
+        // Plan-tier gate for healthcareMode toggles. PHI requires the full
+        // BAA / HIPAA / MFA stack (checked below); healthcareMode by itself
+        // only requires the org be on a Healthcare or Enterprise plan.
+        const [org] = await db
+          .select({ planType: organizationsTable.planType })
+          .from(organizationsTable)
+          .where(eq(organizationsTable.id, req.dbClient!.id))
+          .limit(1);
+        const planType = org?.planType ?? "free";
+        if (planType !== "healthcare" && planType !== "enterprise") {
+          recordAuditEventAsync({
+            organizationId: existingProject.organizationId,
+            projectId: existingProject.id,
+            actorOrganizationId: req.dbClient!.id,
+            actorEmail: req.dbClient!.email,
+            category: "compliance",
+            action: "healthcare_gating_blocked",
+            targetType: "project",
+            targetId: String(existingProject.id),
+            metadata: {
+              attempted: "healthcare_mode_enable",
+              failedPreconditions: [
+                `org.planType must be healthcare or enterprise (is ${planType})`,
+              ],
+            },
+            ...reqAuditMeta(req),
+          });
+          res.status(403).json({
+            error:
+              "Healthcare mode is locked until your organization is on a Healthcare or Enterprise plan. Visit /compliance to review the requirements.",
+            code: "phi_gating_failed",
+            failedPreconditions: [
+              `org.planType must be healthcare or enterprise (is ${planType})`,
+            ],
+          });
+          return;
+        }
+      }
+      if (flippingPhi) {
+        const [org] = await db
+          .select()
+          .from(organizationsTable)
+          .where(eq(organizationsTable.id, req.dbClient!.id))
+          .limit(1);
+        const [profile] = await db
+          .select({
+            auditLoggingEnabled: complianceProfilesTable.auditLoggingEnabled,
+          })
+          .from(complianceProfilesTable)
+          .where(eq(complianceProfilesTable.organizationId, req.dbClient!.id))
+          .limit(1);
+        const failed: string[] = [];
+        const planType = org?.planType ?? "free";
+        if (planType !== "healthcare" && planType !== "enterprise") {
+          failed.push(
+            `org.planType must be healthcare or enterprise (is ${planType})`,
+          );
+        }
+        if ((org?.baaStatus ?? "not_required") !== "active") {
+          failed.push(
+            `org.baaStatus must be active (signed BAA) (is ${org?.baaStatus ?? "not_required"})`,
+          );
+        }
+        if ((org?.hipaaDeploymentStatus ?? "not_required") !== "approved") {
+          failed.push(
+            `org.hipaaDeploymentStatus must be approved (is ${org?.hipaaDeploymentStatus ?? "not_required"})`,
+          );
+        }
+        if (!org || Number(org.mfaRequired) <= 0) {
+          failed.push("org.mfaRequired must be true (MFA enforcement enabled)");
+        }
+        // Mirror /compliance/me's `phiModeUnlocked` rule: audit logging must
+        // be enabled at the org-compliance-profile level before PHI mode can
+        // be flipped on a project. Default-true; only fails if an admin has
+        // explicitly turned it off.
+        if (profile && profile.auditLoggingEnabled === false) {
+          failed.push("compliance.auditLoggingEnabled must be true");
+        }
+        if (failed.length > 0) {
+          recordAuditEventAsync({
+            organizationId: existingProject.organizationId,
+            projectId: existingProject.id,
+            actorOrganizationId: req.dbClient!.id,
+            actorEmail: req.dbClient!.email,
+            category: "compliance",
+            action: "healthcare_gating_blocked",
+            targetType: "project",
+            targetId: String(existingProject.id),
+            metadata: { failedPreconditions: failed, attempted: "phi_mode_enable" },
+            ...reqAuditMeta(req),
+          });
+          res.status(403).json({
+            error:
+              "PHI mode is locked until your organization has an approved Healthcare or Enterprise plan, signed BAA, MFA enforcement, audit logging, and approved HIPAA deployment environment. Do not enter real patient data in this MVP.",
+            code: "phi_gating_failed",
+            failedPreconditions: failed,
+          });
+          return;
+        }
+      }
+    }
+
+    // Capture the prior phiAllowed value so we can emit accurate
+    // phi_mode_enabled / phi_mode_disabled audit events for transitions.
+    let priorPhiAllowed: boolean | null = null;
+    if (body.data.phiAllowed !== undefined) {
+      const [existingProject] = await db
+        .select({ phiAllowed: projectsTable.phiAllowed })
+        .from(projectsTable)
+        .where(
+          and(
+            eq(projectsTable.id, params.data.id),
+            eq(projectsTable.organizationId, req.dbClient!.id),
+          ),
+        );
+      priorPhiAllowed = existingProject?.phiAllowed ?? null;
+    }
+
     const [row] = await db
       .update(projectsTable)
       .set({
         ...(body.data.title !== undefined && { title: body.data.title }),
+        ...(body.data.healthcareMode !== undefined && {
+          healthcareMode: body.data.healthcareMode,
+        }),
+        ...(body.data.phiAllowed !== undefined && {
+          phiAllowed: body.data.phiAllowed,
+        }),
         ...(body.data.description !== undefined && { description: body.data.description }),
         ...(body.data.summary !== undefined && { summary: body.data.summary }),
         ...(body.data.liveUrl !== undefined && {
@@ -867,6 +1018,27 @@ router.patch(
       metadata: { fields: Object.keys(body.data) },
       ...reqAuditMeta(req),
     });
+    // Phase 8 — emit a dedicated audit row when PHI mode flips so the
+    // compliance dashboard can surface the transition without scanning
+    // every project_updated event's metadata.
+    if (
+      body.data.phiAllowed !== undefined &&
+      priorPhiAllowed !== null &&
+      body.data.phiAllowed !== priorPhiAllowed
+    ) {
+      recordAuditEventAsync({
+        organizationId: row.organizationId,
+        projectId: row.id,
+        actorOrganizationId: req.dbClient!.id,
+        actorEmail: req.dbClient!.email,
+        category: "compliance",
+        action: body.data.phiAllowed ? "phi_mode_enabled" : "phi_mode_disabled",
+        targetType: "project",
+        targetId: String(row.id),
+        metadata: { from: priorPhiAllowed, to: body.data.phiAllowed },
+        ...reqAuditMeta(req),
+      });
+    }
     if (
       (body.data.githubOwner !== undefined || body.data.githubRepo !== undefined) &&
       row.githubOwner &&
@@ -1675,6 +1847,39 @@ router.put(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    // Phase 8 — PHI guard on workspace file saves. Projects without
+    // phiAllowed get scanned; on hit we never persist the offending body
+    // and write a `phi_blocked` audit row whose metadata only contains
+    // the matched rule labels.
+    if (!project.phiAllowed) {
+      const phi = scanForPhi(content);
+      if (phi.blocked) {
+        recordAuditEventAsync({
+          organizationId: project.organizationId,
+          projectId: project.id,
+          actorOrganizationId: req.dbClient!.id,
+          actorEmail: req.dbClient!.email,
+          category: "phi",
+          action: "phi_blocked",
+          targetType: "project_file",
+          targetId: String(file.id),
+          metadata: {
+            stage: "file_put",
+            rules: phi.hits.map((h) => h.rule),
+            contentLength: content.length,
+          },
+          ...reqAuditMeta(req),
+        });
+        res.status(400).json({
+          error:
+            "This file body looks like protected health information (PHI). Do not enter real patient data in this MVP. Saving is blocked unless your project has BAA-backed PHI handling enabled.",
+          code: "phi_blocked",
+          rules: phi.hits.map((h) => h.rule),
+          labels: phi.hits.map((h) => h.label),
+        });
+        return;
+      }
+    }
     try {
       const storage = new ObjectStorageService();
       const objectPath = await storage.uploadInlineObject({
@@ -1812,6 +2017,35 @@ router.post(
     if (existing) {
       res.status(409).json({ error: "A file at that path already exists." });
       return;
+    }
+    if (!project.phiAllowed && content) {
+      const phi = scanForPhi(content);
+      if (phi.blocked) {
+        recordAuditEventAsync({
+          organizationId: project.organizationId,
+          projectId: project.id,
+          actorOrganizationId: req.dbClient!.id,
+          actorEmail: req.dbClient!.email,
+          category: "phi",
+          action: "phi_blocked",
+          targetType: "project_file",
+          targetId: name,
+          metadata: {
+            stage: "file_inline_create",
+            rules: phi.hits.map((h) => h.rule),
+            contentLength: content.length,
+          },
+          ...reqAuditMeta(req),
+        });
+        res.status(400).json({
+          error:
+            "This file body looks like protected health information (PHI). Do not enter real patient data in this MVP. Saving is blocked unless your project has BAA-backed PHI handling enabled.",
+          code: "phi_blocked",
+          rules: phi.hits.map((h) => h.rule),
+          labels: phi.hits.map((h) => h.label),
+        });
+        return;
+      }
     }
     try {
       const storage = new ObjectStorageService();

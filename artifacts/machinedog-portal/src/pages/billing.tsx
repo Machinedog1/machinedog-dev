@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, Check, ExternalLink, Shield, Sparkles, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { PHI_MODE_LOCKED_WARNING } from "@/lib/compliance-warnings";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -129,9 +130,9 @@ export default function BillingPage() {
             )}
           </div>
           {sub?.organization.baaStatus && sub.organization.baaStatus !== "not_required" && (
-            <div className="mt-3 inline-flex items-center gap-2 text-xs font-mono px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30">
-              <Shield className="h-3 w-3" /> BAA {sub.organization.baaStatus} — PHI mode locked
-              until Phase 8 review completes.
+            <div className="mt-3 inline-flex items-start gap-2 text-xs font-mono px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30 max-w-3xl">
+              <Shield className="h-3 w-3 mt-0.5 shrink-0" />
+              <span>{PHI_MODE_LOCKED_WARNING}</span>
             </div>
           )}
         </div>
@@ -228,7 +229,7 @@ export default function BillingPage() {
 
                   {p.requiresBaa && (
                     <div className="mt-3 text-[10px] font-mono text-blue-400 leading-tight">
-                      Healthcare tier sets BAA review pending. PHI mode unlocks in Phase 8.
+                      {PHI_MODE_LOCKED_WARNING}
                     </div>
                   )}
 

@@ -12,6 +12,7 @@ import {
   LayoutTemplate,
   Settings,
   ShieldAlert,
+  ShieldCheck,
   Menu,
   X,
   Sun,
@@ -63,6 +64,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: "/tokens", label: "Tokens", icon: Coins },
     { href: "/billing", label: "Billing", icon: CreditCard },
     { href: "/consulting", label: "Consulting", icon: Briefcase },
+    { href: "/compliance", label: "Compliance", icon: ShieldCheck },
   ];
 
   const adminItems = [

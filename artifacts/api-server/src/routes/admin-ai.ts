@@ -16,7 +16,7 @@ import {
   requireAuth,
   loadOrCreateClient,
   requireActiveClient,
-  requireAdmin,
+  requirePlatformAdmin,
 } from "../lib/auth";
 import {
   listProviders,
@@ -29,7 +29,7 @@ import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 
 const router: IRouter = Router();
 
-const adminGuards = [requireAuth, loadOrCreateClient, requireActiveClient, requireAdmin];
+const adminGuards = [requireAuth, loadOrCreateClient, requireActiveClient, requirePlatformAdmin];
 
 function fail(
   res: Parameters<Parameters<typeof router.post>[1]>[1] & {

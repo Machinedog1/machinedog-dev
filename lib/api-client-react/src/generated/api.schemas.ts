@@ -375,6 +375,9 @@ export const AuditAction = {
   plan_changed: "plan_changed",
   compliance_updated: "compliance_updated",
   lead_updated: "lead_updated",
+  phi_mode_enabled: "phi_mode_enabled",
+  phi_mode_disabled: "phi_mode_disabled",
+  hipaa_deployment_approved: "hipaa_deployment_approved",
 } as const;
 
 /**
@@ -612,6 +615,195 @@ export interface SetOrgPlanResponse {
    * @nullable
    */
   warning?: string | null;
+}
+
+export interface ApprovePhiModeBody {
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface ApprovePhiModeResponse {
+  projectId: number;
+  healthcareMode: boolean;
+  phiAllowed: boolean;
+}
+
+export interface ApproveHipaaDeploymentBody {
+  /** @nullable */
+  reason?: string | null;
+}
+
+export type MyComplianceProfilePlanType =
+  (typeof MyComplianceProfilePlanType)[keyof typeof MyComplianceProfilePlanType];
+
+export const MyComplianceProfilePlanType = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+  business: "business",
+  team: "team",
+  enterprise: "enterprise",
+  healthcare: "healthcare",
+} as const;
+
+export type MyComplianceProfileBaaStatus =
+  (typeof MyComplianceProfileBaaStatus)[keyof typeof MyComplianceProfileBaaStatus];
+
+export const MyComplianceProfileBaaStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  active: "active",
+  expired: "expired",
+} as const;
+
+export type MyComplianceProfileHipaaDeploymentStatus =
+  (typeof MyComplianceProfileHipaaDeploymentStatus)[keyof typeof MyComplianceProfileHipaaDeploymentStatus];
+
+export const MyComplianceProfileHipaaDeploymentStatus = {
+  not_required: "not_required",
+  required: "required",
+  pending: "pending",
+  approved: "approved",
+  revoked: "revoked",
+} as const;
+
+export type MyComplianceProfileAwsHipaaEnvironmentStatus =
+  (typeof MyComplianceProfileAwsHipaaEnvironmentStatus)[keyof typeof MyComplianceProfileAwsHipaaEnvironmentStatus];
+
+export const MyComplianceProfileAwsHipaaEnvironmentStatus = {
+  not_configured: "not_configured",
+  pending: "pending",
+  active: "active",
+  revoked: "revoked",
+} as const;
+
+export type MyComplianceProfileRiskAnalysisStatus =
+  (typeof MyComplianceProfileRiskAnalysisStatus)[keyof typeof MyComplianceProfileRiskAnalysisStatus];
+
+export const MyComplianceProfileRiskAnalysisStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export type MyComplianceProfileIncidentResponseStatus =
+  (typeof MyComplianceProfileIncidentResponseStatus)[keyof typeof MyComplianceProfileIncidentResponseStatus];
+
+export const MyComplianceProfileIncidentResponseStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export type MyComplianceProfileBackupPolicyStatus =
+  (typeof MyComplianceProfileBackupPolicyStatus)[keyof typeof MyComplianceProfileBackupPolicyStatus];
+
+export const MyComplianceProfileBackupPolicyStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export type MyComplianceProfileDataRetentionPolicyStatus =
+  (typeof MyComplianceProfileDataRetentionPolicyStatus)[keyof typeof MyComplianceProfileDataRetentionPolicyStatus];
+
+export const MyComplianceProfileDataRetentionPolicyStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export interface MyComplianceProfile {
+  organizationId: number;
+  planType: MyComplianceProfilePlanType;
+  baaStatus: MyComplianceProfileBaaStatus;
+  hipaaDeploymentStatus: MyComplianceProfileHipaaDeploymentStatus;
+  mfaRequired: boolean;
+  healthcareEnabled: boolean;
+  phiAllowed: boolean;
+  auditLoggingEnabled: boolean;
+  auditRequired: boolean;
+  hipaaDeploymentRequired: boolean;
+  awsHipaaEnvironmentStatus: MyComplianceProfileAwsHipaaEnvironmentStatus;
+  riskAnalysisStatus: MyComplianceProfileRiskAnalysisStatus;
+  incidentResponseStatus: MyComplianceProfileIncidentResponseStatus;
+  backupPolicyStatus: MyComplianceProfileBackupPolicyStatus;
+  dataRetentionPolicyStatus: MyComplianceProfileDataRetentionPolicyStatus;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  lastReviewedAt?: string | null;
+  /** @nullable */
+  lastReviewedByEmail?: string | null;
+  /** True iff every server-side precondition for PHI mode is met. */
+  phiModeUnlocked: boolean;
+  failedPreconditions: string[];
+  /** Standardized warning copy to display on every PHI-related surface. Verbatim from compliance-warnings.ts. */
+  warningCopy: string;
+}
+
+export type UpdateMyComplianceProfileBodyRiskAnalysisStatus =
+  (typeof UpdateMyComplianceProfileBodyRiskAnalysisStatus)[keyof typeof UpdateMyComplianceProfileBodyRiskAnalysisStatus];
+
+export const UpdateMyComplianceProfileBodyRiskAnalysisStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export type UpdateMyComplianceProfileBodyIncidentResponseStatus =
+  (typeof UpdateMyComplianceProfileBodyIncidentResponseStatus)[keyof typeof UpdateMyComplianceProfileBodyIncidentResponseStatus];
+
+export const UpdateMyComplianceProfileBodyIncidentResponseStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export type UpdateMyComplianceProfileBodyBackupPolicyStatus =
+  (typeof UpdateMyComplianceProfileBodyBackupPolicyStatus)[keyof typeof UpdateMyComplianceProfileBodyBackupPolicyStatus];
+
+export const UpdateMyComplianceProfileBodyBackupPolicyStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export type UpdateMyComplianceProfileBodyDataRetentionPolicyStatus =
+  (typeof UpdateMyComplianceProfileBodyDataRetentionPolicyStatus)[keyof typeof UpdateMyComplianceProfileBodyDataRetentionPolicyStatus];
+
+export const UpdateMyComplianceProfileBodyDataRetentionPolicyStatus = {
+  not_started: "not_started",
+  in_progress: "in_progress",
+  approved: "approved",
+  needs_attention: "needs_attention",
+} as const;
+
+export interface UpdateMyComplianceProfileBody {
+  riskAnalysisStatus?: UpdateMyComplianceProfileBodyRiskAnalysisStatus;
+  incidentResponseStatus?: UpdateMyComplianceProfileBodyIncidentResponseStatus;
+  backupPolicyStatus?: UpdateMyComplianceProfileBodyBackupPolicyStatus;
+  dataRetentionPolicyStatus?: UpdateMyComplianceProfileBodyDataRetentionPolicyStatus;
+  auditLoggingEnabled?: boolean;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface RequestComplianceReviewBody {
+  /** @nullable */
+  message?: string | null;
+}
+
+export interface RequestComplianceReviewResponse {
+  ok: boolean;
 }
 
 export type SetOrgComplianceBodyBaaStatus =
@@ -911,6 +1103,8 @@ export interface UpdateProjectBody {
   title?: string;
   description?: string;
   summary?: string;
+  healthcareMode?: boolean;
+  phiAllowed?: boolean;
   /** @nullable */
   liveUrl?: string | null;
   /** @nullable */

@@ -59,4 +59,7 @@ export const AuditAction = {
   plan_changed: "plan_changed",
   compliance_updated: "compliance_updated",
   lead_updated: "lead_updated",
+  phi_mode_enabled: "phi_mode_enabled",
+  phi_mode_disabled: "phi_mode_disabled",
+  hipaa_deployment_approved: "hipaa_deployment_approved",
 } as const;

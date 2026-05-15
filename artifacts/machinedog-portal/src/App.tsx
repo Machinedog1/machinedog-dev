@@ -41,6 +41,7 @@ import AdminCompliancePage from "@/pages/admin/compliance";
 import AdminGithubPage from "@/pages/admin/github";
 import AdminLeadsPage from "@/pages/admin/leads";
 import SettingsPage from "@/pages/settings";
+import CompliancePage from "@/pages/compliance";
 
 import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
 import { useEffect } from "react";
@@ -196,6 +197,9 @@ function AuthedRoutes() {
       </Route>
       <Route path="/settings">
         <AuthGuard><SettingsPage /></AuthGuard>
+      </Route>
+      <Route path="/compliance">
+        <AuthGuard><CompliancePage /></AuthGuard>
       </Route>
 
       <Route path="/admin">

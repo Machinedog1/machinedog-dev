@@ -15,6 +15,7 @@ import {
   Coins,
   ArrowRight,
 } from "lucide-react";
+import { PHI_MODE_LOCKED_WARNING } from "@/lib/compliance-warnings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -142,8 +143,12 @@ export default function TemplatesPage() {
                   )}
                 </div>
                 {blocked && (
-                  <p className="text-[10px] text-amber-300/90 inline-flex items-center gap-1 font-mono uppercase tracking-wider">
-                    <Lock className="h-3 w-3" /> Healthcare plan required
+                  <p
+                    className="text-[10px] text-amber-300/90 font-mono leading-snug"
+                    title={PHI_MODE_LOCKED_WARNING}
+                  >
+                    <Lock className="h-3 w-3 inline mr-1" />
+                    {PHI_MODE_LOCKED_WARNING}
                   </p>
                 )}
                 <div className="mt-auto pt-2 text-[11px] font-mono uppercase tracking-wider text-primary inline-flex items-center gap-1">
@@ -235,10 +240,7 @@ function TemplateDetailDialog({
               {blocked && (
                 <div className="rounded-md ring-1 ring-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5 text-amber-300 font-mono inline-flex items-start gap-2">
                   <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    This template requires a Healthcare or Enterprise plan.
-                    Contact sales to upgrade.
-                  </span>
+                  <span>{PHI_MODE_LOCKED_WARNING}</span>
                 </div>
               )}
             </div>
@@ -256,11 +258,11 @@ function TemplateDetailDialog({
               {blocked ? (
                 <Button
                   disabled
-                  title="This template requires a Healthcare or Enterprise plan."
+                  title={PHI_MODE_LOCKED_WARNING}
                   data-testid={`button-use-template-${template.slug}`}
                   className="font-mono text-[11px] uppercase"
                 >
-                  <Lock className="h-3 w-3 mr-1.5" /> Healthcare plan required
+                  <Lock className="h-3 w-3 mr-1.5" /> PHI mode locked
                 </Button>
               ) : (
                 <Link

@@ -22,3 +22,4 @@ export * from "./ai-usage";
 export * from "./ai-conversations";
 export * from "./build-jobs";
 export * from "./deployments";
+export * from "./compliance-profiles";

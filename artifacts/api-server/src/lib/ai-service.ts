@@ -374,7 +374,7 @@ export async function phiPreflight(
     blockedForPhi: true,
     status: "blocked",
     errorMessage: "phi_blocked",
-    metadata: { rules, stage: "preflight" },
+    metadata: { rules, stage: "preflight", contentLength: promptText.length },
   });
   recordAuditEventAsync({
     organizationId: deps.organizationId,
@@ -383,8 +383,9 @@ export async function phiPreflight(
     action: "phi_blocked",
     targetType: "project",
     targetId: String(deps.projectId),
-    // Metadata MUST contain only rule identifiers — never the offending text.
-    metadata: { rules, stage: "preflight" },
+    // Metadata MUST contain only rule identifiers + content length — never
+    // the offending text itself.
+    metadata: { rules, stage: "preflight", contentLength: promptText.length },
   });
   return { blocked: true, rules, labels, blockedMessage };
 }
@@ -499,7 +500,10 @@ export async function aiSend(
         blockedForPhi: true,
         status: "blocked",
         errorMessage: "phi_blocked",
-        metadata: { rules: scan.hits.map((h) => h.rule) },
+        metadata: {
+          rules: scan.hits.map((h) => h.rule),
+          contentLength: lastUserText.length,
+        },
       });
       recordAuditEventAsync({
         organizationId: deps.organizationId,
@@ -508,8 +512,12 @@ export async function aiSend(
         action: "phi_blocked",
         targetType: "project",
         targetId: String(deps.projectId),
-        // Metadata MUST contain only rule labels — never the offending text.
-        metadata: { rules: scan.hits.map((h) => h.rule) },
+        // Metadata MUST contain only rule labels + content length — never
+        // the offending text itself.
+        metadata: {
+          rules: scan.hits.map((h) => h.rule),
+          contentLength: lastUserText.length,
+        },
       });
       return {
         ok: false,

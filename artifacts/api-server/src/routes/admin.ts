@@ -38,7 +38,7 @@ import {
   UpdateAdminLeadBody,
   UpdateAdminLeadResponse,
 } from "@workspace/api-zod";
-import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
+import { requireAuth, loadOrCreateClient, requirePlatformAdmin } from "../lib/auth";
 import { generateSecureToken } from "../lib/passwords";
 import { sendInviteEmail } from "../lib/mailer";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
@@ -54,7 +54,7 @@ import {
 
 const router: IRouter = Router();
 
-router.use("/admin", requireAuth, loadOrCreateClient, requireAdmin);
+router.use("/admin", requireAuth, loadOrCreateClient, requirePlatformAdmin);
 
 router.get("/admin/stats", async (_req, res): Promise<void> => {
   const [{ totalClients }] = await db

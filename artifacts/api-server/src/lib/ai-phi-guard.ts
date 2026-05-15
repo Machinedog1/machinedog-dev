@@ -77,6 +77,21 @@ const RULES: Rule[] = [
     label: "Patient + phone number combination",
     re: /\bpatient\b[^\n]{0,80}?\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/i,
   },
+  {
+    id: "email_with_patient",
+    label: "Patient + email address combination",
+    re: /\bpatient\b[^\n]{0,80}?\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  },
+  {
+    id: "address_label",
+    label: "Patient street address reference",
+    re: /\b(patient(?:'s)?\s*(?:address|street|home\s*address))\b[\s:][^\n]{4,}/i,
+  },
+  {
+    id: "health_plan_beneficiary",
+    label: "Health plan beneficiary number",
+    re: /\b(beneficiary|subscriber)\s*(?:id|number|#)[\s:#-]*[A-Z0-9-]{6,}\b/i,
+  },
 ];
 
 export function scanForPhi(text: string): PhiScanResult {

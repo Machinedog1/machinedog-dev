@@ -40,12 +40,16 @@ import {
   ListAdminComplianceQueryParams,
   ListAdminComplianceResponse,
 } from "@workspace/api-zod";
-import { requireAuth, loadOrCreateClient, requireAdmin } from "../lib/auth";
+import {
+  requireAuth,
+  loadOrCreateClient,
+  requirePlatformAdmin,
+} from "../lib/auth";
 import { recordAuditEventAsync, reqAuditMeta } from "../lib/audit";
 
 const router: IRouter = Router();
 
-router.use("/admin", requireAuth, loadOrCreateClient, requireAdmin);
+router.use("/admin", requireAuth, loadOrCreateClient, requirePlatformAdmin);
 
 // ---------- Helpers ----------------------------------------------------------
 
@@ -490,6 +494,99 @@ router.patch("/admin/organizations/:id/compliance", async (req, res): Promise<vo
   const out = await loadOrgWithCounts(id);
   res.json(SetAdminOrganizationComplianceResponse.parse(out));
 });
+
+// Phase 8 — one-click HIPAA-deployment approval. Sets the org's
+// hipaaDeploymentStatus=approved and emits a dedicated audit event so the
+// per-org compliance page can confirm the precondition independently of
+// the more general compliance_updated stream.
+router.post(
+  "/admin/organizations/:id/compliance/approve-hipaa",
+  async (req, res): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const reason =
+      typeof req.body?.reason === "string" ? req.body.reason.trim() : null;
+    const [existing] = await db
+      .select()
+      .from(organizationsTable)
+      .where(eq(organizationsTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    await db
+      .update(organizationsTable)
+      .set({ hipaaDeploymentStatus: "approved" })
+      .where(eq(organizationsTable.id, id));
+    recordAuditEventAsync({
+      organizationId: id,
+      actorOrganizationId: req.dbClient?.id ?? null,
+      actorEmail: req.dbClient?.email ?? null,
+      category: "compliance",
+      action: "hipaa_deployment_approved",
+      targetType: "organization",
+      targetId: String(id),
+      metadata: {
+        from: existing.hipaaDeploymentStatus,
+        to: "approved",
+        reason,
+      },
+      ...reqAuditMeta(req),
+    });
+    invalidateMetricsCache();
+    const out = await loadOrgWithCounts(id);
+    res.json(SetAdminOrganizationComplianceResponse.parse(out));
+  },
+);
+
+// Phase 8 — operator override that flips a project's PHI mode after a manual
+// compliance review. Records a phi_mode_enabled audit event attributed to
+// the platform admin (separate from the org-side toggle handler in projects.ts).
+router.post(
+  "/admin/projects/:id/phi-mode/approve",
+  async (req, res): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const reason =
+      typeof req.body?.reason === "string" ? req.body.reason.trim() : null;
+    const [existing] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    await db
+      .update(projectsTable)
+      .set({ healthcareMode: true, phiAllowed: true })
+      .where(eq(projectsTable.id, id));
+    recordAuditEventAsync({
+      organizationId: existing.organizationId,
+      actorOrganizationId: req.dbClient?.id ?? null,
+      actorEmail: req.dbClient?.email ?? null,
+      category: "compliance",
+      action: "phi_mode_enabled",
+      targetType: "project",
+      targetId: String(id),
+      metadata: {
+        from: { healthcareMode: existing.healthcareMode, phiAllowed: existing.phiAllowed },
+        to: { healthcareMode: true, phiAllowed: true },
+        reason,
+        approvedByPlatformAdmin: true,
+      },
+      ...reqAuditMeta(req),
+    });
+    invalidateMetricsCache();
+    res.json({ projectId: id, healthcareMode: true, phiAllowed: true });
+  },
+);
 
 // ---------- /admin/users -----------------------------------------------------
 

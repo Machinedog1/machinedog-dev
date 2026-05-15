@@ -75,6 +75,7 @@ import {
   Stethoscope,
   LayoutTemplate,
 } from "lucide-react";
+import { PHI_MODE_LOCKED_WARNING } from "@/lib/compliance-warnings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -2381,7 +2382,7 @@ function ProjectActionBarShell({ project }: { project: Project }) {
             title={
               project.phiAllowed
                 ? "BAA active. PHI capture enabled."
-                : `BAA ${project.baaStatus ?? "required"}. PHI capture disabled until BAA is signed (Phase 8).`
+                : PHI_MODE_LOCKED_WARNING
             }
           >
             <ShieldCheck className="h-3 w-3" />
@@ -2534,10 +2535,7 @@ function ProjectSecretsPanel({
           className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-mono text-amber-700 dark:text-amber-300"
           data-testid="banner-secrets-healthcare"
         >
-          Healthcare mode is ON for this project. Do not store any PHI in
-          secret values — names, MRNs, dates of birth, addresses, or
-          identifiers will be rejected by the PHI guard. Use this vault for
-          API keys, tokens, and infrastructure credentials only.
+          {PHI_MODE_LOCKED_WARNING}
         </div>
       )}
 

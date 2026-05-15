@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import {
   useListAdminCompliance,
+  useApproveAdminOrganizationHipaaDeployment,
+  useApproveAdminProjectPhiMode,
+  useSetAdminOrganizationCompliance,
   getListAdminComplianceQueryKey,
   type ListAdminComplianceParams,
   type AdminOrganization,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +43,7 @@ export default function AdminCompliancePage() {
   const [hipaa, setHipaa] = useState<string>("all");
   const [offset, setOffset] = useState(0);
   const [detail, setDetail] = useState<Row | null>(null);
+  const [phiProjectId, setPhiProjectId] = useState("");
 
   const params: ListAdminComplianceParams = useMemo(
     () => ({
@@ -50,6 +56,52 @@ export default function AdminCompliancePage() {
   );
   const { data, isLoading } = useListAdminCompliance(params, {
     query: { queryKey: getListAdminComplianceQueryKey(params) },
+  });
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const setCompliance = useSetAdminOrganizationCompliance({
+    mutation: {
+      onSuccess: (resp) => {
+        qc.invalidateQueries({ queryKey: getListAdminComplianceQueryKey(params) });
+        setDetail(resp as AdminOrganization);
+        toast({ title: "Compliance posture updated." });
+      },
+      onError: (e) =>
+        toast({
+          title: "Update failed",
+          description: String(e),
+          variant: "destructive",
+        }),
+    },
+  });
+  const approvePhi = useApproveAdminProjectPhiMode({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "PHI mode approved for project." });
+        setPhiProjectId("");
+      },
+      onError: (e) =>
+        toast({
+          title: "PHI approval failed",
+          description: String(e),
+          variant: "destructive",
+        }),
+    },
+  });
+  const approveHipaa = useApproveAdminOrganizationHipaaDeployment({
+    mutation: {
+      onSuccess: (resp) => {
+        qc.invalidateQueries({ queryKey: getListAdminComplianceQueryKey(params) });
+        setDetail(resp as AdminOrganization);
+        toast({ title: "HIPAA deployment approved." });
+      },
+      onError: (e) =>
+        toast({
+          title: "Approval failed",
+          description: String(e),
+          variant: "destructive",
+        }),
+    },
   });
 
   const columns: AdminTableColumn<Row>[] = [
@@ -161,21 +213,132 @@ export default function AdminCompliancePage() {
             <DialogDescription>{detail?.primaryEmail}</DialogDescription>
           </DialogHeader>
           {detail && (
-            <dl className="grid grid-cols-2 gap-3 text-sm font-mono">
-              <F label="Plan" value={detail.planType} />
-              <F label="Status" value={detail.status} />
-              <F label="BAA" value={detail.baaStatus} />
-              <F label="HIPAA deploy" value={detail.hipaaDeploymentStatus} />
-              <F label="MFA required" value={detail.mfaRequired ? "yes" : "no"} />
-              <F label="Members" value={String(detail.memberCount)} />
-              <F label="Projects" value={String(detail.projectCount)} />
-              <F
-                label="Updated"
-                value={format(new Date(detail.updatedAt), "MMM d, yyyy HH:mm")}
-              />
-            </dl>
+            <div className="flex flex-col gap-4 text-sm font-mono">
+              <dl className="grid grid-cols-2 gap-3">
+                <F label="Plan" value={detail.planType} />
+                <F label="Status" value={detail.status} />
+                <F label="Members" value={String(detail.memberCount)} />
+                <F label="Projects" value={String(detail.projectCount)} />
+                <F
+                  label="Updated"
+                  value={format(new Date(detail.updatedAt), "MMM d, yyyy HH:mm")}
+                />
+              </dl>
+              <div className="flex flex-col gap-3 border-t border-border/30 pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span>BAA status</span>
+                  <Select
+                    value={detail.baaStatus}
+                    onValueChange={(v) =>
+                      setCompliance.mutate({
+                        id: detail.id,
+                        data: { baaStatus: v as "active" },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-44 font-mono text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BAA_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s} className="font-mono text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>HIPAA deployment</span>
+                  <Select
+                    value={detail.hipaaDeploymentStatus}
+                    onValueChange={(v) =>
+                      setCompliance.mutate({
+                        id: detail.id,
+                        data: { hipaaDeploymentStatus: v as "approved" },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-44 font-mono text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HIPAA_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s} className="font-mono text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>MFA required</span>
+                  <Select
+                    value={detail.mfaRequired ? "yes" : "no"}
+                    onValueChange={(v) =>
+                      setCompliance.mutate({
+                        id: detail.id,
+                        data: { mfaRequired: v === "yes" },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-44 font-mono text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes" className="font-mono text-xs">
+                        required
+                      </SelectItem>
+                      <SelectItem value="no" className="font-mono text-xs">
+                        not required
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           )}
-          <DialogFooter>
+          {detail && (
+            <div className="flex flex-col gap-2 border-t border-border/30 pt-3 text-xs font-mono">
+              <span className="uppercase text-muted-foreground">
+                Approve PHI mode for a project
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  className="flex-1 rounded border border-border/40 bg-background px-2 py-1 font-mono text-xs"
+                  placeholder="project id"
+                  value={phiProjectId}
+                  onChange={(e) =>
+                    setPhiProjectId(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!phiProjectId || approvePhi.isPending}
+                  onClick={() =>
+                    approvePhi.mutate({
+                      id: Number(phiProjectId),
+                      data: { reason: null },
+                    })
+                  }
+                >
+                  {approvePhi.isPending ? "Approving…" : "Approve PHI mode"}
+                </Button>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            {detail && detail.hipaaDeploymentStatus !== "approved" && (
+              <Button
+                onClick={() =>
+                  approveHipaa.mutate({ id: detail.id, data: { reason: null } })
+                }
+                disabled={approveHipaa.isPending}
+              >
+                {approveHipaa.isPending ? "Approving…" : "Approve HIPAA deployment"}
+              </Button>
+            )}
             <Link href="/admin/organizations">
               <Button variant="outline">Manage in Organizations →</Button>
             </Link>

@@ -43,13 +43,46 @@ export function requireActiveClient(req: Request, res: Response, next: NextFunct
   next();
 }
 
+/**
+ * Authorization middleware. NOTE: `req.dbClient.isAdmin` is set in
+ * `lib/clerk.ts` from the org-membership role (`owner` or `admin`), so this
+ * gate represents "current user is an owner/admin of the active organization"
+ * — NOT a platform-staff admin. Platform-staff admin endpoints live under
+ * `/admin/...` and are gated by `requirePlatformAdmin` (email allowlist).
+ */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.dbClient) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
   if (!req.dbClient.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
+    res.status(403).json({ error: "Org owner or admin role required" });
+    return;
+  }
+  next();
+}
+
+// Alias used by Phase 8 compliance routes to make intent unambiguous at call
+// sites: the org's owner/admin (not platform staff) manages the checklist.
+export const requireOrgOwnerOrAdmin = requireAdmin;
+
+/**
+ * Platform-staff admin gate. Backed by the ADMIN_EMAILS allowlist (see
+ * `isAdminEmail`). Used to protect operator endpoints under `/admin/*` so
+ * tenant org owners/admins cannot reach them.
+ */
+export function requirePlatformAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.dbClient) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const email = req.dbClient.email ?? "";
+  if (!email || !isAdminEmail(email)) {
+    res.status(403).json({ error: "Platform admin access required" });
     return;
   }
   next();

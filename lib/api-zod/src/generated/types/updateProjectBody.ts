@@ -12,6 +12,8 @@ export interface UpdateProjectBody {
   title?: string;
   description?: string;
   summary?: string;
+  healthcareMode?: boolean;
+  phiAllowed?: boolean;
   /** @nullable */
   liveUrl?: string | null;
   /** @nullable */

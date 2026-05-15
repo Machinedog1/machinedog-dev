@@ -1877,6 +1877,105 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationList"
 
+  /admin/organizations/{id}/compliance/approve-hipaa:
+    post:
+      operationId: approveAdminOrganizationHipaaDeployment
+      tags: [admin]
+      summary: Approve an organization's HIPAA deployment environment (admin only). Sets hipaaDeploymentStatus=approved and emits a hipaa_deployment_approved audit event.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveHipaaDeploymentBody"
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrganization"
+
+  /admin/projects/{id}/phi-mode/approve:
+    post:
+      operationId: approveAdminProjectPhiMode
+      tags: [admin]
+      summary: Operator override that flips a project's phiAllowed=true after a
+        manual compliance review. Records a phi_mode_enabled audit event
+        attributed to the admin actor.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovePhiModeBody"
+      responses:
+        "200":
+          description: Updated project phi/healthcare flags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovePhiModeResponse"
+
+  /compliance/me:
+    get:
+      operationId: getMyComplianceProfile
+      tags: [compliance]
+      summary: Per-organization compliance posture for the signed-in user.
+      responses:
+        "200":
+          description: Compliance profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyComplianceProfile"
+    patch:
+      operationId: updateMyComplianceProfile
+      tags: [compliance]
+      summary: Update the operational compliance checklist (org owner/admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyComplianceProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyComplianceProfile"
+
+  /compliance/me/request-review:
+    post:
+      operationId: requestComplianceReview
+      tags: [compliance]
+      summary: Request operator review to enable healthcare/PHI mode for the signed-in user's org. Records a healthcare_mode_requested audit event.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestComplianceReviewBody"
+      responses:
+        "200":
+          description: Acknowledgement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestComplianceReviewResponse"
+
   /admin/orders:
     get:
       operationId: listAllBuildOrders
@@ -2390,6 +2489,9 @@ components:
         - plan_changed
         - compliance_updated
         - lead_updated
+        - phi_mode_enabled
+        - phi_mode_disabled
+        - hipaa_deployment_approved
 
     AdminMetrics:
       type: object
@@ -2540,6 +2642,125 @@ components:
           type: ["string", "null"]
           description: Populated when the new plan diverges from the org's Stripe subscription state.
       required: [organization]
+
+    ApprovePhiModeBody:
+      type: object
+      properties:
+        reason:
+          type: ["string", "null"]
+
+    ApprovePhiModeResponse:
+      type: object
+      properties:
+        projectId: { type: integer }
+        healthcareMode: { type: boolean }
+        phiAllowed: { type: boolean }
+      required: [projectId, healthcareMode, phiAllowed]
+
+    ApproveHipaaDeploymentBody:
+      type: object
+      properties:
+        reason:
+          type: ["string", "null"]
+
+    MyComplianceProfile:
+      type: object
+      properties:
+        organizationId: { type: integer }
+        planType:
+          type: string
+          enum: [free, starter, pro, business, team, enterprise, healthcare]
+        baaStatus:
+          type: string
+          enum: [not_required, required, pending, active, expired]
+        hipaaDeploymentStatus:
+          type: string
+          enum: [not_required, required, pending, approved, revoked]
+        mfaRequired: { type: boolean }
+        healthcareEnabled: { type: boolean }
+        phiAllowed: { type: boolean }
+        auditLoggingEnabled: { type: boolean }
+        auditRequired: { type: boolean }
+        hipaaDeploymentRequired: { type: boolean }
+        awsHipaaEnvironmentStatus:
+          type: string
+          enum: [not_configured, pending, active, revoked]
+        riskAnalysisStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        incidentResponseStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        backupPolicyStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        dataRetentionPolicyStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        notes:
+          type: ["string", "null"]
+        lastReviewedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastReviewedByEmail:
+          type: ["string", "null"]
+        phiModeUnlocked: { type: boolean, description: True iff every server-side precondition for PHI mode is met. }
+        failedPreconditions:
+          type: array
+          items: { type: string }
+        warningCopy:
+          type: string
+          description: Standardized warning copy to display on every PHI-related surface. Verbatim from compliance-warnings.ts.
+      required:
+        - organizationId
+        - planType
+        - baaStatus
+        - hipaaDeploymentStatus
+        - mfaRequired
+        - healthcareEnabled
+        - phiAllowed
+        - auditLoggingEnabled
+        - riskAnalysisStatus
+        - incidentResponseStatus
+        - backupPolicyStatus
+        - dataRetentionPolicyStatus
+        - auditRequired
+        - hipaaDeploymentRequired
+        - awsHipaaEnvironmentStatus
+        - phiModeUnlocked
+        - failedPreconditions
+        - warningCopy
+
+    UpdateMyComplianceProfileBody:
+      type: object
+      properties:
+        riskAnalysisStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        incidentResponseStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        backupPolicyStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        dataRetentionPolicyStatus:
+          type: string
+          enum: [not_started, in_progress, approved, needs_attention]
+        auditLoggingEnabled: { type: boolean }
+        notes:
+          type: ["string", "null"]
+
+    RequestComplianceReviewBody:
+      type: object
+      properties:
+        message:
+          type: ["string", "null"]
+
+    RequestComplianceReviewResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+      required: [ok]
 
     SetOrgComplianceBody:
       type: object
@@ -2908,6 +3129,10 @@ components:
           type: string
         summary:
           type: string
+        healthcareMode:
+          type: boolean
+        phiAllowed:
+          type: boolean
         liveUrl:
           type: ["string", "null"]
         coverImageUrl:

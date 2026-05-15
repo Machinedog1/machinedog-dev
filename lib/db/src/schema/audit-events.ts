@@ -57,6 +57,9 @@ export const AUDIT_ACTION_VALUES = [
   "plan_changed",
   "compliance_updated",
   "lead_updated",
+  "phi_mode_enabled",
+  "phi_mode_disabled",
+  "hipaa_deployment_approved",
 ] as const;
 export type AuditActionValue = (typeof AUDIT_ACTION_VALUES)[number];
 export const auditActionEnum = pgEnum("audit_action", AUDIT_ACTION_VALUES);

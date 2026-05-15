@@ -146,6 +146,7 @@ router.post(
           metadata: {
             stage: "secret_create",
             rules: phi.hits.map((h) => h.rule),
+            contentLength: value.length,
           },
           ...reqAuditMeta(req),
         });
@@ -268,7 +269,11 @@ router.patch(
           action: "phi_blocked",
           targetType: "project_secret",
           targetId: String(secretId),
-          metadata: { stage: "secret_update", rules: phi.hits.map((h) => h.rule) },
+          metadata: {
+            stage: "secret_update",
+            rules: phi.hits.map((h) => h.rule),
+            contentLength: value.length,
+          },
           ...reqAuditMeta(req),
         });
         res.status(400).json({
@@ -341,6 +346,22 @@ router.post(
     if (!project.phiAllowed) {
       const phi = scanForPhi(value);
       if (phi.blocked) {
+        recordAuditEventAsync({
+          organizationId: project.organizationId,
+          projectId: project.id,
+          actorOrganizationId: req.dbClient!.id,
+          actorEmail: req.dbClient!.email,
+          category: "phi",
+          action: "phi_blocked",
+          targetType: "project_secret",
+          targetId: String(secretId),
+          metadata: {
+            stage: "secret_rotate",
+            rules: phi.hits.map((h) => h.rule),
+            contentLength: value.length,
+          },
+          ...reqAuditMeta(req),
+        });
         res.status(400).json({
           error:
             "This value looks like protected health information (PHI). Rotation blocked.",

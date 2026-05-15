@@ -31,3 +31,13 @@ jobs:
 
       - name: Typecheck workspace
         run: pnpm run typecheck
+
+  compliance-copy:
+    name: Compliance copy lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Verify standardized PHI warning copy
+        run: bash scripts/check-compliance-copy.sh
