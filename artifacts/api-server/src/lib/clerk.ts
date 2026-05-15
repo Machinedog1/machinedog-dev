@@ -132,6 +132,30 @@ export async function loadClerkAndOrganization(
     if (auth?.userId) {
       req.clerkAuth = { userId: auth.userId, sessionId: auth.sessionId ?? null };
     }
+    // TEMP DIAGNOSTIC: log what Clerk middleware actually saw on /auth/me so we
+    // can debug the prod 401 flood. Remove once cutover is verified.
+    if (req.url.startsWith("/auth/me")) {
+      const cookieHeader = req.headers.cookie ?? "";
+      const cookieNames = cookieHeader
+        .split(";")
+        .map((c) => c.trim().split("=")[0])
+        .filter(Boolean);
+      const authHeader = req.headers.authorization ?? "";
+      logger.info(
+        {
+          authHeaderPresent: !!authHeader,
+          authHeaderPrefix: authHeader.slice(0, 12),
+          cookieNames,
+          clerkUserId: req.clerkAuth?.userId ?? null,
+          clerkAuthStatusHeader: res.getHeader("x-clerk-auth-status") ?? null,
+          clerkAuthReasonHeader: res.getHeader("x-clerk-auth-reason") ?? null,
+          clerkAuthMessageHeader: res.getHeader("x-clerk-auth-message") ?? null,
+          host: req.headers.host,
+          origin: req.headers.origin ?? null,
+        },
+        "DIAG /auth/me clerk middleware result",
+      );
+    }
   }
 
   if (req.clerkAuth?.userId) {
