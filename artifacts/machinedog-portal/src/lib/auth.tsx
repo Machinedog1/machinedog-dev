@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
+import { useAuth as useClerkAuth, useUser } from "@clerk/react";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { setBillingApiTokenGetter } from "./billing-api";
 

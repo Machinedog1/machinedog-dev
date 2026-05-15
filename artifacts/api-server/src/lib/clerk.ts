@@ -23,6 +23,7 @@ import type { Organization, OrganizationMember } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { recordAuditEventAsync, reqAuditMeta } from "./audit";
+import { getClerkProxyHost } from "../middlewares/clerkProxyMiddleware";
 
 // Per-process in-memory de-dup so we don't write a `signin` audit row on
 // every authenticated API request.

@@ -1,0 +1,47 @@
+Replit Managed Clerk Auth is partially installed or broken because the required Clerk keys/secrets are missing.
+
+I need you to repair the Replit Managed Clerk provisioning, not switch to manual Clerk unless absolutely impossible.
+
+Do this:
+
+1. Open/inspect the Replit Auth pane state for this project.
+   - Confirm whether a Replit-managed Clerk app exists.
+   - Confirm whether it is connected to this Replit App.
+   - Confirm whether the Auth pane can see Development and Production environments.
+
+2. Check the app secrets/environment variables.
+   - In development, confirm these exist:
+     CLERK_PUBLISHABLE_KEY
+     CLERK_SECRET_KEY
+   - They should be managed by Replit.
+   - The development values should begin with pk_test and sk_test.
+   - Do not hardcode values.
+   - Do not create fake placeholder keys.
+
+3. If the managed Clerk app exists but the keys are missing:
+   - Trigger Replit Managed Clerk to re-sync/re-provision the credentials.
+   - Reconnect the managed Clerk app to this Replit App.
+   - Regenerate the missing Replit-managed secrets through the Auth integration if possible.
+   - Restart the workspace after the secrets are restored.
+
+4. If the managed Clerk app is corrupted and cannot restore keys:
+   - Tell me clearly before deleting anything.
+   - If safe, remove only the broken Replit-managed Clerk app from the Auth pane, then re-add Replit Managed Clerk Auth so Replit provisions a fresh tenant and fresh secrets.
+   - Do not delete my database.
+   - Do not delete user/application tables.
+   - Do not switch to external Clerk unless Replit Managed Clerk cannot provision after retrying.
+
+5. After the keys exist:
+   - Wire the app to use process.env.CLERK_PUBLISHABLE_KEY and process.env.CLERK_SECRET_KEY.
+   - Make sure the frontend only uses the publishable key.
+   - Make sure the secret key is server-only.
+   - Restart the dev server.
+   - Verify /sign-in loads.
+   - Verify protected routes redirect to sign-in.
+   - Verify login reaches the dashboard.
+
+6. Final report:
+   - Tell me whether Replit Managed Clerk was successfully re-provisioned.
+   - Tell me whether CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY now exist.
+   - Tell me the login URL/path.
+   - Tell me any exact manual Replit UI step still required.

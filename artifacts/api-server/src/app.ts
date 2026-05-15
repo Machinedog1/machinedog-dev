@@ -8,6 +8,10 @@ import clerkWebhookRouter from "./routes/clerk-webhook";
 import hostsWebhookRouter from "./routes/hosts-webhook";
 import { logger } from "./lib/logger";
 import { loadClerkAndOrganization } from "./lib/clerk";
+import {
+  CLERK_PROXY_PATH,
+  clerkProxyMiddleware,
+} from "./middlewares/clerkProxyMiddleware";
 
 const app: Express = express();
 
@@ -30,6 +34,11 @@ app.use(
     },
   }),
 );
+
+// Replit-managed Clerk: proxy Clerk Frontend API requests through our domain
+// so the browser sees first-party cookies. Must be mounted BEFORE any body
+// parsers — the proxy streams raw bytes.
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 // Stripe webhook needs the raw body — must mount before json parsers
 app.use("/api/stripe/webhook", stripeWebhookRouter);

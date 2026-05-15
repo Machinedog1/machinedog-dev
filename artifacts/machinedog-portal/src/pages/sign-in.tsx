@@ -1,4 +1,4 @@
-import { SignIn } from "@clerk/clerk-react";
+import { SignIn } from "@clerk/react";
 import { Logo } from "@/components/Logo";
 import { glassClerkAppearance } from "@/lib/clerkAppearance";
 
