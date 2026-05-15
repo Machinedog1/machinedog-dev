@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@clerk/express": "^2.1.15",
-    "@clerk/shared": "^4.11.0",
     "@google-cloud/storage": "^7.19.0",
     "@node-rs/argon2": "^2.0.2",
     "@replit/connectors-sdk": "^0.4.0",
@@ -23,7 +22,6 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "google-auth-library": "^10.6.2",
-    "http-proxy-middleware": "^3.0.5",
     "nodemailer": "^6.10.1",
     "pino": "^9",
     "pino-http": "^10",
