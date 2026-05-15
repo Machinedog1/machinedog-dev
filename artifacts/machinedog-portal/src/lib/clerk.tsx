@@ -22,6 +22,13 @@ export function isClerkConfigured(): boolean {
   return !!env.VITE_CLERK_PUBLISHABLE_KEY;
 }
 
+// Server-side Clerk proxy mount path — must match CLERK_PROXY_PATH in
+// artifacts/api-server/src/middlewares/clerkProxyMiddleware.ts. Defaulting
+// here so VITE_CLERK_PROXY_URL is no longer a required env var; it can
+// still be overridden when the Clerk dashboard is configured for a
+// different proxy URL.
+const DEFAULT_CLERK_PROXY_URL = "/api/__clerk";
+
 const LazyClerkProvider = lazy(async () => {
   const [{ ClerkProvider }, { publishableKeyFromHost }] = await Promise.all([
     import("@clerk/react"),
@@ -31,7 +38,7 @@ const LazyClerkProvider = lazy(async () => {
     window.location.hostname,
     env.VITE_CLERK_PUBLISHABLE_KEY,
   );
-  const proxyUrl = env.VITE_CLERK_PROXY_URL;
+  const proxyUrl = env.VITE_CLERK_PROXY_URL ?? DEFAULT_CLERK_PROXY_URL;
   return {
     default: ({ children }: { children: ReactNode }) => (
       <ClerkProvider
