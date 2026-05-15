@@ -13,8 +13,14 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { resolveOrganizationForClerkUser } from "@workspace/db";
+import {
+  db,
+  organizationsTable,
+  organizationMembersTable,
+  resolveOrganizationForClerkUser,
+} from "@workspace/db";
 import type { Organization, OrganizationMember } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { recordAuditEventAsync, reqAuditMeta } from "./audit";
 
@@ -91,7 +97,10 @@ export async function loadClerkAndOrganization(
 
   if (req.clerkAuth?.userId) {
     try {
-      const tenant = await resolveOrganizationForClerkUser(req.clerkAuth.userId);
+      let tenant = await resolveOrganizationForClerkUser(req.clerkAuth.userId);
+      if (!tenant) {
+        tenant = await autoProvisionTenant(req.clerkAuth.userId);
+      }
       if (tenant) {
         req.organization = tenant.organization;
         req.organizationMember = tenant.member;
@@ -132,6 +141,93 @@ export function requireOrganization(
     return;
   }
   next();
+}
+
+/**
+ * First-time sign-in: create a personal organization and owner membership
+ * for the Clerk user so they can use the app immediately. Removes the old
+ * invite-only restriction. Idempotent — if a member row was created by a
+ * concurrent request, the unique index will reject the second insert and
+ * we simply re-resolve.
+ */
+async function autoProvisionTenant(
+  clerkUserId: string,
+): Promise<{ organization: Organization; member: OrganizationMember; source: "clerk_user" } | null> {
+  let email = "";
+  let displayName = "";
+  try {
+    const mod = await import("@clerk/express");
+    const user = await mod.clerkClient.users.getUser(clerkUserId);
+    email =
+      user.primaryEmailAddress?.emailAddress ??
+      user.emailAddresses[0]?.emailAddress ??
+      "";
+    displayName =
+      [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+      user.username ||
+      email ||
+      "New workspace";
+  } catch (err) {
+    logger.warn(
+      { err: (err as Error).message, clerkUserId },
+      "Failed to fetch Clerk user for auto-provision",
+    );
+    return null;
+  }
+  if (!email) {
+    logger.warn({ clerkUserId }, "Clerk user has no email — cannot auto-provision tenant");
+    return null;
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [org] = await tx
+        .insert(organizationsTable)
+        .values({
+          name: `${displayName}'s workspace`,
+          primaryEmail: email,
+        })
+        .returning();
+      const [member] = await tx
+        .insert(organizationMembersTable)
+        .values({
+          organizationId: org.id,
+          clerkUserId,
+          email,
+          role: "owner",
+          status: "active",
+          acceptedAt: new Date(),
+        })
+        .returning();
+      return { organization: org, member };
+    });
+    logger.info(
+      { clerkUserId, organizationId: result.organization.id, email },
+      "Auto-provisioned organization for new Clerk user",
+    );
+    return { organization: result.organization, member: result.member, source: "clerk_user" };
+  } catch (err) {
+    // Likely a race with a concurrent first request — try resolving again.
+    logger.warn(
+      { err: (err as Error).message, clerkUserId },
+      "Auto-provision insert failed, attempting re-resolve",
+    );
+    return resolveOrganizationForClerkUser(clerkUserId);
+  }
+}
+
+// Backfill a clerk_user_id onto an existing email-matched member when the
+// user signs in for the first time after being invited by email. Returns the
+// resolved tenant or null if no matching email was found. Currently unused —
+// reserved for the invite flow once we wire it back up.
+export async function _attachClerkUserToInvitedMember(
+  clerkUserId: string,
+  email: string,
+): Promise<void> {
+  await db
+    .update(organizationMembersTable)
+    .set({ clerkUserId, status: "active", acceptedAt: new Date() })
+    .where(eq(organizationMembersTable.email, email.toLowerCase()));
 }
 
 export function requireOrgRole(...roles: string[]) {

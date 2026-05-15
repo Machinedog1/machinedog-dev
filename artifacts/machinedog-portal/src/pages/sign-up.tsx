@@ -1,5 +1,6 @@
-import { Link } from "wouter";
+import { SignUp } from "@clerk/clerk-react";
 import { Logo } from "@/components/Logo";
+import { isClerkEnabled } from "@/lib/clerk";
 
 export default function SignUpPage() {
   return (
@@ -9,50 +10,33 @@ export default function SignUpPage() {
     >
       <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
         <Logo size="sm" />
-      </header>
-
-      <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10">
-        <div
-          className="w-full max-w-lg rounded-[28px] p-6 sm:p-8"
+        <a
+          href={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/")}
+          className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wider uppercase text-white/80 transition hover:text-white"
           style={{
-            background: "rgba(255,255,255,0.05)",
+            background: "rgba(255,255,255,0.06)",
             border: "1px solid rgba(255,255,255,0.14)",
           }}
         >
-          <div className="text-[11px] font-mono tracking-[0.24em] uppercase text-primary/90 mb-2">
-            Invite-only
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-3">
-            Machinedog.Dev is invite-only
-          </h1>
-          <p className="text-sm text-white/70 leading-relaxed mb-6">
-            Accounts are created when our team sends you an invitation by email.
-            Check your inbox for an invitation link, or request access below.
-          </p>
+          Sign in <span aria-hidden>→</span>
+        </a>
+      </header>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/intake"
-              className="inline-flex items-center justify-center gap-2 rounded-[14px] px-5 py-3 text-sm font-semibold tracking-wide text-white shadow-lg transition hover:opacity-95"
-              style={{
-                background:
-                  "linear-gradient(135deg, hsl(200 95% 55%) 0%, hsl(254 90% 65%) 100%)",
-              }}
-            >
-              Request invite <span aria-hidden>→</span>
-            </Link>
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center justify-center gap-2 rounded-[14px] px-5 py-3 text-sm font-semibold tracking-wide text-white/90 transition hover:text-white"
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.14)",
-              }}
-            >
-              I already have an account
-            </Link>
+      <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10">
+        {isClerkEnabled() ? (
+          <SignUp
+            routing="path"
+            path={`${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/").replace(/\/$/, "")}
+            signInUrl={`${import.meta.env.BASE_URL}sign-in`.replace(/\/+/g, "/")}
+            fallbackRedirectUrl={import.meta.env.BASE_URL}
+            appearance={{ baseTheme: undefined }}
+          />
+        ) : (
+          <div className="max-w-md text-center text-white/80 text-sm">
+            Authentication is not configured for this environment. Set{" "}
+            <code>VITE_CLERK_PUBLISHABLE_KEY</code> to enable sign-up.
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

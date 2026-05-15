@@ -3,7 +3,7 @@ import { Logo } from "@/components/Logo";
 import { isClerkEnabled } from "@/lib/clerk";
 
 export default function SignInPage() {
-  const intakeHref = `${import.meta.env.BASE_URL}intake`.replace(/\/+/g, "/");
+  const signUpHref = `${import.meta.env.BASE_URL}sign-up`.replace(/\/+/g, "/");
 
   return (
     <div
@@ -13,14 +13,14 @@ export default function SignInPage() {
       <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-5 sm:pt-7">
         <Logo size="sm" />
         <a
-          href={intakeHref}
+          href={signUpHref}
           className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wider uppercase text-white/80 transition hover:text-white"
           style={{
             background: "rgba(255,255,255,0.06)",
             border: "1px solid rgba(255,255,255,0.14)",
           }}
         >
-          Request invite <span aria-hidden>→</span>
+          Sign up <span aria-hidden>→</span>
         </a>
       </header>
 

@@ -121,10 +121,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (authLoading || (authMember && isLoading)) return <LoadingScreen />;
   if (!authMember) return null;
-  if (!me) {
-    if (location !== "/not-invited") setLocation("/not-invited");
-    return null;
-  }
+  // No /me yet (org auto-provision in flight on first sign-in) — show the
+  // loading screen rather than bouncing to /not-invited. The backend creates
+  // the org+member on the first authenticated request, so the next /me poll
+  // will succeed.
+  if (!me) return <LoadingScreen />;
 
   return <AppLayout>{children}</AppLayout>;
 }
