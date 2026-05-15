@@ -1,0 +1,98 @@
+The sign-in and sign-up buttons currently do nothing. The page loads, but clicking Sign Up does not open Clerk, does not redirect, and does not show a login modal.
+
+Fix the auth flow completely. Do not just explain.
+
+Use the existing Replit Managed Clerk/Auth integration. Do not switch to manual external Clerk. Do not hardcode keys.
+
+Current problem:
+- /dashboard loads only the background and header.
+- The Sign Up button is visible but does nothing.
+- /sign-in and /sign-up also do nothing or show no visible Clerk form.
+- Replit Auth/Managed Clerk still needs a successful login to finish configuration.
+
+Do this:
+
+1. Inspect the actual framework and routing system.
+   - Determine whether this is Next.js, Vite React, React Router, Wouter, Express, or another setup.
+   - Find the current Sign Up button component.
+   - Find the current /sign-in and /sign-up routes.
+   - Find the app root/provider file.
+
+2. Fix the Clerk provider.
+   - Ensure the entire frontend app is wrapped in the correct Clerk provider.
+   - Use the correct package for the framework.
+   - If this is Next.js, use @clerk/nextjs.
+   - If this is Vite/React, use @clerk/clerk-react.
+   - If this app uses an Express backend, use the correct server-side Clerk middleware where needed.
+
+3. Fix the environment variables.
+   Confirm the app has the correct frontend publishable key variable.
+   - For Vite, the frontend usually needs VITE_CLERK_PUBLISHABLE_KEY.
+   - For Next.js, the frontend usually needs NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.
+   - Replit Managed Clerk may also provide CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY.
+   - If the app currently only has CLERK_PUBLISHABLE_KEY, map it safely to the correct frontend variable in the Replit environment or code config.
+   - Never expose CLERK_SECRET_KEY to the client.
+   - Do not use fake placeholder keys.
+
+4. Create real visible auth pages.
+
+   If this is Next.js:
+   - Create or repair the Clerk sign-in route using Clerk’s <SignIn /> component.
+   - Create or repair the Clerk sign-up route using Clerk’s <SignUp /> component.
+   - Use the correct Next.js route structure for this project’s App Router or Pages Router.
+   - Make /sign-in visibly render a Clerk sign-in form.
+   - Make /sign-up visibly render a Clerk sign-up form.
+
+   If this is Vite/React:
+   - Create or repair routes for /sign-in and /sign-up.
+   - Render Clerk’s <SignIn /> component on /sign-in.
+   - Render Clerk’s <SignUp /> component on /sign-up.
+   - Ensure React Router/Wouter route definitions actually point to those components.
+
+5. Fix the header buttons.
+   - The Sign Up button must navigate to /sign-up.
+   - Add a Sign In button that navigates to /sign-in.
+   - If the user is signed in, hide Sign In/Sign Up and show the Clerk UserButton/account menu.
+   - If using modal auth, make the modal visibly open. If modal wiring is unreliable, use full-page routes instead.
+
+6. Fix /dashboard.
+   - /dashboard must not be blank.
+   - If signed out, redirect to /sign-in.
+   - If signed in, show real dashboard content.
+   - Add a temporary visible line:
+     “Dashboard loaded. Auth status: signed in/signed out.”
+   - Remove this debug line only after auth works.
+
+7. Add /auth-debug.
+   Create a temporary /auth-debug route that visibly shows:
+   - Clerk provider loaded: yes/no
+   - Publishable key present: yes/no
+   - User signed in: yes/no
+   - User ID if signed in
+   - Buttons/links to:
+     /sign-in
+     /sign-up
+     /dashboard
+   Do not display secret key values.
+
+8. Check JavaScript errors.
+   - Open/fix frontend console errors.
+   - Fix broken click handlers.
+   - Fix route mismatches.
+   - Fix auth hooks being called outside the Clerk provider.
+   - Fix blank-screen errors.
+
+9. Restart the dev server.
+
+10. Give me the exact test order:
+   - First URL to open in Replit Preview
+   - Then /auth-debug
+   - Then /sign-up
+   - Then /dashboard
+
+Final report:
+- Tell me what framework this app uses.
+- Tell me why the Sign Up button did nothing.
+- Tell me which files you changed.
+- Tell me whether Clerk keys exist.
+- Tell me the exact Replit Preview URL/path I should use for the first login.

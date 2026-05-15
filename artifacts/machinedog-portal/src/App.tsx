@@ -40,6 +40,7 @@ import AdminGithubPage from "@/pages/admin/github";
 import AdminLeadsPage from "@/pages/admin/leads";
 import SettingsPage from "@/pages/settings";
 import CompliancePage from "@/pages/compliance";
+import AuthDebugPage from "@/pages/auth-debug";
 
 import { useGetMe, useListMyProjects, getListMyProjectsQueryKey } from "@workspace/api-client-react";
 import { useEffect } from "react";

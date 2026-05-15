@@ -1,14 +1,18 @@
 /**
  * Clerk integration wrapper for the portal — wired for Replit-managed Clerk.
  *
- * Per the clerk-auth skill canonical wiring (verbatim):
+ * Per the clerk-auth skill canonical wiring:
  *   - publishableKey is resolved from window.location.hostname so the same
  *     build serves multiple Clerk custom domains.
  *   - proxyUrl is unconditional (empty string in dev, auto-populated in prod).
  *   - Uses @clerk/react (Replit's flavor), not @clerk/clerk-react.
+ *
+ * Wrapped in ClerkErrorBoundary so a missing publishable key shows a real
+ * diagnostic screen + link to /auth-debug instead of blank-screening the app.
  */
 
 import { lazy, Suspense, type ReactNode } from "react";
+import { ClerkErrorBoundary } from "@/components/ClerkErrorBoundary";
 
 const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
 
@@ -37,8 +41,10 @@ const LazyClerkProvider = lazy(async () => {
 
 export function ClerkProviderWrapper({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={null}>
-      <LazyClerkProvider>{children}</LazyClerkProvider>
-    </Suspense>
+    <ClerkErrorBoundary>
+      <Suspense fallback={null}>
+        <LazyClerkProvider>{children}</LazyClerkProvider>
+      </Suspense>
+    </ClerkErrorBoundary>
   );
 }
